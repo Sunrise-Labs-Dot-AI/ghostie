@@ -1,0 +1,50 @@
+:root {
+  --gh-pixel-font-display: "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, sans-serif;
+  --gh-pixel-font-body: "Atkinson Hyperlegible", -apple-system, BlinkMacSystemFont, sans-serif;
+  --gh-pixel-font-label: "Recursive", "Spline Sans Mono", monospace;
+  --gh-pixel-font-accent: "Spline Sans Mono", "Recursive", monospace;
+  --gh-pixel-font-editorial-display: "Fraunces", Georgia, serif;
+  --gh-pixel-font-editorial-body: "Literata", Georgia, serif;
+  --gh-pixel-font-technical-display: "Space Grotesk", -apple-system, BlinkMacSystemFont, sans-serif;
+  --gh-pixel-font-friendly-display: "Gabarito", -apple-system, BlinkMacSystemFont, sans-serif;
+  --gh-pixel-font-journal-display: "Newsreader", Georgia, serif;
+  --gh-pixel-font-office-display: "Chivo", -apple-system, BlinkMacSystemFont, sans-serif;
+  --gh-pixel-font-alt-body: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, sans-serif;
+  --gh-pixel-font-alt-mono: "Azeret Mono", "IBM Plex Mono", monospace;
+
+  --gh-pixel-cream: #fff8f1;
+  --gh-pixel-paper: #ffffff;
+  --gh-pixel-ink: #111111;
+  --gh-pixel-soft: #51495d;
+  --gh-pixel-line: #d8d0c8;
+  --gh-pixel-office-teal: #6f8f88;
+  --gh-pixel-therapy-sage: #9fb89b;
+  --gh-pixel-soft-lavender: #b9a6c9;
+  --gh-pixel-signal-coral: #ff6b6b;
+  --gh-pixel-analytics-green: #173f35;
+  --gh-pixel-console-mint: #b9f5df;
+  --gh-pixel-screen-cyan: #2eaee9;
+  --gh-pixel-honey: #ffcf4d;
+
+  /* Legacy accents retained for older explorations. */
+  --gh-pixel-mint: #9be7d7;
+  --gh-pixel-cyan: #2eaee9;
+  --gh-pixel-coral: #ff5d66;
+  --gh-pixel-honey: #ffcf4d;
+  --gh-pixel-plum: #2b2148;
+  --gh-pixel-green: #39d076;
+
+  --gh-ghostie-bg: #eceae6;
+  --gh-ghostie-grid-line: #d0d0d0;
+  --gh-ghostie-pixel-size: 6px;
+  --gh-ghostie-sub-pixel-size: 2px;
+  --gh-ghostie-outline: #1a1a1a;
+  --gh-ghostie-body: #f8f9fa;
+  --gh-ghostie-shadow: #d1d8e0;
+  --gh-ghostie-phone-body: #2c3e50;
+  --gh-ghostie-phone-screen: #3498db;
+
+  --gh-pixel-border: 3px solid var(--gh-pixel-ink);
+  --gh-pixel-shadow: 4px 4px 0 var(--gh-pixel-ink);
+  --gh-pixel-shadow-lg: 8px 8px 0 var(--gh-pixel-ink);
+}

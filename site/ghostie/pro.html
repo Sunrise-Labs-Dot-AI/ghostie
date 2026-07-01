@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ghostie for power users — plug your texts into Claude</title>
+  <meta name="description" content="Ghostie speaks MCP: read-only iMessage and WhatsApp servers for Claude and other agents, staged drafts behind a human approval gate, bring your own key.">
+  <link rel="icon" type="image/svg+xml" href="/assets/idle.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon-180.png">
+  <meta property="og:title" content="Ghostie for power users">
+  <meta property="og:description" content="Connect Claude or any MCP agent to your texts. Same approval gate on every send.">
+  <meta property="og:image" content="https://ghostie.app/assets/og-card.png">
+  <meta property="og:url" content="https://ghostie.app/pro">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,640;9..144,700&family=Atkinson+Hyperlegible:wght@400;700&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --paper: #FFF8F1;
+      --ink: #141416;
+      --night: #1C1724;
+      --night-card: #262031;
+      --night-line: rgba(255, 248, 241, 0.22);
+      --text-soft: rgba(255, 248, 241, 0.78);
+      --mint: #BFF2E8;
+      --teal: #89E5D3;
+      --honey: #FFD66D;
+      --coral: #FF8E7E;
+      --radius: 14px;
+      --font-display: "Fraunces", Georgia, serif;
+      --font-body: "Atkinson Hyperlegible", -apple-system, sans-serif;
+      --font-pixel: "Silkscreen", monospace;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: var(--font-body);
+      background-color: var(--night);
+      background-image:
+        linear-gradient(rgba(255, 248, 241, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 248, 241, 0.04) 1px, transparent 1px);
+      background-size: 28px 28px;
+      color: var(--paper);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+    .pixel { image-rendering: pixelated; }
+    a { color: var(--teal); }
+    .eyebrow {
+      font-family: var(--font-pixel);
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--teal);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-pixel);
+      font-size: 14px;
+      text-transform: uppercase;
+      text-decoration: none;
+      color: var(--ink);
+      background: var(--honey);
+      border: 2.5px solid var(--ink);
+      border-radius: 12px;
+      padding: 12px 20px;
+      box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.55);
+      cursor: pointer;
+      transition: transform 0.08s ease;
+    }
+    .btn:hover { transform: translate(-2px, -2px); }
+    .btn.ghosty { background: var(--night-card); color: var(--paper); border-color: var(--night-line); }
+    .topbar {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 22px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--paper); }
+    .brand img { width: 34px; }
+    .brand span { font-family: var(--font-pixel); font-weight: 700; font-size: 19px; }
+    .brand .tag { font-family: var(--font-pixel); font-size: 11px; color: var(--honey); margin-left: 4px; }
+    main { max-width: 1080px; margin: 0 auto; padding: 40px 24px 80px; }
+    .hero { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 44px; align-items: center; padding: 24px 0 56px; }
+    h1 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: clamp(38px, 5.2vw, 62px);
+      line-height: 1.04;
+      margin: 14px 0 18px;
+    }
+    h1 em { font-style: normal; color: var(--teal); }
+    .sub { font-size: 18px; color: var(--text-soft); max-width: 34em; }
+    .hero img { width: min(70%, 200px); margin: 0 auto; display: block; filter: drop-shadow(6px 8px 0 rgba(0, 0, 0, 0.4)); }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; margin: 26px 0 10px; }
+    .card {
+      background: var(--night-card);
+      border: 2px solid var(--night-line);
+      border-radius: var(--radius);
+      padding: 22px;
+    }
+    .card h3 { font-family: var(--font-pixel); font-size: 14px; color: var(--teal); margin-bottom: 8px; }
+    .card p { font-size: 15.5px; color: var(--text-soft); }
+    .card code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 13px; color: var(--mint); }
+    .steps { counter-reset: step; margin: 48px 0 10px; display: grid; gap: 14px; }
+    .step {
+      display: flex;
+      gap: 16px;
+      align-items: baseline;
+      background: var(--night-card);
+      border: 2px solid var(--night-line);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+    }
+    .step::before {
+      counter-increment: step;
+      content: "0" counter(step);
+      font-family: var(--font-pixel);
+      color: var(--honey);
+      font-size: 14px;
+    }
+    .step p { color: var(--text-soft); font-size: 16px; }
+    .step strong { color: var(--paper); }
+    .gate {
+      margin-top: 56px;
+      border: 2.5px solid var(--honey);
+      border-radius: 18px;
+      padding: 32px;
+      text-align: center;
+      background: rgba(255, 214, 109, 0.07);
+    }
+    .gate h2 { font-family: var(--font-display); font-size: clamp(26px, 3.2vw, 36px); margin-bottom: 10px; }
+    .gate p { color: var(--text-soft); max-width: 44em; margin: 0 auto; }
+    .back { margin-top: 56px; text-align: center; }
+    footer { border-top: 2px solid var(--night-line); padding: 28px 24px 40px; }
+    .foot { max-width: 1080px; margin: 0 auto; display: flex; justify-content: space-between; gap: 18px; flex-wrap: wrap; font-size: 14px; color: var(--text-soft); }
+    .foot a { color: var(--text-soft); }
+    @media (max-width: 800px) {
+      .hero { grid-template-columns: 1fr; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+  <script defer src="/analytics.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <img class="pixel" src="/assets/ghostie-hero.png" alt="" width="250" height="240">
+      <span>GHOSTIE</span><span class="tag">/ FOR AI NERDS</span>
+    </a>
+    <a class="btn" href="/api/download">&#8595; Download</a>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">Same ghost, different dial</p>
+        <h1><em>Ghostwrite.</em></h1>
+        <p class="sub">Turn on the AI side and Ghostie drafts replies in your own voice, reads the room before you send, and plugs your texts into Claude or Codex. It always proposes; you always approve. Bring your own key, or let Claude drive.</p>
+      </div>
+      <img class="pixel" src="/assets/gear.svg" alt="">
+    </section>
+
+    <section aria-label="Capabilities">
+      <div class="grid">
+        <article class="card">
+          <h3>Drafts in your voice</h3>
+          <p>Ghostie learns how you actually text, weird abbreviations included, and drafts replies that sound like you, not a chatbot. You approve, edit, or toss.</p>
+        </article>
+        <article class="card">
+          <h3>Plug into Claude &amp; Codex</h3>
+          <p>Read-only MCP servers for iMessage and WhatsApp. Claude Desktop, Claude Code, or any MCP agent can read and search; there is no send tool.</p>
+        </article>
+        <article class="card">
+          <h3>Staged drafts</h3>
+          <p>Agents and AI features stage drafts into one approval queue. You review, then approve, edit, or toss. Hold-to-fire for anything outbound.</p>
+        </article>
+        <article class="card">
+          <h3>Bring your own key</h3>
+          <p>Add your own API key and every AI feature is yours, unmetered. The key lives on your Mac, nowhere else.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="steps" aria-label="Setup">
+      <div class="step"><p><strong>Download Ghostie</strong> and finish the two-minute setup. It runs in your menu bar and holds the only Full Disk Access grant; your AI never needs one.</p></div>
+      <div class="step"><p><strong>Open Settings &#8594; AI Tools</strong> and click "Add to Claude". Ghostie writes the MCP config for Claude Desktop or Claude Code itself.</p></div>
+      <div class="step"><p><strong>Ask Claude anything about your texts.</strong> Reads come back instantly; anything outbound lands in your approval queue, labeled with who wrote it.</p></div>
+    </section>
+
+    <section class="gate">
+      <h2>AI writes it. You send it. In that order.</h2>
+      <p>The gate is not a setting you can forget about. It is the architecture: agents have no send capability, only the ability to propose. The send button belongs to a human with a mouse.</p>
+    </section>
+
+    <p class="back"><a class="btn ghosty" href="/">&#8592; Back to the friendly side</a></p>
+  </main>
+
+  <footer>
+    <div class="foot">
+      <span>&copy; 2016 <a href="https://sunriselabs.ai">Sunrise Labs</a></span>
+      <nav aria-label="Footer">
+        <a href="/privacy">Privacy</a> &middot;
+        <a href="/security">Security</a> &middot;
+        <a href="/support">Support</a>
+      </nav>
+    </div>
+  </footer>
+</body>
+</html>

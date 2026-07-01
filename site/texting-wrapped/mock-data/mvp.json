@@ -1,0 +1,90 @@
+{
+  "filters": {
+    "window_days": 365,
+    "since_ts_ms": 1717200000000,
+    "until_ts_ms": 1748736000000
+  },
+  "latency": {
+    "total_reply_pairs": 934,
+    "pct_within_5min": 50,
+    "pct_within_30min": 71,
+    "pct_within_1hr": 83,
+    "pct_within_4hr": 94,
+    "mean_minutes": 15,
+    "median_minutes": 6,
+    "thread_count": 74,
+    "window_label": "past 12 months"
+  },
+  "ball_in_court": {
+    "total_threads_sampled": 100,
+    "threads_with_ball_in_court": 45,
+    "pct_ball_in_court": 45,
+    "live_conversations_estimate": 35,
+    "snapshot_label": "June 2025"
+  },
+  "group_contribution": {
+    "total_groups_analyzed": 8,
+    "total_messages_in_groups": 3100,
+    "user_messages_in_groups": 1178,
+    "user_contribution_pct": 38,
+    "user_reaction_rate_pct": 9,
+    "peer_reaction_rate_pct": 21,
+    "groups_where_user_silent": 0,
+    "groups_mostly_reactions": 0,
+    "worst_offender": {
+      "thread_label": "Sunday Supper",
+      "total": 60,
+      "user_count": 20,
+      "user_pct": 33.3,
+      "user_reaction_pct": 5
+    },
+    "per_thread": [
+      { "thread_label": "Sunday Supper", "total": 60, "user_count": 20, "user_pct": 33.3, "user_reaction_pct": 5 },
+      { "thread_label": "The Planning Committee", "total": 720, "user_count": 310, "user_pct": 43.1, "user_reaction_pct": 7 },
+      { "thread_label": "Roommates", "total": 580, "user_count": 240, "user_pct": 41.4, "user_reaction_pct": 8 }
+    ]
+  },
+  "top_people": [
+    { "name": "Zoe Martin", "count": 2520 },
+    { "name": "Evan Stone", "count": 2188 },
+    { "name": "Mina Rao", "count": 1690 },
+    { "name": "Chris Novak", "count": 1502 },
+    { "name": "Parker Shaw", "count": 1201 },
+    { "name": "Riley Adams", "count": 884 },
+    { "name": "Dana Moss", "count": 790 },
+    { "name": "Quinn Ross", "count": 706 },
+    { "name": "Sasha Bloom", "count": 661 },
+    { "name": "Noah Reed", "count": 602 }
+  ],
+  "emoji": {
+    "pct_messages_with_emoji": 18,
+    "emoji_per_message": 0.28,
+    "top": [
+      { "emoji": "👍", "count": 430 },
+      { "emoji": "😂", "count": 402 },
+      { "emoji": "✅", "count": 210 },
+      { "emoji": "🙏", "count": 196 },
+      { "emoji": "🎉", "count": 155 }
+    ]
+  },
+  "style": {
+    "pct_end_period": 18,
+    "pct_all_lowercase": 38,
+    "laugh_tokens": { "lol": 270, "haha": 340, "joy": 402 },
+    "dominant_laugh": "haha",
+    "sample_size": 3600
+  },
+  "age": {
+    "estimated_age": 36,
+    "band": "millennial",
+    "label": "Millennial",
+    "approx_age": "28-43",
+    "confidence": "low",
+    "drivers": [
+      "Uses thumbs-up as punctuation",
+      "Moderate period usage",
+      "High group-chat contribution"
+    ],
+    "sample_size": 3600
+  }
+}

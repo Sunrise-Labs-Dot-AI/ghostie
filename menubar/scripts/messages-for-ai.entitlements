@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Entitlements for Messages for AI (hardened-runtime, non-sandboxed).
+
+  JIT (v0.3.0):
+
+  `com.apple.security.cs.allow-jit` and `com.apple.security.cs.allow-
+  unsigned-executable-memory` are REQUIRED for the Bun-compiled backend
+  Mach-O (`messages-for-ai-backend`). Bun uses a JavaScript JIT and an
+  FFI trampoline JIT —
+  Hardened Runtime SIGTRAPs the process the first time it tries to
+  map writable+executable pages without these entitlements. Symptom
+  before the fix: WhatsApp daemon exited status=5 (SIGTRAP) ~2-3s
+  after spawn, the moment the menubar's first RPC call invoked
+  peer-auth's FFI-backed getsockopt/proc_pidpath path. imessage-drafts-
+  mcp never crashed in the wild only because its short-lived stdio
+  calls didn't hit the JIT-needed code paths often enough to trigger.
+
+  Apple Events scope (v0.1.1, PR 5b code-review finding #10):
+
+  `com.apple.security.automation.apple-events` is required for ANY
+  Apple Event sending under hardened-runtime. Removing it would break
+  the menubar's send path (DraftSender.swift calls Messages.app via
+  AppleScript). The user's TCC consent prompt gates each new target
+  app the first time it's contacted, so the actual scope at runtime
+  is still bounded by user consent — but the *static* entitlement
+  allows AE to any scriptable app.
+
+  `com.apple.security.scripting-targets` below declares INTENT:
+  Messages.app is the only target the app expects to send to. This
+  entry is enforced for sandboxed apps but is documentation-only for
+  the non-sandboxed hardened-runtime case we're in here. Properly
+  enforcing the scope requires turning the menubar into a sandboxed
+  app (com.apple.security.app-sandbox + temporary-exception entries
+  for ~/.messages-mcp/ filesystem access) — that's a larger refactor
+  deferred to v0.1.2.
+
+  When that refactor lands: add `<key>com.apple.security.app-sandbox</key>
+  <true/>` and a `<key>com.apple.security.temporary-exception.files.
+  home-relative-path.read-write</key><array><string>.messages-mcp/
+  </string></array>` block so the sidecar + drafts writes still work.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.personal-information.addressbook</key>
+    <true/>
+    <key>com.apple.security.automation.apple-events</key>
+    <true/>
+    <key>com.apple.security.cs.allow-jit</key>
+    <true/>
+    <key>com.apple.security.cs.allow-unsigned-executable-memory</key>
+    <true/>
+    <key>com.apple.security.scripting-targets</key>
+    <dict>
+        <key>com.apple.iChat</key>
+        <array/>
+    </dict>
+</dict>
+</plist>

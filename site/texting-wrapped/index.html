@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Texting Wrapped - Messages for AI</title>
+  <meta name="description" content="Texting Wrapped turns your iMessage and WhatsApp habits into a local, shareable recap. No extra setup required.">
+  <meta property="og:title" content="Texting Wrapped">
+  <meta property="og:description" content="Your reply speed, group-chat lore, top texters, texting age, and tiny behavioral indictments. Built locally on your Mac.">
+  <meta property="og:type" content="website">
+  <link rel="canonical" href="https://textingwrapped.com/">
+  <meta property="og:url" content="https://textingwrapped.com/">
+  <meta property="og:image" content="https://textingwrapped.com/assets/wrapped-card-share.png">
+  <link rel="icon" type="image/png" href="../icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@500;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <script src="https://js.stripe.com/v3/"></script>
+
+  <style>
+    :root {
+      --ink: #170b1d;
+      --ink-soft: rgba(23, 11, 29, 0.76);
+      --cream: #fff3e5;
+      --paper: rgba(255, 248, 238, 0.78);
+      --line: rgba(23, 11, 29, 0.16);
+      --pink: #d04f91;
+      --coral: #ff6542;
+      --violet: #25114a;
+      --mint: #17c49a;
+      --shadow: 0 30px 90px rgba(30, 8, 44, 0.28);
+      --radius: 8px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100svh;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.88), transparent 24%),
+        radial-gradient(circle at 82% 18%, rgba(255, 232, 148, 0.32), transparent 18%),
+        linear-gradient(135deg, #ffd7b4 0%, #ff8063 31%, #c84e9d 62%, #211047 100%);
+      font-family: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.35;
+    }
+
+    a { color: inherit; }
+
+    .page {
+      min-height: 100svh;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      overflow-x: hidden;
+    }
+
+    .topbar {
+      position: relative;
+      z-index: 5;
+      max-width: 1160px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 22px 24px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 20px;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .download-link,
+    .tip-link,
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 44px;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      text-decoration: none;
+      border: 0;
+      cursor: pointer;
+      font: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      transition: transform 0.16s ease, opacity 0.16s ease;
+    }
+
+    .button svg,
+    .download-link svg,
+    .tip-link svg {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 16px;
+      stroke-width: 2.3;
+    }
+
+    .download-link:hover,
+    .tip-link:hover,
+    .button:hover {
+      transform: translateY(-1px);
+      opacity: 0.92;
+    }
+
+    .download-link,
+    .button.primary {
+      background: var(--ink);
+      color: var(--cream);
+    }
+
+    .tip-link {
+      background: rgba(255, 247, 236, 0.68);
+      color: var(--ink);
+      border: 1px solid rgba(23, 11, 29, 0.18);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+    }
+
+    .button.secondary {
+      background: rgba(255, 247, 236, 0.62);
+      color: var(--ink);
+      border: 1px solid rgba(23, 11, 29, 0.18);
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+    }
+
+    .hero {
+      position: relative;
+      z-index: 1;
+      max-width: 1160px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 8px 24px 22px;
+      display: grid;
+      grid-template-columns: minmax(0, 0.88fr) minmax(286px, 0.42fr);
+      gap: clamp(28px, 5vw, 66px);
+      align-items: center;
+      min-height: 0;
+    }
+
+    .hero-copy {
+      position: relative;
+      z-index: 2;
+      max-width: 640px;
+    }
+
+    .title {
+      margin: 0 0 24px;
+      letter-spacing: 0;
+    }
+
+    .title-texting {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      margin: 0 0 12px 2px;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: clamp(15px, 1.45vw, 21px);
+      line-height: 1;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .title-texting::before,
+    .title-texting::after {
+      content: "";
+      display: block;
+      width: clamp(34px, 5vw, 70px);
+      height: 2px;
+      background: currentColor;
+      opacity: 0.8;
+    }
+
+    .title-wrapped {
+      display: block;
+      font-family: "Instrument Serif", Georgia, serif;
+      font-style: italic;
+      font-weight: 400;
+      font-size: clamp(84px, 10.8vw, 150px);
+      line-height: 0.78;
+      letter-spacing: 0;
+      text-wrap: balance;
+      max-width: 640px;
+    }
+
+    .tagline {
+      margin: 0 0 20px;
+      max-width: 600px;
+      color: rgba(23, 11, 29, 0.86);
+      font-size: clamp(20px, 1.8vw, 26px);
+      line-height: 1.12;
+      font-weight: 700;
+    }
+
+    .fine-print {
+      margin: 12px 0 0;
+      color: rgba(23, 11, 29, 0.63);
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    details.nerds {
+      max-width: 660px;
+      border-top: 1px solid rgba(23, 11, 29, 0.18);
+      padding-top: 14px;
+      color: rgba(23, 11, 29, 0.78);
+    }
+
+    details.nerds summary {
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      cursor: pointer;
+      list-style: none;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    details.nerds summary::-webkit-details-marker { display: none; }
+
+    details.nerds summary::before {
+      content: "+";
+      width: 21px;
+      height: 21px;
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      background: rgba(255, 248, 238, 0.7);
+      border: 1px solid rgba(23, 11, 29, 0.18);
+    }
+
+    details.nerds[open] summary::before { content: "-"; }
+
+    .nerd-panel {
+      margin-top: 14px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .nerd-item {
+      padding: 13px;
+      border-radius: var(--radius);
+      background: rgba(255, 248, 238, 0.62);
+      border: 1px solid rgba(23, 11, 29, 0.12);
+    }
+
+    .nerd-item b {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 13px;
+    }
+
+    .nerd-item span {
+      display: block;
+      color: rgba(23, 11, 29, 0.64);
+      font-size: 12px;
+      line-height: 1.34;
+    }
+
+    .carousel-wrap {
+      position: relative;
+      justify-self: end;
+      width: clamp(254px, 21vw, 306px);
+      display: grid;
+      gap: 13px;
+    }
+
+    .phone-frame {
+      position: relative;
+      padding: 11px;
+      border-radius: 34px;
+      background:
+        linear-gradient(145deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0) 24%),
+        #120819;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      box-shadow: var(--shadow);
+    }
+
+    .phone-frame::before {
+      content: "";
+      position: absolute;
+      z-index: 4;
+      top: 18px;
+      left: 50%;
+      width: 78px;
+      height: 22px;
+      transform: translateX(-50%);
+      border-radius: 999px;
+      background: #0b0610;
+      box-shadow: 0 1px 0 rgba(255, 255, 255, 0.14) inset;
+      pointer-events: none;
+    }
+
+    .carousel-window {
+      position: relative;
+      aspect-ratio: 552 / 1200;
+      overflow: hidden;
+      border-radius: 24px;
+      background: rgba(16, 8, 22, 0.72);
+    }
+
+    .carousel-track {
+      height: 100%;
+      display: flex;
+      transform: translateX(calc(var(--active-slide, 0) * -100%));
+      transition: transform 540ms cubic-bezier(.22,.61,.36,1);
+    }
+
+    .carousel-slide {
+      flex: 0 0 100%;
+      min-width: 0;
+      padding: 0;
+      margin: 0;
+    }
+
+    .carousel-slide img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      background: #100816;
+    }
+
+    .carousel-dots {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .carousel-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      border: 0;
+      padding: 0;
+      background: rgba(255, 250, 243, 0.44);
+      cursor: pointer;
+      transition: width 0.2s ease, background 0.2s ease;
+    }
+
+    .carousel-dot[aria-current="true"] {
+      width: 24px;
+      background: #fffaf3;
+    }
+
+    .site-footer {
+      max-width: 1160px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 0 24px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 18px;
+      color: rgba(23, 11, 29, 0.56);
+      font-size: 12px;
+    }
+
+    .footer-links {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .footer-links a {
+      color: rgba(255, 248, 238, 0.74);
+      text-decoration: none;
+      text-shadow: 0 1px 14px rgba(23, 11, 29, 0.32);
+    }
+
+    .sunrise-link {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .sunrise-link:hover,
+    .footer-links a:hover {
+      text-decoration: underline;
+    }
+
+    .tip-dialog {
+      width: min(640px, calc(100vw - 32px));
+      max-height: min(760px, calc(100svh - 32px));
+      padding: 0;
+      color: var(--ink);
+      background: rgba(255, 247, 236, 0.94);
+      border: 1px solid rgba(23, 11, 29, 0.18);
+      border-radius: var(--radius);
+      box-shadow: 0 28px 90px rgba(23, 11, 29, 0.46);
+      overflow: hidden;
+    }
+
+    .tip-dialog::backdrop {
+      background: rgba(23, 11, 29, 0.42);
+      -webkit-backdrop-filter: blur(13px);
+      backdrop-filter: blur(13px);
+    }
+
+    .tip-shell {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      max-height: inherit;
+    }
+
+    .tip-header,
+    .tip-picker,
+    .tip-footer {
+      padding-inline: clamp(18px, 4vw, 28px);
+    }
+
+    .tip-header {
+      position: relative;
+      padding-block: 24px 14px;
+      border-bottom: 1px solid rgba(23, 11, 29, 0.12);
+    }
+
+    .tip-kicker {
+      margin: 0 0 6px;
+      color: rgba(23, 11, 29, 0.48);
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .tip-title {
+      margin: 0;
+      max-width: 470px;
+      font-family: "Instrument Serif", Georgia, serif;
+      font-size: clamp(38px, 6vw, 54px);
+      font-style: italic;
+      font-weight: 400;
+      line-height: 0.92;
+    }
+
+    .tip-copy {
+      margin: 10px 0 0;
+      max-width: 500px;
+      color: rgba(23, 11, 29, 0.7);
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .tip-close {
+      position: absolute;
+      top: 18px;
+      right: 18px;
+      width: 34px;
+      height: 34px;
+      border: 1px solid rgba(23, 11, 29, 0.16);
+      border-radius: 999px;
+      display: grid;
+      place-items: center;
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.34);
+      cursor: pointer;
+    }
+
+    .tip-close svg {
+      width: 16px;
+      height: 16px;
+      stroke-width: 2.4;
+    }
+
+    .tip-picker {
+      display: grid;
+      gap: 12px;
+      padding-block: 16px;
+    }
+
+    .tip-amounts {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .tip-amount {
+      display: grid;
+      place-items: center;
+      gap: 2px;
+      min-height: 48px;
+      padding: 8px 6px;
+      border: 1px solid rgba(23, 11, 29, 0.14);
+      border-radius: var(--radius);
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.32);
+      cursor: pointer;
+      font: inherit;
+      font-weight: 700;
+    }
+
+    .tip-amount strong,
+    .tip-amount small {
+      display: block;
+      line-height: 1;
+    }
+
+    .tip-amount strong {
+      font-size: 15px;
+    }
+
+    .tip-amount small {
+      color: rgba(23, 11, 29, 0.54);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .tip-amount[aria-pressed="true"] {
+      background: var(--ink);
+      color: var(--cream);
+      border-color: var(--ink);
+    }
+
+    .tip-amount[aria-pressed="true"] small {
+      color: rgba(255, 243, 229, 0.72);
+    }
+
+    .tip-field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .tip-field label {
+      color: rgba(23, 11, 29, 0.5);
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .tip-input-wrap {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      min-height: 48px;
+      padding: 0 14px;
+      border: 1px solid rgba(23, 11, 29, 0.14);
+      border-radius: var(--radius);
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .tip-input-wrap span {
+      color: rgba(23, 11, 29, 0.56);
+      font-weight: 700;
+    }
+
+    .tip-input-wrap input {
+      width: 100%;
+      min-width: 0;
+      border: 0;
+      outline: 0;
+      color: var(--ink);
+      background: transparent;
+      font: inherit;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .stripe-continue {
+      width: 100%;
+      min-height: 50px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      border: 0;
+      border-radius: var(--radius);
+      color: var(--cream);
+      background: var(--ink);
+      cursor: pointer;
+      font: inherit;
+      font-size: 15px;
+      font-weight: 700;
+    }
+
+    .stripe-continue svg {
+      width: 18px;
+      height: 18px;
+      stroke-width: 2.2;
+    }
+
+    .stripe-continue[disabled] {
+      cursor: wait;
+      opacity: 0.72;
+    }
+
+    .stripe-note {
+      margin: 0;
+      color: rgba(23, 11, 29, 0.58);
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .stripe-box {
+      display: none;
+      height: min(560px, calc(100svh - 214px));
+      min-height: 420px;
+      padding: 0 clamp(10px, 2vw, 18px) 18px;
+      overflow: auto;
+    }
+
+    .tip-dialog[data-checkout="ready"] .tip-picker,
+    .tip-dialog[data-checkout="ready"] .tip-footer {
+      display: none;
+    }
+
+    .tip-dialog[data-checkout="ready"] .stripe-box {
+      display: block;
+    }
+
+    .tip-error {
+      display: none;
+      margin: 0;
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      color: #5c1422;
+      background: rgba(255, 209, 196, 0.62);
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .tip-error:not(:empty) {
+      display: block;
+    }
+
+    .tip-footer {
+      padding-block: 0 20px;
+    }
+
+    @media (max-width: 860px) {
+      .page {
+        min-height: auto;
+      }
+
+      .topbar {
+        padding: 18px 16px 6px;
+      }
+
+      .hero {
+        min-height: auto;
+        grid-template-columns: 1fr;
+        padding: 10px 16px 22px;
+        gap: 16px;
+      }
+
+      .title-wrapped {
+        font-size: clamp(72px, 18vw, 104px);
+      }
+
+      .title {
+        margin-bottom: 16px;
+      }
+
+      .tagline {
+        font-size: 18px;
+        margin-bottom: 16px;
+      }
+
+      .carousel-wrap {
+        justify-self: center;
+        width: min(46vw, 188px);
+        grid-row: 1;
+      }
+
+      .hero-copy {
+        grid-row: 2;
+      }
+
+      .nerd-panel {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (min-width: 861px) and (max-height: 700px) {
+      .carousel-wrap {
+        width: 238px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .topbar {
+        padding-top: 14px;
+      }
+
+      .download-link,
+      .tip-link {
+        min-height: 40px;
+        padding: 10px 12px;
+        font-size: 13px;
+      }
+
+      .actions {
+        align-items: stretch;
+      }
+
+      .button {
+        width: 100%;
+        min-height: 42px;
+      }
+
+      .site-footer {
+        padding: 0 16px 12px;
+        gap: 12px;
+        font-size: 11px;
+      }
+
+      .footer-links {
+        gap: 10px;
+      }
+
+      .tip-amounts {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div class="top-actions">
+        <button class="tip-link" id="tip-jar" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v18"></path>
+            <path d="M17 7.5c0-1.93-2.24-3.5-5-3.5S7 5.57 7 7.5s2.24 3.5 5 3.5 5 1.57 5 3.5S14.76 18 12 18s-5-1.57-5-3.5"></path>
+          </svg>
+          Tip Jar
+        </button>
+        <a class="download-link" href="https://messagesfor.ai/api/download">
+          <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v12"></path>
+            <path d="m7 10 5 5 5-5"></path>
+            <path d="M5 21h14"></path>
+          </svg>
+          Download
+        </a>
+      </div>
+    </header>
+
+    <main class="hero">
+      <section class="hero-copy" aria-labelledby="hero-title">
+        <h1 class="title" id="hero-title">
+          <span class="title-texting">Texting</span>
+          <span class="title-wrapped">Wrapped</span>
+        </h1>
+        <p class="tagline">
+          Your year in texts, except the algorithm is your own Mac and the vibe is gently accusatory.
+        </p>
+        <p class="fine-print">Local recap. Shareable cards. No extra setup.</p>
+
+        <details class="nerds" id="details">
+          <summary>Details for nerds</summary>
+          <div class="nerd-panel">
+            <div class="nerd-item">
+              <b>Deterministic</b>
+              <span>Texting Wrapped is computed by the app. No assistant connection is required for this feature.</span>
+            </div>
+            <div class="nerd-item">
+              <b>Local on your Mac</b>
+              <span>It reads local iMessage data and linked WhatsApp data, then writes a private HTML recap.</span>
+            </div>
+            <div class="nerd-item">
+              <b>Metadata-first</b>
+              <span>The core cards use counts, timestamps, participants, and thread structure rather than message bodies.</span>
+            </div>
+            <div class="nerd-item">
+              <b>Same app</b>
+              <span>The download is Messages for AI for Mac. Its assistant/MCP features are separate from Wrapped.</span>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <section class="carousel-wrap" aria-label="Example Texting Wrapped cards">
+        <div class="phone-frame">
+          <div class="carousel-window">
+            <div class="carousel-track" id="wrappedCarouselTrack">
+              <figure class="carousel-slide">
+                <img src="assets/wrapped-card-volume.png" width="552" height="1200" alt="Texting Wrapped card showing 12,400 texts sent">
+              </figure>
+              <figure class="carousel-slide">
+                <img src="assets/wrapped-card-age.png" width="552" height="1200" alt="Texting Wrapped card estimating texting age as 27">
+              </figure>
+              <figure class="carousel-slide">
+                <img src="assets/wrapped-card-groups.png" width="552" height="1200" alt="Texting Wrapped card showing a 0.7 percent group-chat contribution">
+              </figure>
+              <figure class="carousel-slide">
+                <img src="assets/wrapped-card-archetype.png" width="552" height="1200" alt="Texting Wrapped archetype card: The Quick Draw">
+              </figure>
+              <figure class="carousel-slide">
+                <img src="assets/wrapped-card-share.png" width="552" height="1200" alt="Texting Wrapped recap card showing the Group MVP summary">
+              </figure>
+            </div>
+          </div>
+        </div>
+        <div class="carousel-dots" aria-label="Choose example card">
+          <button class="carousel-dot" type="button" data-carousel-dot="0" aria-label="Show volume card" aria-current="true"></button>
+          <button class="carousel-dot" type="button" data-carousel-dot="1" aria-label="Show texting age card" aria-current="false"></button>
+          <button class="carousel-dot" type="button" data-carousel-dot="2" aria-label="Show group chat card" aria-current="false"></button>
+          <button class="carousel-dot" type="button" data-carousel-dot="3" aria-label="Show archetype card" aria-current="false"></button>
+          <button class="carousel-dot" type="button" data-carousel-dot="4" aria-label="Show recap card" aria-current="false"></button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <a class="sunrise-link" href="https://sunriselabs.ai">© 2026 Sunrise Labs</a>
+      <nav class="footer-links" aria-label="Footer links">
+        <a href="https://messagesfor.ai/">Messages for AI</a>
+        <a href="https://messagesfor.ai/terms.html">Terms</a>
+        <a href="https://messagesfor.ai/privacy.html">Privacy</a>
+        <a href="https://messagesfor.ai/security.html">Security</a>
+        <a href="https://messagesfor.ai/support.html">Support</a>
+      </nav>
+    </footer>
+
+    <dialog class="tip-dialog" id="tipDialog" aria-labelledby="tip-title">
+      <div class="tip-shell">
+        <header class="tip-header">
+          <p class="tip-kicker">Tiny support desk</p>
+          <h2 class="tip-title" id="tip-title">Feed the recap machine.</h2>
+          <p class="tip-copy">Tips help keep Sunrise Labs experiments weird, local, and more useful than your group chat deserves.</p>
+          <button class="tip-close" id="tipClose" type="button" aria-label="Close tip jar">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 6 6 18"></path>
+              <path d="m6 6 12 12"></path>
+            </svg>
+          </button>
+        </header>
+        <form class="tip-picker" id="tipForm">
+          <div class="tip-amounts" aria-label="Tip amount">
+            <button class="tip-amount" type="button" data-tip-amount="1" aria-pressed="false"><strong>$1</strong><small>Bob</small></button>
+            <button class="tip-amount" type="button" data-tip-amount="3.50" aria-pressed="false"><strong>$3.50</strong><small>tree fiddy</small></button>
+            <button class="tip-amount" type="button" data-tip-amount="8.67" aria-pressed="true"><strong>$8.67</strong><small>5309</small></button>
+            <button class="tip-amount" type="button" data-tip-amount="42" aria-pressed="false"><strong>$42</strong><small>the answer</small></button>
+            <button class="tip-amount" type="button" data-tip-amount="99" aria-pressed="false"><strong>$99</strong><small>problems</small></button>
+          </div>
+          <div class="tip-field">
+            <label for="customTipAmount">Or name an amount</label>
+            <div class="tip-input-wrap">
+              <span>$</span>
+              <input id="customTipAmount" name="amount" inputmode="decimal" autocomplete="off" value="8.67" aria-label="Custom tip amount">
+            </div>
+          </div>
+          <p class="tip-error" id="tipError" role="alert"></p>
+          <button class="stripe-continue" id="stripeContinue" type="submit">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18"></path>
+              <path d="M3 12h18"></path>
+              <path d="M7 18h10"></path>
+            </svg>
+            Continue with Stripe
+          </button>
+        </form>
+        <div class="stripe-box" id="stripeCheckout"></div>
+        <footer class="tip-footer">
+          <p class="stripe-note">Stripe handles the payment form. Texting Wrapped does not see or store card details. This is a tip, not a charitable donation.</p>
+        </footer>
+      </div>
+    </dialog>
+  </div>
+
+  <script>
+    const carouselTrack = document.getElementById("wrappedCarouselTrack");
+    const carouselDots = Array.from(document.querySelectorAll("[data-carousel-dot]"));
+    const carouselPrev = document.querySelector("[data-carousel-prev]");
+    const carouselNext = document.querySelector("[data-carousel-next]");
+    let carouselIndex = 0;
+    let carouselTimer;
+
+    function setCarousel(index) {
+      if (!carouselTrack || carouselDots.length === 0) return;
+      carouselIndex = (index + carouselDots.length) % carouselDots.length;
+      carouselTrack.style.setProperty("--active-slide", carouselIndex);
+      carouselDots.forEach((dot, dotIndex) => {
+        dot.setAttribute("aria-current", dotIndex === carouselIndex ? "true" : "false");
+      });
+    }
+
+    function restartCarouselTimer() {
+      clearInterval(carouselTimer);
+      carouselTimer = setInterval(() => setCarousel(carouselIndex + 1), 3600);
+    }
+
+    carouselDots.forEach((dot) => {
+      dot.addEventListener("click", () => {
+        setCarousel(Number(dot.dataset.carouselDot));
+        restartCarouselTimer();
+      });
+    });
+
+    if (carouselPrev && carouselNext) {
+      carouselPrev.addEventListener("click", () => {
+        setCarousel(carouselIndex - 1);
+        restartCarouselTimer();
+      });
+      carouselNext.addEventListener("click", () => {
+        setCarousel(carouselIndex + 1);
+        restartCarouselTimer();
+      });
+    }
+
+    setCarousel(0);
+    restartCarouselTimer();
+
+    const tipDialog = document.getElementById("tipDialog");
+    const tipButton = document.getElementById("tip-jar");
+    const tipClose = document.getElementById("tipClose");
+    const tipForm = document.getElementById("tipForm");
+    const tipInput = document.getElementById("customTipAmount");
+    const tipError = document.getElementById("tipError");
+    const tipAmounts = Array.from(document.querySelectorAll("[data-tip-amount]"));
+    const stripeContinue = document.getElementById("stripeContinue");
+    const stripeCheckoutTarget = document.getElementById("stripeCheckout");
+    let stripePromise;
+    let embeddedCheckout;
+
+    function setTipAmount(amount) {
+      tipInput.value = amount;
+      tipAmounts.forEach((button) => {
+        button.setAttribute("aria-pressed", button.dataset.tipAmount === String(amount) ? "true" : "false");
+      });
+    }
+
+    function getTipAmount() {
+      const dollars = Number.parseFloat(String(tipInput.value).replace(/[^0-9.]/g, ""));
+      if (!Number.isFinite(dollars)) return null;
+      return Math.round(dollars * 100);
+    }
+
+    function showTipError(message) {
+      tipError.textContent = message;
+    }
+
+    async function loadStripeClient() {
+      if (stripePromise) return stripePromise;
+      stripePromise = fetch("/api/stripe-config")
+        .then((response) => {
+          if (!response.ok) throw new Error("Stripe is not configured yet.");
+          return response.json();
+        })
+        .then(({ publishableKey }) => {
+          if (!publishableKey || !window.Stripe) throw new Error("Stripe is not configured yet.");
+          return window.Stripe(publishableKey);
+        });
+      return stripePromise;
+    }
+
+    async function clearEmbeddedCheckout() {
+      if (embeddedCheckout && typeof embeddedCheckout.destroy === "function") {
+        embeddedCheckout.destroy();
+      }
+      embeddedCheckout = null;
+      stripeCheckoutTarget.replaceChildren();
+      tipDialog.dataset.checkout = "picker";
+    }
+
+    tipButton.addEventListener("click", () => {
+      showTipError("");
+      tipDialog.dataset.checkout = "picker";
+      tipDialog.showModal();
+    });
+
+    tipClose.addEventListener("click", async () => {
+      await clearEmbeddedCheckout();
+      tipDialog.close();
+    });
+
+    tipDialog.addEventListener("click", async (event) => {
+      if (event.target === tipDialog) {
+        await clearEmbeddedCheckout();
+        tipDialog.close();
+      }
+    });
+
+    tipAmounts.forEach((button) => {
+      button.addEventListener("click", () => setTipAmount(button.dataset.tipAmount));
+    });
+
+    tipInput.addEventListener("input", () => {
+      const cents = getTipAmount();
+      tipAmounts.forEach((button) => {
+        button.setAttribute("aria-pressed", Number(button.dataset.tipAmount) * 100 === cents ? "true" : "false");
+      });
+    });
+
+    tipForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      showTipError("");
+      const amount = getTipAmount();
+      if (!amount || amount < 100) {
+        showTipError("Minimum tip is $1.");
+        return;
+      }
+      if (amount > 50000) {
+        showTipError("Maximum tip is $500.");
+        return;
+      }
+
+      stripeContinue.disabled = true;
+      try {
+        const stripe = await loadStripeClient();
+        const response = await fetch("/api/create-tip-session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount,
+            source: "texting-wrapped",
+            returnPath: window.location.pathname + window.location.search
+          })
+        });
+        const { clientSecret, error } = await response.json();
+        if (!response.ok || !clientSecret) throw new Error(error || "Stripe checkout could not start.");
+
+        await clearEmbeddedCheckout();
+        embeddedCheckout = await stripe.initEmbeddedCheckout({ clientSecret });
+        tipDialog.dataset.checkout = "ready";
+        embeddedCheckout.mount("#stripeCheckout");
+      } catch (error) {
+        showTipError(error.message || "Stripe checkout could not start.");
+      } finally {
+        stripeContinue.disabled = false;
+      }
+    });
+
+  </script>
+</body>
+</html>

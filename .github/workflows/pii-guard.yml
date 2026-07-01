@@ -1,0 +1,26 @@
+name: pii-guard
+
+# Privacy gate: block real phone numbers and personal emails from entering the
+# tree. This is a separate, cheap, Linux-only workflow with DELIBERATELY NO
+# paths-ignore (unlike test.yml, which skips docs/markdown to save macOS
+# minutes). Real contact data can land in a .md, a doc, or a comment just as
+# easily as in code, so this guard must run on every change, including
+# docs-only and markdown-only ones.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: pii-guard-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pii-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for real contact data
+        run: python3 scripts/check-no-real-pii.py

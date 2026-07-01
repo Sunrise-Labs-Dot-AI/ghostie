@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ghostie — little tools for being a better friend</title>
+  <meta name="description" content="A friendly ghost for your Mac menu bar, full of little free tools for staying close to people: a nudge when a thread goes quiet, a heads-up before a birthday, and your whole texting year as a story. All on your Mac.">
+  <link rel="icon" type="image/svg+xml" href="/assets/idle.svg">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+  <link rel="apple-touch-icon" href="/assets/apple-touch-icon-180.png">
+  <meta property="og:title" content="Ghostie — little tools for being a better friend">
+  <meta property="og:description" content="A friendly ghost for your Mac. Nudges when threads go quiet, birthday heads-ups, and your texting year as a story. Free, and all on your Mac.">
+  <meta property="og:image" content="https://ghostie.app/assets/og-card.png">
+  <meta property="og:url" content="https://ghostie.app">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,640;9..144,700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://js.stripe.com/v3/" defer></script>
+  <style>
+    :root {
+      --paper: #FFF8F1;
+      --paper-deep: #FCEFE2;
+      --grid-line: rgba(20, 20, 22, 0.055);
+      --ink: #141416;
+      --ink-soft: #4A4742;
+      --body-white: #FCFAF6;
+      --mint: #E6F8F4;
+      --teal: #007D73;
+      --teal-soft: #BFF2E8;
+      --coral: #E85D4F;
+      --coral-soft: #FFE0DA;
+      --honey: #FFD66D;
+      --honey-soft: #FFF0C2;
+      --honey-deep: #B27708;
+      --lilac-soft: #EEE8FF;
+      --night: #1C1724;
+      --night-card: #262031;
+      --shadow: 4px 4px 0 var(--ink);
+      --shadow-sm: 3px 3px 0 var(--ink);
+      --radius: 14px;
+      --font-display: "Fraunces", Georgia, serif;
+      --font-body: "Atkinson Hyperlegible", -apple-system, sans-serif;
+      --font-pixel: "Silkscreen", monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-body);
+      background-color: var(--paper);
+      background-image:
+        linear-gradient(var(--grid-line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+      background-size: 28px 28px;
+      color: var(--ink);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .pixel { image-rendering: pixelated; image-rendering: crisp-edges; }
+
+    .eyebrow {
+      font-family: var(--font-pixel);
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--teal);
+    }
+
+    a { color: var(--teal); }
+
+    /* ---------- buttons ---------- */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--font-pixel);
+      font-size: 15px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      text-decoration: none;
+      color: var(--ink);
+      background: var(--honey);
+      border: 2.5px solid var(--ink);
+      border-radius: 12px;
+      padding: 14px 22px;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      transition: transform 0.08s ease, box-shadow 0.08s ease;
+    }
+    .btn:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--ink); }
+    .btn:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+    .btn:focus-visible { outline: 3px dashed var(--teal); outline-offset: 3px; }
+    .btn.ghosty { background: var(--body-white); }
+    .btn.minty { background: var(--teal-soft); }
+    .btn.dark { background: var(--ink); color: var(--paper); }
+    .btn.dark:hover { box-shadow: 6px 6px 0 var(--teal); }
+
+    /* ---------- topbar ---------- */
+    .topbar {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 22px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--ink);
+    }
+    .brand img { width: 36px; height: auto; }
+    .brand span {
+      font-family: var(--font-pixel);
+      font-weight: 700;
+      font-size: 21px;
+      letter-spacing: 0.03em;
+    }
+    .topbar .actions { display: flex; gap: 12px; }
+    .topbar .btn { padding: 10px 16px; font-size: 13px; }
+
+    /* ---------- hero ---------- */
+    .hero {
+      max-width: 1140px;
+      margin: 0 auto;
+      padding: 56px 24px 84px;
+      display: grid;
+      grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+      gap: 48px;
+      align-items: center;
+    }
+    .hero h1 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: clamp(46px, 6.4vw, 78px);
+      line-height: 1.02;
+      letter-spacing: -0.015em;
+      margin: 18px 0 22px;
+    }
+    .hero h1 .no { color: var(--coral); }
+    .hero h1 .yes { color: var(--teal); }
+    .hero .sub {
+      font-size: 19px;
+      color: var(--ink-soft);
+      max-width: 30em;
+      margin-bottom: 30px;
+    }
+    .hero .sub strong { color: var(--ink); }
+    .cta-row { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+    .cta-note {
+      font-size: 14px;
+      color: var(--ink-soft);
+      margin-top: 14px;
+    }
+
+    .reveal { opacity: 0; transform: translateY(14px); animation: rise 0.55s ease forwards; }
+    .reveal:nth-child(2) { animation-delay: 0.08s; }
+    .reveal:nth-child(3) { animation-delay: 0.16s; }
+    .reveal:nth-child(4) { animation-delay: 0.24s; }
+    .reveal:nth-child(5) { animation-delay: 0.32s; }
+    @keyframes rise { to { opacity: 1; transform: none; } }
+
+    /* hero visual: sprite + approval card */
+    .hero-visual { position: relative; min-height: 470px; }
+    .hero-sprite {
+      width: min(38%, 185px);
+      height: auto;
+      position: absolute;
+      left: 2%;
+      top: 0;
+      animation: float 3.2s steps(6) infinite;
+      filter: drop-shadow(6px 8px 0 rgba(20, 20, 22, 0.12));
+    }
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-14px); }
+    }
+    .approval-card {
+      position: absolute;
+      right: 0;
+      top: 52%;
+      width: min(78%, 330px);
+      background: var(--body-white);
+      border: 2.5px solid var(--ink);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px;
+      transform: rotate(1.6deg);
+    }
+    .approval-card .badge {
+      position: absolute;
+      top: -16px;
+      right: 16px;
+      background: var(--honey);
+      border: 2.5px solid var(--ink);
+      border-radius: 999px;
+      font-family: var(--font-pixel);
+      font-size: 11px;
+      padding: 5px 12px 3px;
+      letter-spacing: 0.06em;
+    }
+    .approval-card .to {
+      font-family: var(--font-pixel);
+      font-size: 11px;
+      color: var(--ink-soft);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+    }
+    .approval-card .bubble {
+      background: var(--mint);
+      border: 2px solid var(--ink);
+      border-radius: 14px 14px 14px 4px;
+      padding: 12px 14px;
+      font-size: 15.5px;
+    }
+    .nudge-list { display: grid; gap: 9px; margin-top: 4px; }
+    .nudge {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+      background: var(--mint);
+      border: 2px solid var(--ink);
+      border-radius: 11px;
+      padding: 10px 13px;
+      font-size: 14.5px;
+    }
+    .nudge:nth-child(2) { background: var(--honey-soft); }
+    .nudge:nth-child(3) { background: var(--lilac-soft); }
+    .nudge-ico { font-size: 17px; line-height: 1; }
+    .nudge-text { line-height: 1.3; }
+
+    .annotation {
+      position: absolute;
+      font-family: var(--font-pixel);
+      font-size: 11px;
+      color: var(--ink-soft);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+    .annotation::before {
+      content: "";
+      display: block;
+      width: 2px;
+      height: 26px;
+      margin: 0 auto 6px;
+      background-image: linear-gradient(var(--ink-soft) 55%, transparent 55%);
+      background-size: 2px 7px;
+    }
+    .annotation.sprite-note { left: 9%; top: 39%; }
+
+    /* ---------- skirt divider ---------- */
+    .skirt {
+      height: 26px;
+      background: var(--ink);
+      clip-path: polygon(0 0, 100% 0, 100% 40%, 95% 40%, 95% 100%, 85% 100%, 85% 40%, 75% 40%, 75% 100%, 65% 100%, 65% 40%, 55% 40%, 55% 100%, 45% 100%, 45% 40%, 35% 40%, 35% 100%, 25% 100%, 25% 40%, 15% 40%, 15% 100%, 5% 100%, 5% 40%, 0 40%);
+    }
+
+    /* ---------- sections ---------- */
+    section { padding: 84px 24px; }
+    .wrap { max-width: 1140px; margin: 0 auto; }
+    .section-head { max-width: 640px; margin-bottom: 48px; }
+    .section-head h2 {
+      font-family: var(--font-display);
+      font-weight: 640;
+      font-size: clamp(32px, 4vw, 46px);
+      line-height: 1.08;
+      margin: 12px 0 14px;
+    }
+    .section-head p { font-size: 17.5px; color: var(--ink-soft); }
+
+    /* tool celebration bento */
+    .features { background: var(--paper-deep); }
+    .bento {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 24px;
+    }
+    .tool-card {
+      grid-column: span 2;
+      background: var(--body-white);
+      border: 2.5px solid var(--ink);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      padding: 24px;
+      position: relative;
+      transition: transform 0.1s ease, box-shadow 0.1s ease;
+    }
+    .tool-card:hover { transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--ink); }
+    .tool-card.big { grid-column: span 3; }
+    .tool-card.mint { background: var(--mint); }
+    .tool-card.coral { background: var(--coral-soft); }
+    .tool-card.honey { background: var(--honey-soft); }
+    .tool-card.lilac { background: var(--lilac-soft); }
+    .tool-card > img { width: 52px; margin-bottom: 14px; }
+    .tool-card > img.feature-art {
+      display: block;
+      width: 136px;
+      height: 136px;
+      object-fit: contain;
+      margin: -8px auto 14px;
+    }
+    .tool-card h3 { font-family: var(--font-pixel); font-size: 15px; margin-bottom: 8px; }
+    .tool-card p { font-size: 15.5px; color: var(--ink-soft); }
+    .tool-head { display: flex; gap: 18px; align-items: flex-start; }
+    .tool-head img { width: 64px; flex: none; }
+    .tool-head img.feature-art {
+      width: 142px;
+      height: 142px;
+      flex: 0 0 142px;
+      object-fit: contain;
+      margin: -12px 0 -6px -4px;
+    }
+    .tool-head h3 { font-size: 17px; }
+    .vignette {
+      margin-top: 18px;
+      display: grid;
+      gap: 8px;
+    }
+    .v-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--body-white);
+      border: 2px solid var(--ink);
+      border-radius: 10px;
+      padding: 9px 14px;
+      font-size: 14px;
+    }
+    .v-name { font-weight: 700; }
+    .v-meta { color: var(--ink-soft); flex: 1; }
+    .v-chip {
+      font-family: var(--font-pixel);
+      font-size: 10px;
+      text-transform: uppercase;
+      background: var(--teal-soft);
+      border: 2px solid var(--ink);
+      border-radius: 999px;
+      padding: 3px 9px 1px;
+    }
+    .v-chip.honey { background: var(--honey); }
+    .card-note { position: absolute; top: 18px; right: 20px; }
+    .card-note::before { display: none; }
+
+    /* quiet pro pointer */
+    .pro-pointer { padding: 48px 24px; }
+    .pro-row {
+      display: flex;
+      align-items: center;
+      gap: 22px;
+      flex-wrap: wrap;
+      border: 2.5px dashed var(--ink);
+      border-radius: var(--radius);
+      padding: 22px 26px;
+      background: var(--body-white);
+    }
+    .pro-row p { flex: 1; min-width: 240px; color: var(--ink-soft); font-size: 16px; }
+
+    /* gate */
+    .gate-card {
+      background: var(--honey-soft);
+      border: 2.5px solid var(--ink);
+      border-radius: 20px;
+      box-shadow: 6px 6px 0 var(--ink);
+      padding: 56px 48px;
+      display: grid;
+      grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+      gap: 44px;
+      align-items: center;
+    }
+    .gate-card h2 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: clamp(30px, 3.6vw, 44px);
+      line-height: 1.06;
+      margin: 12px 0 16px;
+    }
+    .gate-card .eyebrow { color: var(--honey-deep); }
+    .gate-list { list-style: none; display: grid; gap: 14px; }
+    .gate-list li {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      font-size: 16.5px;
+    }
+    .gate-list .check {
+      flex: none;
+      width: 26px;
+      height: 26px;
+      margin-top: 1px;
+      background: var(--honey);
+      border: 2px solid var(--ink);
+      border-radius: 7px;
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    /* tip jar */
+    .tip-section { text-align: center; }
+    .tip-section .wrap { max-width: 660px; }
+    .tip-section img { width: 84px; height: auto; margin-bottom: 8px; }
+    .tip-section h2 {
+      font-family: var(--font-display);
+      font-weight: 640;
+      font-size: clamp(30px, 3.6vw, 42px);
+      margin: 10px 0 12px;
+    }
+    .tip-section p { color: var(--ink-soft); font-size: 17px; margin-bottom: 26px; }
+
+    /* footer */
+    footer {
+      border-top: 2.5px solid var(--ink);
+      background: var(--paper-deep);
+      padding: 40px 24px 48px;
+    }
+    .foot {
+      max-width: 1140px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      gap: 24px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .foot .brand span { font-size: 17px; }
+    .foot nav { display: flex; gap: 22px; flex-wrap: wrap; }
+    .foot a { color: var(--ink-soft); text-decoration: none; font-size: 14.5px; }
+    .foot a:hover { color: var(--ink); text-decoration: underline; }
+    .foot .legal { width: 100%; font-size: 13px; color: var(--ink-soft); }
+
+    /* ---------- tip dialog ---------- */
+    dialog#tip-dialog {
+      border: 2.5px solid var(--ink);
+      border-radius: 18px;
+      box-shadow: 8px 8px 0 var(--ink);
+      background: var(--body-white);
+      padding: 28px;
+      width: min(92vw, 460px);
+    }
+    dialog#tip-dialog::backdrop { background: rgba(28, 23, 36, 0.55); }
+    #tip-dialog h3 { font-family: var(--font-display); font-size: 26px; margin-bottom: 6px; }
+    #tip-dialog .tip-sub { color: var(--ink-soft); font-size: 15px; margin-bottom: 18px; }
+    .tip-amounts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 14px; }
+    .tip-amounts button {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      font-family: var(--font-body);
+      padding: 11px 2px 9px;
+      background: var(--mint);
+      border: 2px solid var(--ink);
+      border-radius: 10px;
+      cursor: pointer;
+      box-shadow: var(--shadow-sm);
+    }
+    .tip-amounts button strong { font-family: var(--font-pixel); font-size: 13px; }
+    .tip-amounts button small { font-size: 10.5px; color: var(--ink-soft); }
+    .tip-amounts button[aria-pressed="true"] { background: var(--honey); }
+    .tip-amounts button[aria-pressed="true"] small { color: var(--ink); }
+    .tip-custom { display: flex; gap: 10px; margin-bottom: 18px; }
+    .tip-custom input {
+      flex: 1;
+      font-family: var(--font-body);
+      font-size: 16px;
+      border: 2px solid var(--ink);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: var(--paper);
+    }
+    .tip-error { color: var(--coral); font-size: 14px; min-height: 20px; margin-bottom: 6px; }
+    .tip-actions { display: flex; gap: 12px; justify-content: flex-end; }
+    #stripe-box { margin-top: 16px; }
+    dialog[data-checkout="ready"] .tip-config { display: none; }
+
+    .thanks-banner {
+      position: fixed;
+      left: 50%;
+      bottom: 28px;
+      transform: translateX(-50%);
+      background: var(--honey);
+      border: 2.5px solid var(--ink);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      font-family: var(--font-pixel);
+      font-size: 13px;
+      padding: 12px 18px 10px;
+      z-index: 50;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hero-sprite { animation: none; }
+      .reveal { animation: none; opacity: 1; transform: none; }
+      html { scroll-behavior: auto; }
+    }
+
+    @media (max-width: 860px) {
+      .hero { grid-template-columns: 1fr; padding-top: 28px; gap: 24px; }
+      .hero-visual { min-height: 380px; margin-top: 10px; }
+      .bento { grid-template-columns: 1fr 1fr; }
+      .tool-card, .tool-card.big { grid-column: span 1; }
+      .tool-card > img.feature-art { width: 124px; height: 124px; }
+      .tool-head img.feature-art { width: 118px; height: 118px; flex-basis: 118px; }
+      .gate-card { grid-template-columns: 1fr; padding: 36px 28px; }
+      .topbar #download-top { display: none; }
+    }
+    @media (max-width: 560px) {
+      .bento { grid-template-columns: 1fr; }
+      .tool-head { gap: 14px; }
+      .tool-head img.feature-art { width: 112px; height: 112px; flex-basis: 112px; }
+      .tip-amounts { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+  <script defer src="/analytics.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <img class="pixel" src="/assets/ghostie-hero.png" alt="" width="250" height="240">
+      <span>GHOSTIE</span>
+    </a>
+    <div class="actions">
+      <button class="btn ghosty" id="tip-open-top" type="button">Tip jar</button>
+      <a class="btn" id="download-top" href="/api/download">Download</a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <div>
+        <p class="eyebrow reveal">A friendly ghost for your Mac</p>
+        <h1 id="hero-title" class="reveal">Don't <span class="no">ghost</span> the people you love.</h1>
+        <p class="sub reveal">Ghostie is a friendly little Mac app full of tools for staying close: a nudge when a thread goes quiet, a heads-up before a birthday, and your whole texting year as a story. <strong>Free, and all on your Mac.</strong></p>
+        <div class="cta-row reveal">
+          <a class="btn" id="download-hero" href="/api/download">&#8595; Download for Mac</a>
+          <button class="btn ghosty" id="tip-open-hero" type="button">Leave a tip</button>
+        </div>
+        <p class="cta-note reveal">Free for macOS 14+. No account. Works with iMessage and WhatsApp.</p>
+      </div>
+      <div class="hero-visual" aria-hidden="true">
+        <img class="hero-sprite pixel" src="/assets/ghostie-hero.png" alt="" width="250" height="240" decoding="async">
+        <p class="annotation sprite-note">ghostie</p>
+        <div class="approval-card">
+          <span class="badge">ghostie noticed</span>
+          <p class="to">A few gentle nudges</p>
+          <div class="nudge-list">
+            <div class="nudge"><span class="nudge-ico">&#128075;</span><span class="nudge-text"><strong>Emma</strong> has been quiet 12 days</span></div>
+            <div class="nudge"><span class="nudge-ico">&#127874;</span><span class="nudge-text"><strong>Jordan</strong> turns 31 on Saturday</span></div>
+            <div class="nudge"><span class="nudge-ico">&#128202;</span><span class="nudge-text">Your texting year is ready</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="skirt" role="presentation"></div>
+
+    <section class="features" aria-labelledby="tools-title">
+      <div class="wrap">
+        <div class="section-head">
+          <p class="eyebrow">Free, and just for you</p>
+          <h2 id="tools-title">Little tools for being a better friend</h2>
+          <p>Ghostie watches your back so you stay close to people, and turns your texting life into something you actually want to look at. All on your Mac. Pick your favorites, ignore the rest.</p>
+        </div>
+        <div class="bento">
+          <article class="tool-card big mint">
+            <div class="tool-head">
+              <img class="feature-art" src="/assets/ghostie-feature-dont-ghost-transparent.png" alt="" width="640" height="640" loading="lazy" decoding="async">
+              <div>
+                <h3>Don't Ghost</h3>
+                <p>The conversations that have gone quiet: the ones waiting on your reply, and the ones worth reaching out on first. Sorted by who you'd hate to lose touch with. No guilt trips, just a nudge.</p>
+              </div>
+            </div>
+            <div class="vignette" aria-hidden="true">
+              <div class="v-row"><span class="v-name">Emma</span><span class="v-meta">12 days quiet</span><span class="v-chip">say hi</span></div>
+              <div class="v-row"><span class="v-name">Marcus</span><span class="v-meta">3 weeks quiet</span><span class="v-chip">say hi</span></div>
+            </div>
+          </article>
+          <article class="tool-card big coral">
+            <div class="tool-head">
+              <img class="feature-art" src="/assets/ghostie-feature-birthday-texts-transparent.png" alt="" width="640" height="640" loading="lazy" decoding="async">
+              <div>
+                <h3>Birthdays</h3>
+                <p>Builds your birthday list from the people you actually talk to, not your whole address book, so you never miss one that matters.</p>
+              </div>
+            </div>
+            <div class="vignette" aria-hidden="true">
+              <div class="v-row"><span class="v-name">Saturday</span><span class="v-meta">Jordan turns 31</span><span class="v-chip honey">today</span></div>
+              <div class="v-row"><span class="v-name">Tuesday</span><span class="v-meta">Dad's birthday</span><span class="v-chip honey">in 4 days</span></div>
+            </div>
+          </article>
+          <article class="tool-card honey">
+            <img class="pixel" src="/assets/gift.svg" alt="">
+            <h3>Texting Wrapped</h3>
+            <p>Your year in texts as story cards. Equal parts flattering and incriminating.</p>
+          </article>
+          <article class="tool-card lilac">
+            <img class="feature-art" src="/assets/ghostie-feature-analytics-transparent.png" alt="" width="640" height="640" loading="lazy" decoding="async">
+            <h3>Texting Analytics</h3>
+            <p>Who texts first? Who double-texts? The receipts, charted, for your eyes only.</p>
+          </article>
+          <article class="tool-card coral">
+            <img class="feature-art" src="/assets/ghostie-feature-eq-transparent.png" alt="" width="640" height="640" loading="lazy" decoding="async">
+            <h3>EQ</h3>
+            <p>A gentle read on your relationships, with little nudges to show up better for the people in them: friends, partner, siblings, all of it.</p>
+          </article>
+          <article class="tool-card">
+            <img class="feature-art" src="/assets/ghostie-feature-drafts-transparent.png" alt="" width="640" height="640" loading="lazy" decoding="async">
+            <h3>Drafts</h3>
+            <p>A calm place to write a text out and sit on it, instead of firing off something at 2am you'll regret by breakfast.</p>
+          </article>
+          <article class="tool-card mint">
+            <img class="feature-art" src="/assets/ghostie-feature-scheduled-transparent.png" alt="" width="640" height="640" loading="lazy" decoding="async">
+            <h3>Scheduled</h3>
+            <p>Line up a text for later, poke yourself to call Mom on Sunday, or set a standing "rent's due" nudge for your roommate.</p>
+          </article>
+          <article class="tool-card honey">
+            <img class="feature-art" src="/assets/ghostie-feature-severance-transparent.png" alt="" width="640" height="640" loading="lazy" decoding="async">
+            <h3>Work / Personal</h3>
+            <p>Files work threads away from life threads, Severance-mode easter egg included. Your innie would approve.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="pro-pointer" aria-label="For AI nerds">
+      <div class="wrap pro-row">
+        <img class="pixel" src="/assets/gear.svg" alt="" width="52">
+        <p>Want Ghostie to actually <strong>ghostwrite</strong>? Hand the keys to Claude or Codex and it'll draft replies in your voice, every one still waiting for your approval. That part's for the tinkerers.</p>
+        <a class="btn ghosty" href="/pro">Ghostie for AI nerds &#8594;</a>
+      </div>
+    </section>
+
+    <section class="tip-section" aria-labelledby="tip-title">
+      <div class="wrap">
+        <img class="pixel" src="/assets/ghostie-hero.png" alt="" width="250" height="240" loading="lazy" decoding="async">
+        <p class="eyebrow">Free, honestly free</p>
+        <h2 id="tip-title">The tip jar keeps Ghostie floating</h2>
+        <p>No account, no trial clock, no locked features. If Ghostie saves a friendship or two, you can buy the ghost a coffee.</p>
+        <button class="btn" id="tip-open-main" type="button">Leave a tip</button>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="foot">
+      <a class="brand" href="/">
+        <img class="pixel" src="/assets/ghostie-hero.png" alt="" width="250" height="240" loading="lazy" decoding="async">
+        <span>GHOSTIE</span>
+      </a>
+      <nav aria-label="Footer">
+        <a href="/privacy">Privacy</a>
+        <a href="/terms">Terms</a>
+        <a href="/security">Security</a>
+        <a href="/support">Support</a>
+      </nav>
+      <p class="legal">&copy; 2016 <a href="https://sunriselabs.ai">Sunrise Labs</a></p>
+    </div>
+  </footer>
+
+  <dialog id="tip-dialog" aria-labelledby="tip-dialog-title">
+    <div class="tip-config">
+      <h3 id="tip-dialog-title">Feed the ghost.</h3>
+      <p class="tip-sub">Tips keep Sunrise Labs experiments weird, local, and more useful than your group chat deserves.</p>
+      <div class="tip-amounts" role="group" aria-label="Tip amount">
+        <button type="button" data-cents="100"><strong>$1</strong><small>Bob</small></button>
+        <button type="button" data-cents="350"><strong>$3.50</strong><small>tree fiddy</small></button>
+        <button type="button" data-cents="867" aria-pressed="true"><strong>$8.67</strong><small>5309</small></button>
+        <button type="button" data-cents="4200"><strong>$42</strong><small>the answer</small></button>
+        <button type="button" data-cents="9900"><strong>$99</strong><small>problems</small></button>
+      </div>
+      <div class="tip-custom">
+        <input id="tip-custom-input" type="number" inputmode="decimal" min="1" max="500" step="1" placeholder="Custom amount (USD)" aria-label="Custom tip amount in dollars">
+      </div>
+      <p class="tip-error" id="tip-error" role="alert"></p>
+      <div class="tip-actions">
+        <button class="btn ghosty" id="tip-cancel" type="button">Cancel</button>
+        <button class="btn" id="tip-continue" type="button">Continue</button>
+      </div>
+    </div>
+    <div id="stripe-box"></div>
+  </dialog>
+
+  <script>
+    (function () {
+      const dialog = document.getElementById("tip-dialog");
+      const tipError = document.getElementById("tip-error");
+      const customInput = document.getElementById("tip-custom-input");
+      const amountButtons = Array.from(document.querySelectorAll(".tip-amounts button"));
+      let selectedCents = 867;
+      let stripePromise = null;
+      let embeddedCheckout = null;
+
+      function openDialog() {
+        tipError.textContent = "";
+        dialog.removeAttribute("data-checkout");
+        dialog.showModal();
+      }
+
+      ["tip-open-top", "tip-open-hero", "tip-open-main"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener("click", openDialog);
+      });
+
+      amountButtons.forEach((btn) => {
+        btn.addEventListener("click", () => {
+          amountButtons.forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+          selectedCents = Number(btn.dataset.cents);
+          customInput.value = "";
+        });
+      });
+
+      customInput.addEventListener("input", () => {
+        amountButtons.forEach((b) => b.setAttribute("aria-pressed", "false"));
+      });
+
+      async function getStripe() {
+        if (!stripePromise) {
+          stripePromise = fetch("/api/stripe-config")
+            .then((r) => r.json())
+            .then(({ publishableKey }) => {
+              if (!publishableKey || !window.Stripe) throw new Error("Tips are napping right now. Try again in a bit.");
+              return window.Stripe(publishableKey);
+            });
+        }
+        return stripePromise;
+      }
+
+      async function clearCheckout() {
+        if (embeddedCheckout) {
+          try { embeddedCheckout.destroy(); } catch (_) { /* already gone */ }
+          embeddedCheckout = null;
+        }
+      }
+
+      document.getElementById("tip-cancel").addEventListener("click", async () => {
+        await clearCheckout();
+        dialog.close();
+      });
+
+      dialog.addEventListener("close", clearCheckout);
+
+      document.getElementById("tip-continue").addEventListener("click", async () => {
+        const btn = document.getElementById("tip-continue");
+        tipError.textContent = "";
+        let cents = selectedCents;
+        const custom = customInput.value.trim();
+        if (custom) {
+          const dollars = Number(custom);
+          if (!Number.isFinite(dollars) || dollars < 1 || dollars > 500) {
+            tipError.textContent = "Tips can be $1 to $500.";
+            return;
+          }
+          cents = Math.round(dollars * 100);
+        }
+        btn.disabled = true;
+        try {
+          const stripe = await getStripe();
+          const response = await fetch("/api/create-tip-session", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              amount: cents,
+              source: "ghostie",
+              returnPath: window.location.pathname + window.location.search
+            })
+          });
+          const { clientSecret, error } = await response.json();
+          if (!response.ok || !clientSecret) throw new Error(error || "Checkout could not start.");
+          await clearCheckout();
+          embeddedCheckout = await stripe.initEmbeddedCheckout({ clientSecret });
+          dialog.dataset.checkout = "ready";
+          embeddedCheckout.mount("#stripe-box");
+        } catch (err) {
+          tipError.textContent = err.message || "Checkout could not start.";
+        } finally {
+          btn.disabled = false;
+        }
+      });
+
+      // post-tip thank you
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("tip_session_id")) {
+        const banner = document.createElement("p");
+        banner.className = "thanks-banner";
+        banner.textContent = "Thank you! Ghostie remains afloat.";
+        document.body.appendChild(banner);
+        setTimeout(() => banner.remove(), 6000);
+        const url = new URL(window.location.href);
+        url.searchParams.delete("tip_session_id");
+        history.replaceState(null, "", url.pathname + url.search);
+      }
+    })();
+  </script>
+</body>
+</html>

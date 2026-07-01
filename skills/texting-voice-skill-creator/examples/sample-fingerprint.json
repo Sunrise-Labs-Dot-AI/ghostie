@@ -1,0 +1,77 @@
+{
+  "contact": "Allison (example)",
+  "slug": "allison-example",
+  "sample_size": 36,
+  "window": "2026-05-01 to 2026-05-05",
+  "length": {
+    "median_chars": 11,
+    "p25_chars": 7,
+    "p75_chars": 16,
+    "pct_under_20_chars": 0.8611
+  },
+  "capitalization": {
+    "pct_lowercase_start": 0.9722,
+    "pct_all_lowercase": 0.9722
+  },
+  "punctuation": {
+    "pct_ending_with_period": 0.0278,
+    "pct_ending_with_nothing": 0.9167,
+    "pct_ending_with_exclaim": 0.0,
+    "pct_ending_with_question": 0.0556
+  },
+  "emoji": {
+    "pct_messages_with_emoji": 0.0833,
+    "top_5": [
+      {
+        "emoji": "❤",
+        "count": 3
+      }
+    ]
+  },
+  "abbreviations": {
+    "ty": 1,
+    "lol": 1,
+    "idk": 1,
+    "omw": 1
+  },
+  "bursts": {
+    "median_messages_per_burst": 1,
+    "p75_messages_per_burst": 1,
+    "burst_definition_minutes": 2
+  },
+  "openers": {
+    "top_3": [
+      {
+        "phrase": "on",
+        "count": 3
+      },
+      {
+        "phrase": "running",
+        "count": 2
+      },
+      {
+        "phrase": "yeah",
+        "count": 2
+      }
+    ]
+  },
+  "closers": {
+    "top_3": [
+      {
+        "phrase": "sorry",
+        "count": 2
+      },
+      {
+        "phrase": "hey",
+        "count": 1
+      },
+      {
+        "phrase": "way",
+        "count": 1
+      }
+    ]
+  },
+  "warnings": [
+    "Sample size 36 is between 30 and 100 — patterns are suggestive but not strongly statistical. The generated SKILL.md will surface this caveat."
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "banner": null,
+  "issued_at": "2026-06-09T17:48:25Z",
+  "kill": {
+    "reason": "",
+    "scope": "none"
+  },
+  "min_supported_version": "0.5.7",
+  "schema": 1
+}

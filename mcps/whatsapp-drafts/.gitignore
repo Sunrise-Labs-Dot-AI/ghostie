@@ -1,0 +1,15 @@
+node_modules/
+bin/
+*.log
+.DS_Store
+bun.lockb
+.*.bun-build
+
+# Local runtime state — never commit
+.whatsapp-mcp/
+
+# Build outputs
+dist/
+
+# bun.lock IS committed — required for `bun install --frozen-lockfile`
+# in scripts/install.sh per the plan's supply-chain hardening.

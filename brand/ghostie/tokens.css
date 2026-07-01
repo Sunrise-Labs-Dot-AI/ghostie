@@ -1,0 +1,178 @@
+:root,
+[data-theme="light"] {
+  color-scheme: light;
+
+  --gh-font-display: "Fraunces", Georgia, ui-serif, serif;
+  --gh-font-body: "Inter", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  --gh-font-mono: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+
+  --gh-bg: #FFF8F1;
+  --gh-surface: #FFFFFF;
+  --gh-surface-raised: #FFFDF9;
+  --gh-surface-tint: #F4ECE4;
+  --gh-text: #211A2A;
+  --gh-text-soft: #4E435A;
+  --gh-text-muted: #6D6177;
+  --gh-border: #E8DCD5;
+  --gh-border-strong: #D6C5BA;
+
+  --gh-primary: #2B2148;
+  --gh-primary-hover: #3B2D63;
+  --gh-primary-text: #FFFFFF;
+  --gh-secondary: #E6F8F4;
+  --gh-secondary-hover: #D3F2EB;
+  --gh-secondary-text: #134E49;
+
+  --gh-teal: #007D73;
+  --gh-teal-soft: #BFF2E8;
+  --gh-coral: #E85D4F;
+  --gh-coral-soft: #FFE0DA;
+  --gh-honey: #FFD66D;
+  --gh-honey-soft: #FFF0C2;
+  --gh-lilac: #C9B9FF;
+  --gh-lilac-soft: #EEE8FF;
+
+  --gh-success: #0B7A55;
+  --gh-warning: #8C5600;
+  --gh-danger: #B73535;
+  --gh-info: #2856C7;
+
+  --gh-message-in-bg: #FFFFFF;
+  --gh-message-in-text: #211A2A;
+  --gh-message-out-bg: #DDF7F0;
+  --gh-message-out-text: #173E38;
+  --gh-approval-bg: #FFF1D6;
+  --gh-approval-text: #3F2B00;
+  --gh-approval-border: #E0A323;
+
+  --gh-shadow-1: 0 10px 26px rgba(33, 26, 42, 0.10);
+  --gh-shadow-2: 0 22px 70px rgba(33, 26, 42, 0.16);
+  --gh-focus: 0 0 0 3px rgba(0, 125, 115, 0.24);
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --gh-bg: #121018;
+  --gh-surface: #1E1927;
+  --gh-surface-raised: #2A2335;
+  --gh-surface-tint: #211C2A;
+  --gh-text: #FFF8F1;
+  --gh-text-soft: #E7DCEB;
+  --gh-text-muted: #C8BBCD;
+  --gh-border: #44394F;
+  --gh-border-strong: #5A4C66;
+
+  --gh-primary: #89E5D3;
+  --gh-primary-hover: #A1F2E2;
+  --gh-primary-text: #121018;
+  --gh-secondary: #2A2335;
+  --gh-secondary-hover: #342B43;
+  --gh-secondary-text: #FFF8F1;
+
+  --gh-teal: #89E5D3;
+  --gh-teal-soft: #17453F;
+  --gh-coral: #FF9A8C;
+  --gh-coral-soft: #522A2A;
+  --gh-honey: #FFD978;
+  --gh-honey-soft: #4A3515;
+  --gh-lilac: #D2C6FF;
+  --gh-lilac-soft: #312A46;
+
+  --gh-success: #78DFAF;
+  --gh-warning: #FFD978;
+  --gh-danger: #FF8C8C;
+  --gh-info: #9BB6FF;
+
+  --gh-message-in-bg: #2A2335;
+  --gh-message-in-text: #FFF8F1;
+  --gh-message-out-bg: #174E47;
+  --gh-message-out-text: #F0FFFB;
+  --gh-approval-bg: #3A2A12;
+  --gh-approval-text: #FFECC2;
+  --gh-approval-border: #C99025;
+
+  --gh-shadow-1: 0 12px 30px rgba(0, 0, 0, 0.32);
+  --gh-shadow-2: 0 28px 80px rgba(0, 0, 0, 0.48);
+  --gh-focus: 0 0 0 3px rgba(137, 229, 211, 0.28);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --gh-bg: #121018;
+    --gh-surface: #1E1927;
+    --gh-surface-raised: #2A2335;
+    --gh-surface-tint: #211C2A;
+    --gh-text: #FFF8F1;
+    --gh-text-soft: #E7DCEB;
+    --gh-text-muted: #C8BBCD;
+    --gh-border: #44394F;
+    --gh-border-strong: #5A4C66;
+
+    --gh-primary: #89E5D3;
+    --gh-primary-hover: #A1F2E2;
+    --gh-primary-text: #121018;
+    --gh-secondary: #2A2335;
+    --gh-secondary-hover: #342B43;
+    --gh-secondary-text: #FFF8F1;
+
+    --gh-teal: #89E5D3;
+    --gh-teal-soft: #17453F;
+    --gh-coral: #FF9A8C;
+    --gh-coral-soft: #522A2A;
+    --gh-honey: #FFD978;
+    --gh-honey-soft: #4A3515;
+    --gh-lilac: #D2C6FF;
+    --gh-lilac-soft: #312A46;
+
+    --gh-success: #78DFAF;
+    --gh-warning: #FFD978;
+    --gh-danger: #FF8C8C;
+    --gh-info: #9BB6FF;
+
+    --gh-message-in-bg: #2A2335;
+    --gh-message-in-text: #FFF8F1;
+    --gh-message-out-bg: #174E47;
+    --gh-message-out-text: #F0FFFB;
+    --gh-approval-bg: #3A2A12;
+    --gh-approval-text: #FFECC2;
+    --gh-approval-border: #C99025;
+
+    --gh-shadow-1: 0 12px 30px rgba(0, 0, 0, 0.32);
+    --gh-shadow-2: 0 28px 80px rgba(0, 0, 0, 0.48);
+    --gh-focus: 0 0 0 3px rgba(137, 229, 211, 0.28);
+  }
+}
+
+:root {
+  --gh-radius-xs: 6px;
+  --gh-radius-sm: 8px;
+  --gh-radius-md: 12px;
+  --gh-radius-lg: 18px;
+  --gh-radius-pill: 999px;
+
+  --gh-space-1: 4px;
+  --gh-space-2: 8px;
+  --gh-space-3: 12px;
+  --gh-space-4: 16px;
+  --gh-space-5: 20px;
+  --gh-space-6: 24px;
+  --gh-space-8: 32px;
+  --gh-space-10: 40px;
+  --gh-space-12: 48px;
+  --gh-space-16: 64px;
+
+  --gh-type-hero: clamp(3.5rem, 8vw, 7.25rem);
+  --gh-type-display: clamp(2.6rem, 5vw, 4.8rem);
+  --gh-type-title: clamp(1.9rem, 3vw, 2.8rem);
+  --gh-type-heading: 1.45rem;
+  --gh-type-body: 1rem;
+  --gh-type-small: 0.875rem;
+  --gh-type-caption: 0.75rem;
+
+  --gh-leading-tight: 0.96;
+  --gh-leading-title: 1.08;
+  --gh-leading-body: 1.55;
+}

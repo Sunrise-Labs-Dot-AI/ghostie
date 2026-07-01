@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ghostie macOS UI Prototype</title>
+  <link rel="stylesheet" href="macos-ui.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <main class="page">
+    <header class="prototype-intro">
+      <div>
+        <p class="eyebrow">macOS direction prototype</p>
+        <h1>Ghostie gets a real Mac home.</h1>
+        <p class="intro-copy">A warm native shell for the app icon, window wrapper, navigation, settings, and approval surfaces. Each tool tab keeps its own room inside the same Ghostie office.</p>
+      </div>
+      <div class="commitment-card">
+        <img src="../sprites/out/app/ghostie-macos-icon-classic-clean-v3.png" alt="Ghostie app icon">
+        <div>
+          <span>Committed shell</span>
+          <strong>Paper desk, odd little operator, approval-first.</strong>
+        </div>
+      </div>
+    </header>
+
+    <section class="direction-grid" aria-label="Shared design commitments">
+      <article>
+        <i data-lucide="app-window-mac"></i>
+        <span>Wrapper</span>
+        <p>Native Mac window, soft paper canvas, thin ink rules, no extra top chrome.</p>
+      </article>
+      <article>
+        <i data-lucide="panel-left"></i>
+        <span>Navigation</span>
+        <p>Compact grouped sidebar with a Ghostie status rail and clear separation between humans and agents.</p>
+      </article>
+      <article>
+        <i data-lucide="shield-check"></i>
+        <span>Approval</span>
+        <p>Drafts and scheduled sends use one unmistakable approval language across the app.</p>
+      </article>
+      <article>
+        <i data-lucide="settings-2"></i>
+        <span>General pages</span>
+        <p>Settings, account, status, and setup stay calm, scannable, and utility-first.</p>
+      </article>
+    </section>
+
+    <section class="prototype-stage">
+      <div class="window-frame">
+        <div class="app-shell">
+          <aside class="sidebar" aria-label="Ghostie navigation">
+            <div class="brand-lockup">
+              <img src="../sprites/out/app/ghostie-macos-icon-classic-clean-v3.png" alt="">
+              <div>
+                <strong>Ghostie</strong>
+                <span>Private texting companion</span>
+              </div>
+            </div>
+
+            <nav>
+              <button class="nav-item is-active" type="button" data-panel="messages">
+                <i data-lucide="message-circle"></i><span>Messages</span>
+              </button>
+
+              <p class="nav-label">Messaging Tools</p>
+              <button class="nav-item" type="button" data-panel="drafts">
+                <i data-lucide="pencil-line"></i><span>Drafts</span><b>3</b>
+              </button>
+              <button class="nav-item" type="button" data-panel="scheduled">
+                <i data-lucide="clock-3"></i><span>Scheduled</span><b>1</b>
+              </button>
+              <button class="nav-item" type="button" data-panel="automations">
+                <i data-lucide="repeat-2"></i><span>Automations</span><b>2</b>
+              </button>
+
+              <p class="nav-label">Human Tools</p>
+              <button class="nav-item" type="button" data-panel="dontghost">
+                <i data-lucide="corner-up-left"></i><span>Don't Ghost</span>
+              </button>
+              <button class="nav-item" type="button" data-panel="eq">
+                <i data-lucide="heart-handshake"></i><span>EQ</span>
+              </button>
+              <button class="nav-item" type="button" data-panel="birthdays">
+                <i data-lucide="cake"></i><span>Birthdays</span>
+              </button>
+              <button class="nav-item" type="button" data-panel="wrapped">
+                <i data-lucide="sparkles"></i><span>Wrapped</span>
+              </button>
+              <button class="nav-item" type="button" data-panel="severance">
+                <i data-lucide="briefcase-business"></i><span>Severance</span>
+              </button>
+              <button class="nav-item" type="button" data-panel="analytics">
+                <i data-lucide="chart-no-axes-combined"></i><span>Analytics</span>
+              </button>
+
+              <p class="nav-label">AI Tools</p>
+              <button class="nav-item" type="button" data-panel="voice">
+                <i data-lucide="audio-lines"></i><span>Style</span>
+              </button>
+              <button class="nav-item" type="button" data-panel="history">
+                <i data-lucide="history"></i><span>History</span>
+              </button>
+            </nav>
+
+            <div class="sidebar-footer">
+              <button class="nav-item settings-entry" type="button" data-panel="settings">
+                <i data-lucide="settings"></i><span>Settings</span><em></em>
+              </button>
+            </div>
+          </aside>
+
+          <section class="detail" aria-live="polite">
+            <article class="panel panel-messages is-active" id="messages" data-title="Messages">
+              <div class="pane-header">
+                <div>
+                  <p class="eyebrow">shared shell, native content</p>
+                  <h2>Messages</h2>
+                  <p>Your quiet center for reading, drafting, and approving.</p>
+                </div>
+                <div class="toolbar">
+                  <button type="button"><i data-lucide="sliders-horizontal"></i> Priority</button>
+                  <button type="button"><i data-lucide="square-pen"></i> New draft</button>
+                </div>
+              </div>
+
+              <div class="messages-layout">
+                <div class="thread-list">
+                  <button class="thread-row is-selected" type="button">
+                    <span class="avatar">A</span>
+                    <span><strong>Ashley</strong><small>Should we still do Saturday?</small></span>
+                    <time>9m</time>
+                  </button>
+                  <button class="thread-row" type="button">
+                    <span class="avatar sage">M</span>
+                    <span><strong>Mom</strong><small>Birthday dinner options</small></span>
+                    <time>1h</time>
+                  </button>
+                  <button class="thread-row has-nudge" type="button">
+                    <span class="avatar lavender">J</span>
+                    <span><strong>Jordan</strong><small>Ghostie flagged this as quiet</small></span>
+                    <time>11d</time>
+                  </button>
+                  <button class="thread-row" type="button">
+                    <span class="avatar cyan">R</span>
+                    <span><strong>Roommates</strong><small>WhatsApp, trip logistics</small></span>
+                    <time>Tue</time>
+                  </button>
+                </div>
+
+                <div class="conversation-card">
+                  <div class="conversation-top">
+                    <div>
+                      <strong>Ashley</strong>
+                      <span>iMessage, close friend, reply window open</span>
+                    </div>
+                    <span class="pill coral">tone looks tender</span>
+                  </div>
+                  <div class="bubble incoming">I know you are slammed, just wanted to check if Saturday still works.</div>
+                  <div class="bubble outgoing">Yes, still in. I might be a little fried, but I want to see you.</div>
+                  <div class="ghostie-note">
+                    <img src="../sprites/out/app/ghostie-feature-tone-check-v2.png" alt="">
+                    <div>
+                      <span>Ghostie read</span>
+                      <p>Warm reply. Add one specific detail so it does not feel like a calendar confirmation.</p>
+                    </div>
+                  </div>
+                  <div class="composer">
+                    <span>Draft a reply in my voice...</span>
+                    <button type="button"><i data-lucide="wand-sparkles"></i> Draft</button>
+                  </div>
+                </div>
+
+                <aside class="approval-rail">
+                  <p class="eyebrow">approval language</p>
+                  <h3>Nothing sends alone.</h3>
+                  <div class="approval-card">
+                    <span>Draft awaiting approval</span>
+                    <p>Saturday still works. I really want the time with you, I may just show up in soft-brain mode.</p>
+                    <div>
+                      <button type="button">Approve</button>
+                      <button class="secondary" type="button">Edit</button>
+                    </div>
+                  </div>
+                </aside>
+              </div>
+            </article>
+
+            <article class="panel panel-drafts" id="drafts" data-title="Drafts">
+              <div class="pane-header">
+                <div>
+                  <p class="eyebrow">general page style</p>
+                  <h2>Draft approval queue</h2>
+                  <p>One shared surface for AI-written, scheduled, and automation-created drafts.</p>
+                </div>
+              </div>
+              <div class="queue-grid">
+                <div class="draft-card urgent">
+                  <div><span>Needs approval</span><strong>Ashley</strong></div>
+                  <p>I can still do Saturday. I might be a little fried, but I want to see you.</p>
+                  <footer><button type="button">Approve</button><button class="secondary" type="button">Edit first</button></footer>
+                </div>
+                <div class="draft-card">
+                  <div><span>Birthday text</span><strong>Maya</strong></div>
+                  <p>Happy birthday. I hope today feels easy and a little indulgent.</p>
+                  <footer><button type="button">Approve</button><button class="secondary" type="button">Schedule</button></footer>
+                </div>
+                <div class="draft-card">
+                  <div><span>Automation</span><strong>Dad</strong></div>
+                  <p>Checking in before the appointment. Want me to call after?</p>
+                  <footer><button type="button">Approve</button><button class="secondary" type="button">Hold</button></footer>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel panel-scheduled" id="scheduled" data-title="Scheduled">
+              <div class="pane-header">
+                <div>
+                  <p class="eyebrow">general page style</p>
+                  <h2>Scheduled</h2>
+                  <p>Approved messages that still respect quiet hours and hold states.</p>
+                </div>
+                <div class="toolbar">
+                  <button type="button"><i data-lucide="calendar-plus"></i> Schedule</button>
+                </div>
+              </div>
+              <div class="schedule-list">
+                <div><strong>Tomorrow, 8:30 AM</strong><span>Maya birthday text</span><b>Approved</b></div>
+                <div><strong>Friday, 5:00 PM</strong><span>Roommates trip check-in</span><b class="held">Quiet hours hold</b></div>
+                <div><strong>June 21, 10:00 AM</strong><span>Dad appointment follow-up</span><b>Automation</b></div>
+              </div>
+            </article>
+
+            <article class="panel panel-history" id="history" data-title="History">
+              <div class="pane-header">
+                <div>
+                  <p class="eyebrow">general page style</p>
+                  <h2>History</h2>
+                  <p>A durable audit trail for drafts, approvals, holds, and sends.</p>
+                </div>
+              </div>
+              <div class="timeline">
+                <div><span></span><strong>Approved draft to Ashley</strong><p>9:42 AM, edited once before send</p></div>
+                <div><span></span><strong>Ghostie flagged Jordan</strong><p>11 days quiet, no draft created</p></div>
+                <div><span></span><strong>WhatsApp reconnected</strong><p>Yesterday, daemon healthy</p></div>
+              </div>
+            </article>
+
+            <article class="panel room room-office" id="dontghost" data-title="Do not Ghost">
+              <div class="room-hero">
+                <div>
+                  <p class="eyebrow">tool tab, warm office style</p>
+                  <h2>Don't Ghost</h2>
+                  <p>Ghostie quietly watches for threads where silence might start to say something.</p>
+                </div>
+                <img src="../sprites/out/app/ghostie-feature-dont-ghost-v2.png" alt="Ghostie checking quiet threads">
+              </div>
+              <div class="nudge-board">
+                <div><span>11 days quiet</span><strong>Jordan</strong><p>You asked a question, they answered, then the thread stopped.</p><button type="button">Draft a warm return</button></div>
+                <div><span>High care</span><strong>Mom</strong><p>Birthday dinner planning is waiting on you.</p><button type="button">Open thread</button></div>
+                <div><span>Low pressure</span><strong>Sam</strong><p>Memes only. Probably fine.</p><button class="secondary" type="button">Mute</button></div>
+              </div>
+            </article>
+
+            <article class="panel room room-therapy" id="eq" data-title="EQ">
+              <div class="split-room">
+                <div>
+                  <p class="eyebrow">tool tab, therapy room style</p>
+                  <h2>EQ</h2>
+                  <p>Read the emotional weather before you type into it.</p>
+                  <div class="tone-meter">
+                    <span style="--w:72%">warm</span>
+                    <span style="--w:41%">defensive</span>
+                    <span style="--w:58%">needs detail</span>
+                  </div>
+                </div>
+                <img src="../sprites/out/thinking@256.png" alt="Ghostie in a therapy room">
+                <div class="guidance-card">
+                  <span>Ghostie read</span>
+                  <p>This thread wants reassurance before logistics. Lead with yes, then add the plan.</p>
+                  <button type="button">Apply to draft</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel room room-birthday" id="birthdays" data-title="Birthdays">
+              <div class="pane-header">
+                <div>
+                  <p class="eyebrow">tool tab, calendar style</p>
+                  <h2>Birthdays</h2>
+                  <p>Personal reminders without turning friendship into project management.</p>
+                </div>
+                <img class="header-ghost" src="../sprites/out/app/ghostie-feature-birthday-v2.png" alt="">
+              </div>
+              <div class="birthday-grid">
+                <div><time>Today</time><strong>Maya</strong><span>turns 31</span><button type="button">Write text</button></div>
+                <div><time>Jun 18</time><strong>Nate</strong><span>from Contacts</span><button class="secondary" type="button">Schedule</button></div>
+                <div><time>Jul 02</time><strong>Aunt Lisa</strong><span>needs date check</span><button class="secondary" type="button">Confirm</button></div>
+              </div>
+            </article>
+
+            <article class="panel room room-wrapped" id="wrapped" data-title="Wrapped">
+              <div class="wrapped-shell">
+                <div>
+                  <p class="eyebrow">tool tab, share card style</p>
+                  <h2>Texting Wrapped</h2>
+                  <p>Turn the year into cards that feel like a little story, not a dashboard.</p>
+                  <button type="button">Generate Wrapped</button>
+                </div>
+                <div class="story-card">
+                  <img src="../sprites/out/app/ghostie-feature-wrapped-v2.png" alt="">
+                  <span>2026 recap</span>
+                  <strong>You were fastest with the people who text in lowercase.</strong>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel room room-severance" id="severance" data-title="Severance">
+              <div class="severance-grid">
+                <img src="../sprites/out/idle@256.png" alt="Ghostie in a retro office">
+                <div>
+                  <p class="eyebrow">tool tab, forced dark room</p>
+                  <h2>Severance</h2>
+                  <p>Work and personal sorting keeps the CRT weirdness, but the sidebar stays Ghostie.</p>
+                  <div class="terminal-readout">
+                    <span>FILE: COLD-HARBOR</span>
+                    <span>WORK 42%</span>
+                    <span>PERSONAL 58%</span>
+                  </div>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel room room-analytics" id="analytics" data-title="Analytics">
+              <div class="analytics-grid">
+                <div>
+                  <p class="eyebrow">tool tab, chalkboard style</p>
+                  <h2>Texting Analytics</h2>
+                  <p>Aggregate patterns, readable enough for normal people, precise enough for power users.</p>
+                  <div class="bar-chart">
+                    <span style="--h:40%"></span>
+                    <span style="--h:70%"></span>
+                    <span style="--h:52%"></span>
+                    <span style="--h:88%"></span>
+                    <span style="--h:63%"></span>
+                    <span style="--h:46%"></span>
+                  </div>
+                </div>
+                <img src="../sprites/out/chart@256.png" alt="Ghostie doing texting math">
+              </div>
+            </article>
+
+            <article class="panel room room-voice" id="voice" data-title="Style">
+              <div class="pane-header">
+                <div>
+                  <p class="eyebrow">agent tool, editor style</p>
+                  <h2>Style</h2>
+                  <p>The style guide agents use when Ghostie drafts in your voice.</p>
+                </div>
+              </div>
+              <div class="voice-editor">
+                <aside>
+                  <button class="is-active" type="button">Close friends</button>
+                  <button type="button">Family</button>
+                  <button type="button">Work</button>
+                  <button type="button">Dating</button>
+                </aside>
+                <div>
+                  <label>Guide excerpt</label>
+                  <p>Use short reassurance first. You often soften logistics with a small honest aside. Avoid corporate polish.</p>
+                  <label>Example rewrite</label>
+                  <p>Yes, still on. I may show up a little fried, but I really want to see you.</p>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel room room-automations" id="automations" data-title="Automations">
+              <div class="pane-header">
+                <div>
+                  <p class="eyebrow">agent tool, power style</p>
+                  <h2>Automations</h2>
+                  <p>Rules can create drafts, but approval remains the product promise.</p>
+                </div>
+                <div class="toolbar">
+                  <button type="button"><i data-lucide="plus"></i> New rule</button>
+                </div>
+              </div>
+              <div class="automation-list">
+                <div><strong>Sunday family check-in</strong><span>Stages every Sunday at 4 PM</span><b>Approval required</b></div>
+                <div><strong>Post-meeting follow-up</strong><span>Draft after calendar events tagged client</span><b>Draft only</b></div>
+                <div><strong>Birthday morning note</strong><span>Uses Birthday list, never auto-sends</span><b>Held today</b></div>
+              </div>
+            </article>
+
+            <article class="panel panel-settings" id="settings" data-title="Settings">
+              <div class="pane-header">
+                <div>
+                  <p class="eyebrow">general page, committed shell style</p>
+                  <h2>Settings</h2>
+                  <p>Quiet, scannable, and honest about local privacy.</p>
+                </div>
+              </div>
+
+              <div class="settings-grid">
+                <section class="settings-group">
+                  <h3><i data-lucide="user-round"></i> Account</h3>
+                  <div class="setting-row"><span>Free to start</span><p>25 house credits ready</p><button type="button">Manage</button></div>
+                  <div class="setting-row"><span>Texting Wrapped</span><p>Included in Human Tools</p><label class="switch"><input type="checkbox" checked><i></i></label></div>
+                </section>
+                <section class="settings-group">
+                  <h3><i data-lucide="message-square-lock"></i> Messaging</h3>
+                  <div class="setting-row"><span>iMessage</span><p>Read locally through app daemon</p><label class="switch"><input type="checkbox" checked><i></i></label></div>
+                  <div class="setting-row"><span>WhatsApp</span><p>Paired, approval-gated sends</p><label class="switch"><input type="checkbox" checked><i></i></label></div>
+                  <div class="setting-row"><span>Quiet hours</span><p>Hold sends from 10 PM to 7 AM</p><button type="button">Edit</button></div>
+                </section>
+                <section class="settings-group">
+                  <h3><i data-lucide="key-round"></i> Advanced</h3>
+                  <div class="setting-row"><span>BYOK</span><p>Claude key saved for EQ and drafts</p><button type="button">Change</button></div>
+                  <div class="setting-row"><span>Per-tool models</span><p>Model routing lives here</p><button type="button">Configure</button></div>
+                  <div class="setting-row"><span>Diagnostics</span><p>Metadata-only export</p><button type="button">Export</button></div>
+                </section>
+              </div>
+            </article>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section class="icon-direction" aria-label="App icon direction">
+      <div>
+        <p class="eyebrow">macOS icon commitment</p>
+        <h2>Character-first, no white-logo blob.</h2>
+        <p>The default icon should read at dock size, keep the generated-raster feel, and avoid a Snapchat-like flat white ghost. The clean classic icon is the baseline, while the others show product cues if we want more story.</p>
+      </div>
+      <div class="icon-rack">
+        <img src="../sprites/out/app/ghostie-macos-icon-classic-clean-v3.png" alt="Clean Ghostie icon">
+        <img src="../sprites/out/app/ghostie-macos-icon-classic-soft-tile-v3.png" alt="Soft tile Ghostie icon">
+        <img src="../sprites/out/app/ghostie-macos-icon-classic-approval-v3.png" alt="Approval Ghostie icon">
+        <img src="../sprites/out/app/ghostie-macos-icon-classic-console-v3.png" alt="Console Ghostie icon">
+      </div>
+    </section>
+  </main>
+  <script src="macos-ui.js"></script>
+</body>
+</html>

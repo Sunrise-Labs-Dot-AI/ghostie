@@ -1,0 +1,180 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0"
+     xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Messages for AI</title>
+    <link>https://messagesfor.ai/appcast.xml</link>
+    <description>Auto-update feed for the Messages for AI macOS app.</description>
+    <language>en</language>
+    <!-- release.sh inserts <item> entries here, newest first. -->
+    <item>
+      <title>v0.11.2</title>
+      <sparkle:version>296</sparkle:version>
+      <sparkle:shortVersionString>0.11.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Tue, 30 Jun 2026 21:30:55 -0700</pubDate>
+      <enclosure url="https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.11.2/messages-for-ai-v0.11.2.zip" sparkle:edSignature="YIyGl++EdDcMk0xP8pcdjMdTeGoBYs+EJV/kjgdxr9KpoCeO4ENDiUfa3/dNRrp4oGnnlnYzcr8ikD5q00u1CA==" length="34781759" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.11.1</title>
+      <sparkle:version>293</sparkle:version>
+      <sparkle:shortVersionString>0.11.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Tue, 30 Jun 2026 19:40:23 -0700</pubDate>
+      <enclosure url="https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.11.1/messages-for-ai-v0.11.1.zip" sparkle:edSignature="Iie9D+SaDASQKSf8wOodn844Roz7t2p1cunhNQQUHYFwC7AObU3w2W4UNJ96/6cMYNAy39mKQk9C4nH4iY2cBQ==" length="34781382" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.11.0</title>
+      <sparkle:version>290</sparkle:version>
+      <sparkle:shortVersionString>0.11.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Tue, 30 Jun 2026 13:57:37 -0700</pubDate>
+      <enclosure url="https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.11.0/messages-for-ai-v0.11.0.zip" sparkle:edSignature="2wRDeI7wJf6yor0bNy5H7FvTM7Le928O7aRSSF68AIvOkdzstR3GNpg1V+gZoh/RbyTqIFQ+gYEnZa6xrPm2CA==" length="34745211" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.10.0</title>
+      <sparkle:version>280</sparkle:version>
+      <sparkle:shortVersionString>0.10.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Fri, 19 Jun 2026 20:28:36 -0700</pubDate>
+      <enclosure url="https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.10.0/messages-for-ai-v0.10.0.zip" sparkle:edSignature="6sdRS3ZEHB2EqI82oKYG0U1tcECz9sFApmwTWJvWg+04aC70qzf5cMy9z2AVo0livn68uB3YApdzx0fIAVx1Cw==" length="34572982" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.9.0</title>
+      <sparkle:version>274</sparkle:version>
+      <sparkle:shortVersionString>0.9.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Thu, 18 Jun 2026 10:51:47 -0700</pubDate>
+      <enclosure url="https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.9.0/messages-for-ai-v0.9.0.zip" sparkle:edSignature="nudfsU6bxWGh1CeUbq+A0Lrgt3rnq011vCG2fMP/FLZlMapGUHc9Aedjyowagq1gU3cYFn7fzkkzfr0U8j97Dg==" length="34448168" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.8.0</title>
+      <sparkle:version>270</sparkle:version>
+      <sparkle:shortVersionString>0.8.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Tue, 16 Jun 2026 16:41:48 -0700</pubDate>
+      <enclosure url="https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.8.0/messages-for-ai-v0.8.0.zip" sparkle:edSignature="eOOylXLZylA216YGbPj68jig+gzA7nuCms3R7FEydkzoiR9KEp+X5XkmnXRskvtBlD1ZOQyjKKTfA1LbSDxNDw==" length="33337556" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.7.1</title>
+      <sparkle:version>267</sparkle:version>
+      <sparkle:shortVersionString>0.7.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Mon, 15 Jun 2026 12:52:43 -0700</pubDate>
+      <enclosure url="https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.7.1/messages-for-ai-v0.7.1.zip" sparkle:edSignature="Tzb3wBDIAJla7bcpgWZAZgTN75fWRo2WaDc84sKW8M5OlNqcz0imgoYV2APwNzC8vbY7Apwj59FPuOrzu9NaAQ==" length="33148850" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.7.0</title>
+      <sparkle:version>263</sparkle:version>
+      <sparkle:shortVersionString>0.7.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Sat, 13 Jun 2026 06:58:52 -0700</pubDate>
+      <enclosure url="https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.7.0/messages-for-ai-v0.7.0.zip" sparkle:edSignature="zTTCn0QVCEJqTsYEcDNLv0YAemcD7hPQhUeEoH+f5KY9TrSiO8MFbhYFf4UVXMcq1Sl7GjWTQlkDIvPw6W3GDQ==" length="32308954" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.6.2</title>
+      <sparkle:version>215</sparkle:version>
+      <sparkle:shortVersionString>0.6.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Thu, 11 Jun 2026 10:10:40 -0700</pubDate>
+      <enclosure url="https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.6.2/messages-for-ai-v0.6.2.zip" sparkle:edSignature="8gNyKMp/4BWo92zNijc4EL9FoLUSWgGtu7vQUKyErLH+66y2LTnnHipITXEgevTvuTOIoh09clb9ogyyd3vsBQ==" length="31859431" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.6.1</title>
+      <sparkle:version>211</sparkle:version>
+      <sparkle:shortVersionString>0.6.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Thu, 11 Jun 2026 09:09:13 -0700</pubDate>
+      <enclosure url="https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.6.1/messages-for-ai-v0.6.1.zip" sparkle:edSignature="TuOO1b4V2V4mb1qZ0dsvirTZpc3NCDDNVYqURd7AWPNGQHqSYIxpyGNub+Hp4vd02RoYW9glrAK9+Q6A1f0sCQ==" length="31855829" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.6.0</title>
+      <sparkle:version>177</sparkle:version>
+      <sparkle:shortVersionString>0.6.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Wed, 10 Jun 2026 13:56:00 -0700</pubDate>
+      <enclosure url="https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.6.0/messages-for-ai-v0.6.0.zip" sparkle:edSignature="qyFl8/GEbU7nZF7neI+0nvoCT2sqdAaO/M5g00K4JUQYmOOG1P5KZmGvdTdNVIXXtZDCuJluXuldS6ZbugiHDQ==" length="31431655" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.5.7</title>
+      <sparkle:version>126</sparkle:version>
+      <sparkle:shortVersionString>0.5.7</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Tue, 09 Jun 2026 09:44:47 -0700</pubDate>
+      <enclosure url="https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.5.7/messages-for-ai-v0.5.7.zip" sparkle:edSignature="Vt9gsYeUpDQljr1o8ZVpKnUqlFx31346mANstlfFt6B7joLtXRxZ6+YuwicXPCukUp/WdTZC5Ra/mhTTIUfQCw==" length="30727584" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.5.6</title>
+      <sparkle:version>114</sparkle:version>
+      <sparkle:shortVersionString>0.5.6</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Tue, 09 Jun 2026 00:10:16 -0700</pubDate>
+      <enclosure url="https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.5.6/messages-for-ai-v0.5.6.zip" sparkle:edSignature="FkZs7dQpGj2mLtwU70IprTb3TnjJxYljpuDGj5JYY6opHb6tRgtzoOa5o8pPgElpc7jnJDcju8BHmUxWlqF8CQ==" length="172311241" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.5.5</title>
+      <sparkle:version>111</sparkle:version>
+      <sparkle:shortVersionString>0.5.5</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Mon, 08 Jun 2026 19:57:39 -0700</pubDate>
+      <enclosure url="https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.5.5/messages-for-ai-v0.5.5.zip" sparkle:edSignature="Ey2kVCHOaO5YM5sqAQ3GRFG/pOk4kYUQLlDe8No/5tTbUS/yfPC931Rv7AuLObm3QjR15ZhdXV0tV3kGRd3rAA==" length="172310502" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.5.4</title>
+      <sparkle:version>108</sparkle:version>
+      <sparkle:shortVersionString>0.5.4</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Mon, 08 Jun 2026 18:57:38 -0700</pubDate>
+      <enclosure url="https://messagesfor.ai/releases/messages-for-ai-v0.5.4.zip" sparkle:edSignature="grxxDm3JY2Al986s/Q/AnN4io1XaraGIaUsmzSz4eZPaDWdAL6uPIJyj03dLyJ4CktEqc0/EKZBItJCIsSIAAQ==" length="172310539" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.5.3</title>
+      <sparkle:version>105</sparkle:version>
+      <sparkle:shortVersionString>0.5.3</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Sun, 07 Jun 2026 16:11:58 -0700</pubDate>
+      <enclosure url="https://messagesfor.ai/releases/messages-for-ai-v0.5.3.zip" sparkle:edSignature="tEC1oJpinWAiReuvZ/p6XwXe5JbqjMcZTmlHBVcsqiM2q3w/ePKNH4HbGSKTA5weZWCsgOBsZWB/tO59/3zWCw==" length="148079912" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.5.2</title>
+      <sparkle:version>96</sparkle:version>
+      <sparkle:shortVersionString>0.5.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Sun, 07 Jun 2026 08:45:01 -0700</pubDate>
+      <enclosure url="https://messagesfor.ai/releases/messages-for-ai-v0.5.2.zip" sparkle:edSignature="u6LjMWE+yTY9UxBfXNUbXzAda0UMKJVisjDNJe66NRNhgCeIp/ghVqqBatJeIymUmk2o7HzSBjc19aPXO2W1CA==" length="147970388" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.5.1</title>
+      <sparkle:version>90</sparkle:version>
+      <sparkle:shortVersionString>0.5.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Fri, 05 Jun 2026 16:42:43 -0700</pubDate>
+      <enclosure url="https://github.com/Sunrise-Labs-Dot-AI/messages-for-ai/releases/download/v0.5.1/messages-for-ai-v0.5.1.zip" sparkle:edSignature="Z8HX3ydoKmQ7Cw/2ZUnTyUth1WRvsvQGNlNdrT/c0GPNtiy1X1AtC0nZNMh3A20ah2UqwAdjAFRnkRypUpOBDQ==" length="147391663" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.5.0</title>
+      <sparkle:version>72</sparkle:version>
+      <sparkle:shortVersionString>0.5.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Fri, 05 Jun 2026 10:17:51 -0700</pubDate>
+      <enclosure url="https://github.com/Sunrise-Labs-Dot-AI/messages-for-ai/releases/download/v0.5.0/messages-for-ai-v0.5.0.zip" sparkle:edSignature="6xCGPgBH2OzZw8SS7bNrGbfFPhPQeq2Q49IdpymyEWgo9ciwytky1jevs6lisGmZAwBQqMVeKl2ZO04W2ldNDw==" length="147169819" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.4.2</title>
+      <sparkle:version>66</sparkle:version>
+      <sparkle:shortVersionString>0.4.2</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Wed, 03 Jun 2026 22:05:54 -0700</pubDate>
+      <enclosure url="https://github.com/Sunrise-Labs-Dot-AI/messages-for-ai/releases/download/v0.4.2/messages-for-ai-v0.4.2.zip" sparkle:edSignature="ZMXwYkYj0t8P9dSiv3OalGiidcErE45wSHRhzCc84kgDWeiSGirPfXxaFH/GiF2q1Djkmun+Gskdwy/60gCrDw==" length="146235001" type="application/octet-stream" />
+    </item>
+    <item>
+      <title>v0.4.1</title>
+      <sparkle:version>64</sparkle:version>
+      <sparkle:shortVersionString>0.4.1</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Wed, 03 Jun 2026 21:29:54 -0700</pubDate>
+      <enclosure url="https://github.com/Sunrise-Labs-Dot-AI/messages-for-ai/releases/download/v0.4.1/messages-for-ai-v0.4.1.zip" sparkle:edSignature="KJQ75EfSwZwZoQElHX8Ikd0++GnZ5MAC5ZXU2AGCwsGJifOI6d+rvM4LAJf0aQsrgrmIf9xl1/JVUAurJTL8AQ==" length="146234999" type="application/octet-stream" />
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "ghostie": {
+      "command": "/Applications/Ghostie.app/Contents/MacOS/ghostie-mcp"
+    },
+    "imessage-drafts": {
+      "command": "/Applications/Ghostie.app/Contents/MacOS/imessage-drafts-mcp"
+    },
+    "whatsapp-drafts": {
+      "command": "/Applications/Ghostie.app/Contents/MacOS/whatsapp-drafts-mcp"
+    }
+  }
+}

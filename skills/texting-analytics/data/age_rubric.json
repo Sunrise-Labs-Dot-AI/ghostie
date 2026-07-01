@@ -1,0 +1,53 @@
+{
+  "_meta": {
+    "title": "Texting Wrapped — Age-Band Estimation Rubric (machine-readable config)",
+    "description": "Probabilistic, NOT deterministic. Each feature contributes weighted points toward an age band. Sum points per band, normalize, pick highest. See scoring_logic.",
+    "generated": "2026-05-28",
+    "overall_confidence": "medium",
+    "disclaimer": "Treat as entertainment/probabilistic prior, not an identity claim. Individual variation is high; tech-savvy older users and conservative younger users produce outliers. The product only renders the card with a much larger outbound sample, enough active days, and multiple independent writing-style signals."
+  },
+
+  "age_bands": {
+    "gen_z":      {"label": "Gen Z",      "birth_years": "1997-2012", "approx_age_2025": "13-27"},
+    "millennial": {"label": "Millennial", "birth_years": "1981-1996", "approx_age_2025": "28-43"},
+    "gen_x":      {"label": "Gen X",      "birth_years": "1965-1980", "approx_age_2025": "44-59"},
+    "boomer_plus":{"label": "Boomer+",    "birth_years": "before 1965","approx_age_2025": "60+"}
+  },
+
+  "scoring_logic": {
+    "step_1": "For each observed feature, add its band points (multiplied by weight) to each band's running total.",
+    "step_2": "Normalize each band total by the sum of weights of all observed features.",
+    "step_3": "The band with the highest normalized score is the best-fit estimate.",
+    "step_4_confidence": "If top band >= 2x second place: report 'likely [band]'. If top two within 20%: report a two-band range (e.g. 'Millennial/Gen X').",
+    "weight_values": {"high": 3, "medium": 2, "low": 1}
+  },
+
+  "features": [
+    {"id": "laugh_skull_or_sob", "label": "Uses 💀 or 😭 for laughter", "points": {"gen_z": 4, "millennial": 1, "gen_x": 0, "boomer_plus": 0}, "weight": "high", "confidence": "medium", "source_key": "dictionary_2022"},
+    {"id": "laugh_joy_nonironic", "label": "Uses 😂 for laughter (non-ironic)", "points": {"gen_z": 0, "millennial": 3, "gen_x": 2, "boomer_plus": 1}, "weight": "medium", "confidence": "medium", "source_key": "meta_2015"},
+    {"id": "laugh_lol_nonironic", "label": "Uses 'lol' non-ironically", "points": {"gen_z": 0, "millennial": 1, "gen_x": 2, "boomer_plus": 3}, "weight": "medium", "confidence": "high", "source_key": "meta_2015"},
+    {"id": "laugh_haha", "label": "Uses 'haha' for laughter", "points": {"gen_z": 2, "millennial": 2, "gen_x": 1, "boomer_plus": 1}, "weight": "low", "confidence": "medium", "source_key": "meta_2015"},
+    {"id": "all_lowercase", "label": "All-lowercase typing", "points": {"gen_z": 4, "millennial": 2, "gen_x": 0, "boomer_plus": 0}, "weight": "high", "confidence": "medium", "source_key": "cgk_2025"},
+    {"id": "proper_caps", "label": "Proper capitalization", "points": {"gen_z": 0, "millennial": 1, "gen_x": 2, "boomer_plus": 3}, "weight": "medium", "confidence": "medium", "source_key": "ucla_2024"},
+    {"id": "period_end_short", "label": "Period ending a short single-sentence text", "points": {"gen_z": 0, "millennial": 1, "gen_x": 2, "boomer_plus": 3}, "weight": "medium", "confidence": "medium", "source_key": "gunraj_2016"},
+    {"id": "no_period", "label": "No period even on multi-sentence messages", "points": {"gen_z": 2, "millennial": 2, "gen_x": 1, "boomer_plus": 0}, "weight": "low", "confidence": "medium", "source_key": "conversation_2016"},
+    {"id": "ellipsis_connector", "label": "Ellipsis ('...') as pause/connector", "points": {"gen_z": 0, "millennial": 0, "gen_x": 2, "boomer_plus": 4}, "weight": "high", "confidence": "medium", "source_key": "reddit_linguistics"},
+    {"id": "repeated_exclaim", "label": "Repeated exclamation marks (!!!)", "points": {"gen_z": 0, "millennial": 1, "gen_x": 2, "boomer_plus": 3}, "weight": "low", "confidence": "low", "source_key": "conversation_2016"},
+    {"id": "multi_bubble_burst", "label": "Multi-bubble burst (one thought per bubble)", "points": {"gen_z": 4, "millennial": 2, "gen_x": 1, "boomer_plus": 0}, "weight": "medium", "confidence": "low", "source_key": "mcculloch_2019"},
+    {"id": "single_long_block", "label": "Single long block message", "points": {"gen_z": 0, "millennial": 1, "gen_x": 2, "boomer_plus": 4}, "weight": "medium", "confidence": "low", "source_key": "mcculloch_2019"},
+    {"id": "signs_name", "label": "Signs texts with their name", "points": {"gen_z": 0, "millennial": 0, "gen_x": 2, "boomer_plus": 4}, "weight": "low", "confidence": "low", "source_key": "kineticmc_2021"},
+    {"id": "emoji_as_punctuation", "label": "Uses emoji as sentence-final punctuation", "points": {"gen_z": 4, "millennial": 2, "gen_x": 1, "boomer_plus": 0}, "weight": "medium", "confidence": "medium", "source_key": "herring_emoji"},
+    {"id": "inline_emoji_heavy", "label": "High inline emoji rate", "points": {"gen_z": 3, "millennial": 2, "gen_x": 1, "boomer_plus": 0}, "weight": "medium", "confidence": "medium", "source_key": "herring_emoji"},
+    {"id": "inline_emoji_sparse", "label": "Sparse inline emoji use", "points": {"gen_z": 0, "millennial": 1, "gen_x": 2, "boomer_plus": 2}, "weight": "low", "confidence": "low", "source_key": "calibration_needed"},
+    {"id": "low_volume", "label": "Sends fewer than 10 texts/day", "points": {"gen_z": 0, "millennial": 0, "gen_x": 2, "boomer_plus": 4}, "weight": "low", "confidence": "medium", "source_key": "pew_2011"},
+    {"id": "high_volume", "label": "High daily texting volume", "points": {"gen_z": 3, "millennial": 2, "gen_x": 1, "boomer_plus": 0}, "weight": "low", "confidence": "low", "source_key": "calibration_needed"}
+  ],
+
+  "limitations": [
+    "Individual variation is high; linguistically aware users code-switch.",
+    "McCulloch's internet-socialization cohorts don't map cleanly to generational labels (a 45yo on Reddit since 2010 may read younger than a late-adopting 30yo).",
+    "Platform shifts the prior: WhatsApp skews older globally, iMessage skews US/iOS, Snapchat/Discord skew younger.",
+    "Unreliable on small samples (<10 messages).",
+    "No single feature is deterministic; accuracy comes from weight accumulation."
+  ]
+}

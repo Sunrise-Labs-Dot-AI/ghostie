@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Operator · Typography systems</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
+  rel="stylesheet"
+/>
+
+<style>
+  /* ============================================================
+     OPERATOR · TYPOGRAPHY BOARD
+     Layout + color held CONSTANT. Only --sans / --mono change
+     per panel (scoped via .sys-* classes on the panel root).
+     ============================================================ */
+
+  :root {
+    /* Operator LIGHT palette + geometry — identical in every panel */
+    --bg: #eef1f5;
+    --paper: #ffffff;
+    --sidebar: #f6f8fa;
+
+    --ink: #111317;
+    --ink-2: #3f4751;
+    --ink-3: #6a727d;
+    --ink-4: #99a1ac;
+
+    --line: #e4e8ee;
+    --line-2: #dfe4eb;
+    --line-strong: #cdd4dd;
+
+    --blue: #0a7cff;
+    --green: #0f9d6b;
+    --amber: #b9791b;
+
+    --imsg-in: #e9e9eb;
+    --imsg-out: linear-gradient(180deg, #1fa2ff, #0a7cff);
+
+    --r-card: 12px;
+    --r-control: 6px;
+    --r-badge: 2px;
+    --r-bubble: 18px;
+    --r-tail: 6px;
+
+    --win-shadow: 0 1px 1px rgba(17, 19, 23, 0.04),
+                  0 12px 28px -10px rgba(17, 19, 23, 0.18),
+                  0 2px 6px rgba(17, 19, 23, 0.05);
+
+    /* Default face tokens (overridden per panel). */
+    --sans: -apple-system, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+  }
+
+  /* ---- Per-system face assignments (the ONLY thing that changes) ---- */
+  .sys-native {
+    --sans: -apple-system, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", monospace;
+  }
+  .sys-standard {
+    --sans: "Inter", -apple-system, system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+  .sys-geist {
+    --sans: "Geist", -apple-system, system-ui, sans-serif;
+    --mono: "Geist Mono", ui-monospace, monospace;
+  }
+  .sys-plex {
+    --sans: "IBM Plex Sans", -apple-system, system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, monospace;
+  }
+  .sys-grotesk {
+    /* Display face is separate from body for this system. */
+    --sans: "Inter", -apple-system, system-ui, sans-serif;
+    --display: "Space Grotesk", -apple-system, system-ui, sans-serif;
+    --mono: "Space Mono", ui-monospace, monospace;
+  }
+  /* Everyone else: display === sans. */
+  .sys-native, .sys-standard, .sys-geist, .sys-plex { --display: var(--sans); }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; text-rendering: optimizeLegibility; }
+
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.5;
+    padding: 40px 24px 96px;
+    font-feature-settings: "cv01", "ss01";
+  }
+
+  .board {
+    max-width: 1240px;
+    margin: 0 auto;
+  }
+
+  /* ============================ TOP BAND ============================ */
+  .topband {
+    padding: 6px 2px 26px;
+  }
+  .topband .eyebrow {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    margin-bottom: 12px;
+  }
+  .topband h1 {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    line-height: 1.08;
+  }
+  .topband h1 .accent { color: var(--blue); }
+  .topband p {
+    margin-top: 10px;
+    font-size: 14px;
+    color: var(--ink-3);
+    max-width: 640px;
+    line-height: 1.55;
+  }
+  .topband .meta {
+    margin-top: 16px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .topband .meta .tag {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    color: var(--ink-3);
+    background: var(--paper);
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-badge);
+    padding: 4px 8px;
+  }
+  .topband .meta .tag b { color: var(--ink-2); font-weight: 600; }
+
+  /* ============================ PANEL ============================ */
+  .panel {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 40px;
+    padding: 44px 0;
+    border-top: 1px solid var(--line-2);
+    align-items: start;
+  }
+
+  /* ---- LEFT: label block (renders in the system's OWN fonts) ---- */
+  .label-block {
+    position: sticky;
+    top: 28px;
+  }
+  .label-block .idx {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--ink-4);
+    margin-bottom: 12px;
+  }
+  .label-block .idx b { color: var(--blue); font-weight: 600; }
+  .label-block .sys-name {
+    font-family: var(--display);
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    color: var(--ink);
+    line-height: 1.02;
+  }
+  .label-block .one-liner {
+    margin-top: 12px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--ink-3);
+    font-family: var(--sans);
+    max-width: 270px;
+  }
+
+  .role-map {
+    margin-top: 18px;
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-control);
+    background: var(--paper);
+    overflow: hidden;
+  }
+  .role-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 9px 11px;
+    font-size: 11px;
+  }
+  .role-row + .role-row { border-top: 1px solid var(--line); }
+  .role-row .role-k {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    width: 58px;
+    flex: none;
+  }
+  .role-row .role-v { color: var(--ink-2); font-weight: 500; }
+  .role-row.is-mono .role-v { font-family: var(--mono); color: var(--ink-3); }
+  .role-row.is-sans .role-v { font-family: var(--sans); }
+
+  /* ---- type-scale specimen ramp ---- */
+  .specimen {
+    margin-top: 16px;
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-control);
+    background: var(--paper);
+    padding: 14px 14px 13px;
+  }
+  .specimen .spec-display {
+    font-family: var(--display);
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    line-height: 1;
+  }
+  .specimen .spec-body {
+    font-family: var(--sans);
+    font-size: 12.5px;
+    color: var(--ink-2);
+    margin-top: 11px;
+    line-height: 1.45;
+  }
+  .specimen .spec-mono {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink-3);
+    margin-top: 9px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+
+  /* ===================================================================
+     RIGHT: THE VIGNETTE (pixel-identical across panels; fonts only).
+     All type uses var(--sans)/var(--display)/var(--mono).
+     =================================================================== */
+  .vignette {
+    width: 100%;
+    max-width: 560px;
+  }
+
+  .window {
+    background: var(--paper);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--r-card);
+    box-shadow: var(--win-shadow);
+    overflow: hidden;
+  }
+
+  /* titlebar — 32px, three dots, centered mono name */
+  .titlebar {
+    height: 32px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--line);
+    background: var(--sidebar);
+  }
+  .traffic { display: flex; gap: 8px; }
+  .traffic i {
+    width: 11px; height: 11px; border-radius: 50%;
+    display: block;
+  }
+  .traffic .r { background: #ff5f57; box-shadow: inset 0 0 0 0.5px rgba(0,0,0,.08); }
+  .traffic .y { background: #febc2e; box-shadow: inset 0 0 0 0.5px rgba(0,0,0,.08); }
+  .traffic .g { background: #28c840; box-shadow: inset 0 0 0 0.5px rgba(0,0,0,.08); }
+  .tb-name {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.02em;
+    color: var(--ink-3);
+    text-align: center;
+    white-space: nowrap;
+  }
+  .tb-spacer { width: 1px; }
+
+  .win-body { padding: 22px 22px 20px; }
+
+  /* (A) header zone */
+  .vig-title {
+    font-family: var(--display);
+    font-size: 27px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+    line-height: 1.05;
+  }
+  .vig-sub {
+    margin-top: 7px;
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.45;
+    color: var(--ink-3);
+    max-width: 440px;
+  }
+
+  /* (B) thread / approval zone */
+  .zone {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: 12px;
+  }
+
+  /* thread row */
+  .thread-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+  }
+  .avatar {
+    width: 30px; height: 30px;
+    border-radius: 8px;
+    background: linear-gradient(180deg, #f2f5f9, #e8edf3);
+    border: 1px solid var(--line-2);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-2);
+    flex: none;
+    letter-spacing: 0.01em;
+  }
+  .thread-id { min-width: 0; flex: 1; }
+  .thread-name {
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    line-height: 1.2;
+  }
+  .thread-handle {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink-3);
+    margin-top: 2px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.005em;
+  }
+  .chips { display: flex; gap: 6px; flex: none; }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-weight: 500;
+    padding: 3px 7px 3px 6px;
+    border-radius: var(--r-badge);
+    border: 1px solid var(--line-2);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .chip svg { display: block; }
+  .chip.blue { color: var(--blue); border-color: rgba(10,124,255,0.28); background: rgba(10,124,255,0.06); }
+  .chip.blue svg { stroke: var(--blue); }
+  .chip.amber { color: var(--amber); border-color: rgba(185,121,27,0.30); background: rgba(185,121,27,0.07); }
+  .chip.amber svg { stroke: var(--amber); }
+
+  /* mini transcript */
+  .transcript { margin-top: 18px; }
+
+  .row-l { display: flex; flex-direction: column; align-items: flex-start; }
+  .row-r { display: flex; flex-direction: column; align-items: flex-end; }
+
+  .bubble {
+    max-width: 76%;
+    font-family: var(--sans);
+    font-size: 13.5px;
+    line-height: 1.34;
+    padding: 8px 13px 9px;
+    border-radius: var(--r-bubble);
+    word-wrap: break-word;
+  }
+  .bubble.in {
+    background: var(--imsg-in);
+    color: #000;
+    border-bottom-left-radius: var(--r-tail);
+  }
+  .bubble.out {
+    background: var(--imsg-out);
+    color: #fff;
+    border-bottom-right-radius: var(--r-tail);
+  }
+  .stamp {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-4);
+    margin-top: 5px;
+    margin-left: 4px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+  }
+
+  /* AI DRAFT tag */
+  .draft-tag {
+    align-self: flex-end;
+    margin-top: 16px;
+    margin-bottom: 7px;
+    font-family: var(--mono);
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-badge);
+    padding: 3px 7px;
+    background: var(--paper);
+    white-space: nowrap;
+  }
+
+  /* hold rail */
+  .hold-rail { margin-top: 9px; align-self: stretch; }
+  .hold-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .hold-l, .hold-r {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.01em;
+  }
+  .hold-l { color: var(--blue); font-weight: 500; }
+  .hold-r { color: var(--ink-3); }
+  .track {
+    margin-top: 6px;
+    height: 4px;
+    border-radius: 99px;
+    background: var(--line-2);
+    overflow: hidden;
+  }
+  .fill {
+    height: 100%;
+    width: 55%;
+    border-radius: 99px;
+    background: linear-gradient(90deg, #1fa2ff, #0a7cff);
+  }
+  .hold-hint {
+    margin-top: 7px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-4);
+    letter-spacing: 0.01em;
+  }
+
+  /* instrument values strip */
+  .values {
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+  }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.04em;
+    padding: 4px 9px 4px 8px;
+    border-radius: var(--r-badge);
+  }
+  .pill.running {
+    color: var(--green);
+    background: rgba(15,157,107,0.08);
+    border: 1px solid rgba(15,157,107,0.22);
+  }
+  .pill.running .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 0 2px rgba(15,157,107,0.16);
+  }
+  .keyval, .verval {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.005em;
+  }
+  .keyval {
+    padding: 4px 9px;
+    border: 1px solid var(--line-2);
+    border-radius: var(--r-badge);
+    background: var(--sidebar);
+    color: var(--ink-2);
+  }
+  .verval { color: var(--ink-4); margin-left: auto; }
+
+  /* tighten display tracking a touch more on the loud display faces */
+  .sys-grotesk .vig-title,
+  .sys-grotesk .sys-name,
+  .sys-grotesk .spec-display { letter-spacing: -0.025em; }
+  .sys-native .vig-title,
+  .sys-native .sys-name { letter-spacing: -0.022em; }
+  .sys-plex .vig-title { letter-spacing: -0.015em; }
+
+  /* footer */
+  .foot {
+    margin-top: 8px;
+    padding-top: 28px;
+    border-top: 1px solid var(--line-2);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    color: var(--ink-4);
+    text-align: center;
+  }
+
+  @media (max-width: 900px) {
+    .panel { grid-template-columns: 1fr; gap: 24px; }
+    .label-block { position: static; }
+  }
+</style>
+</head>
+<body>
+<div class="board">
+
+  <!-- ============================ TOP BAND ============================ -->
+  <header class="topband">
+    <div class="eyebrow">Messages for AI · design</div>
+    <h1>Operator <span class="accent">·</span> Typography systems</h1>
+    <p>Same UI, same color — only the type changes. Pick the system that should carry the product.</p>
+    <div class="meta">
+      <span class="tag"><b>5</b> systems</span>
+      <span class="tag">light mode</span>
+      <span class="tag">sans + <b>mono</b></span>
+      <span class="tag">layout &amp; color held constant</span>
+    </div>
+  </header>
+
+  <!-- =================================================================
+       PANEL 1 · NATIVE
+       ================================================================= -->
+  <section class="panel sys-native">
+    <div class="label-block">
+      <div class="idx"><b>01</b> / 05</div>
+      <div class="sys-name">Native</div>
+      <p class="one-liner">Maximally native and legible; zero-cost; looks like it belongs to the OS.</p>
+      <div class="role-map">
+        <div class="role-row is-sans">
+          <span class="role-k">Disp / UI</span>
+          <span class="role-v">SF Pro</span>
+        </div>
+        <div class="role-row is-mono">
+          <span class="role-k">Values</span>
+          <span class="role-v">SF Mono</span>
+        </div>
+      </div>
+      <div class="specimen">
+        <div class="spec-display">Messages</div>
+        <div class="spec-body">AI proposes, you approve.</div>
+        <div class="spec-mono">0123 · 9:41 AM · 55%</div>
+      </div>
+    </div>
+    <div class="vignette">
+      <!-- VIGNETTE TEMPLATE (identical everywhere) -->
+      <div class="window">
+        <div class="titlebar">
+          <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+          <div class="tb-name">messages-for-ai</div>
+          <div class="tb-spacer"></div>
+        </div>
+        <div class="win-body">
+          <div class="vig-title">Messages for AI</div>
+          <div class="vig-sub">AI proposes, you approve — plus tools built on your message history.</div>
+
+          <div class="zone">
+            <div class="section-label">Conversations</div>
+
+            <div class="thread-row">
+              <div class="avatar">ML</div>
+              <div class="thread-id">
+                <div class="thread-name">Mara Lin</div>
+                <div class="thread-handle">+1 (415) 555-0142</div>
+              </div>
+              <div class="chips">
+                <span class="chip blue">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>2
+                </span>
+                <span class="chip amber">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>1
+                </span>
+              </div>
+            </div>
+
+            <div class="transcript">
+              <div class="row-l">
+                <div class="bubble in">Also happy to meet at 6:30 if that works</div>
+                <div class="stamp">10:53 AM</div>
+              </div>
+
+              <div class="draft-tag">AI Draft · Hold to send · iMessage</div>
+              <div class="row-r">
+                <div class="bubble out">1025 Mission St. I can meet at 6:30</div>
+              </div>
+
+              <div class="hold-rail">
+                <div class="hold-head">
+                  <span class="hold-l">&rarr; HOLD · 0.55s</span>
+                  <span class="hold-r">55%</span>
+                </div>
+                <div class="track"><div class="fill"></div></div>
+                <div class="hold-hint">Keep holding to send…</div>
+              </div>
+            </div>
+
+            <div class="values">
+              <span class="pill running"><span class="dot"></span>RUNNING</span>
+              <span class="keyval">sk-ant-•••••••••••••••3a9f</span>
+              <span class="verval">v0.5.1 (build 61)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================================================================
+       PANEL 2 · STANDARD
+       ================================================================= -->
+  <section class="panel sys-standard">
+    <div class="label-block">
+      <div class="idx"><b>02</b> / 05</div>
+      <div class="sys-name">Standard</div>
+      <p class="one-liner">Neutral, ubiquitous, Linear-grade technical. The safe modern default (what you've seen so far).</p>
+      <div class="role-map">
+        <div class="role-row is-sans">
+          <span class="role-k">Disp / UI</span>
+          <span class="role-v">Inter</span>
+        </div>
+        <div class="role-row is-mono">
+          <span class="role-k">Values</span>
+          <span class="role-v">JetBrains Mono</span>
+        </div>
+      </div>
+      <div class="specimen">
+        <div class="spec-display">Messages</div>
+        <div class="spec-body">AI proposes, you approve.</div>
+        <div class="spec-mono">0123 · 9:41 AM · 55%</div>
+      </div>
+    </div>
+    <div class="vignette">
+      <div class="window">
+        <div class="titlebar">
+          <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+          <div class="tb-name">messages-for-ai</div>
+          <div class="tb-spacer"></div>
+        </div>
+        <div class="win-body">
+          <div class="vig-title">Messages for AI</div>
+          <div class="vig-sub">AI proposes, you approve — plus tools built on your message history.</div>
+
+          <div class="zone">
+            <div class="section-label">Conversations</div>
+
+            <div class="thread-row">
+              <div class="avatar">ML</div>
+              <div class="thread-id">
+                <div class="thread-name">Mara Lin</div>
+                <div class="thread-handle">+1 (415) 555-0142</div>
+              </div>
+              <div class="chips">
+                <span class="chip blue">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>2
+                </span>
+                <span class="chip amber">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>1
+                </span>
+              </div>
+            </div>
+
+            <div class="transcript">
+              <div class="row-l">
+                <div class="bubble in">Also happy to meet at 6:30 if that works</div>
+                <div class="stamp">10:53 AM</div>
+              </div>
+
+              <div class="draft-tag">AI Draft · Hold to send · iMessage</div>
+              <div class="row-r">
+                <div class="bubble out">1025 Mission St. I can meet at 6:30</div>
+              </div>
+
+              <div class="hold-rail">
+                <div class="hold-head">
+                  <span class="hold-l">&rarr; HOLD · 0.55s</span>
+                  <span class="hold-r">55%</span>
+                </div>
+                <div class="track"><div class="fill"></div></div>
+                <div class="hold-hint">Keep holding to send…</div>
+              </div>
+            </div>
+
+            <div class="values">
+              <span class="pill running"><span class="dot"></span>RUNNING</span>
+              <span class="keyval">sk-ant-•••••••••••••••3a9f</span>
+              <span class="verval">v0.5.1 (build 61)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================================================================
+       PANEL 3 · GEIST
+       ================================================================= -->
+  <section class="panel sys-geist">
+    <div class="label-block">
+      <div class="idx"><b>03</b> / 05</div>
+      <div class="sys-name">Geist</div>
+      <p class="one-liner">One type system designed as sans + mono; cleaner and more contemporary than Inter, premium-tool feel.</p>
+      <div class="role-map">
+        <div class="role-row is-sans">
+          <span class="role-k">Disp / UI</span>
+          <span class="role-v">Geist</span>
+        </div>
+        <div class="role-row is-mono">
+          <span class="role-k">Values</span>
+          <span class="role-v">Geist Mono</span>
+        </div>
+      </div>
+      <div class="specimen">
+        <div class="spec-display">Messages</div>
+        <div class="spec-body">AI proposes, you approve.</div>
+        <div class="spec-mono">0123 · 9:41 AM · 55%</div>
+      </div>
+    </div>
+    <div class="vignette">
+      <div class="window">
+        <div class="titlebar">
+          <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+          <div class="tb-name">messages-for-ai</div>
+          <div class="tb-spacer"></div>
+        </div>
+        <div class="win-body">
+          <div class="vig-title">Messages for AI</div>
+          <div class="vig-sub">AI proposes, you approve — plus tools built on your message history.</div>
+
+          <div class="zone">
+            <div class="section-label">Conversations</div>
+
+            <div class="thread-row">
+              <div class="avatar">ML</div>
+              <div class="thread-id">
+                <div class="thread-name">Mara Lin</div>
+                <div class="thread-handle">+1 (415) 555-0142</div>
+              </div>
+              <div class="chips">
+                <span class="chip blue">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>2
+                </span>
+                <span class="chip amber">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>1
+                </span>
+              </div>
+            </div>
+
+            <div class="transcript">
+              <div class="row-l">
+                <div class="bubble in">Also happy to meet at 6:30 if that works</div>
+                <div class="stamp">10:53 AM</div>
+              </div>
+
+              <div class="draft-tag">AI Draft · Hold to send · iMessage</div>
+              <div class="row-r">
+                <div class="bubble out">1025 Mission St. I can meet at 6:30</div>
+              </div>
+
+              <div class="hold-rail">
+                <div class="hold-head">
+                  <span class="hold-l">&rarr; HOLD · 0.55s</span>
+                  <span class="hold-r">55%</span>
+                </div>
+                <div class="track"><div class="fill"></div></div>
+                <div class="hold-hint">Keep holding to send…</div>
+              </div>
+            </div>
+
+            <div class="values">
+              <span class="pill running"><span class="dot"></span>RUNNING</span>
+              <span class="keyval">sk-ant-•••••••••••••••3a9f</span>
+              <span class="verval">v0.5.1 (build 61)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================================================================
+       PANEL 4 · PLEX
+       ================================================================= -->
+  <section class="panel sys-plex">
+    <div class="label-block">
+      <div class="idx"><b>04</b> / 05</div>
+      <div class="sys-name">Plex</div>
+      <p class="one-liner">A humanist-but-technical superfamily with quiet character; reads as a serious, considered instrument.</p>
+      <div class="role-map">
+        <div class="role-row is-sans">
+          <span class="role-k">Disp / UI</span>
+          <span class="role-v">IBM Plex Sans</span>
+        </div>
+        <div class="role-row is-mono">
+          <span class="role-k">Values</span>
+          <span class="role-v">IBM Plex Mono</span>
+        </div>
+      </div>
+      <div class="specimen">
+        <div class="spec-display">Messages</div>
+        <div class="spec-body">AI proposes, you approve.</div>
+        <div class="spec-mono">0123 · 9:41 AM · 55%</div>
+      </div>
+    </div>
+    <div class="vignette">
+      <div class="window">
+        <div class="titlebar">
+          <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+          <div class="tb-name">messages-for-ai</div>
+          <div class="tb-spacer"></div>
+        </div>
+        <div class="win-body">
+          <div class="vig-title">Messages for AI</div>
+          <div class="vig-sub">AI proposes, you approve — plus tools built on your message history.</div>
+
+          <div class="zone">
+            <div class="section-label">Conversations</div>
+
+            <div class="thread-row">
+              <div class="avatar">ML</div>
+              <div class="thread-id">
+                <div class="thread-name">Mara Lin</div>
+                <div class="thread-handle">+1 (415) 555-0142</div>
+              </div>
+              <div class="chips">
+                <span class="chip blue">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>2
+                </span>
+                <span class="chip amber">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>1
+                </span>
+              </div>
+            </div>
+
+            <div class="transcript">
+              <div class="row-l">
+                <div class="bubble in">Also happy to meet at 6:30 if that works</div>
+                <div class="stamp">10:53 AM</div>
+              </div>
+
+              <div class="draft-tag">AI Draft · Hold to send · iMessage</div>
+              <div class="row-r">
+                <div class="bubble out">1025 Mission St. I can meet at 6:30</div>
+              </div>
+
+              <div class="hold-rail">
+                <div class="hold-head">
+                  <span class="hold-l">&rarr; HOLD · 0.55s</span>
+                  <span class="hold-r">55%</span>
+                </div>
+                <div class="track"><div class="fill"></div></div>
+                <div class="hold-hint">Keep holding to send…</div>
+              </div>
+            </div>
+
+            <div class="values">
+              <span class="pill running"><span class="dot"></span>RUNNING</span>
+              <span class="keyval">sk-ant-•••••••••••••••3a9f</span>
+              <span class="verval">v0.5.1 (build 61)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================================================================
+       PANEL 5 · GROTESK
+       ================================================================= -->
+  <section class="panel sys-grotesk">
+    <div class="label-block">
+      <div class="idx"><b>05</b> / 05</div>
+      <div class="sys-name">Grotesk</div>
+      <p class="one-liner">Gives titles a distinct, ownable identity while body stays legible; the most branded option.</p>
+      <div class="role-map">
+        <div class="role-row is-sans">
+          <span class="role-k">Display</span>
+          <span class="role-v" style="font-family: var(--display);">Space Grotesk</span>
+        </div>
+        <div class="role-row is-sans">
+          <span class="role-k">UI / body</span>
+          <span class="role-v">Inter</span>
+        </div>
+        <div class="role-row is-mono">
+          <span class="role-k">Values</span>
+          <span class="role-v">Space Mono</span>
+        </div>
+      </div>
+      <div class="specimen">
+        <div class="spec-display">Messages</div>
+        <div class="spec-body">AI proposes, you approve.</div>
+        <div class="spec-mono">0123 · 9:41 AM · 55%</div>
+      </div>
+    </div>
+    <div class="vignette">
+      <div class="window">
+        <div class="titlebar">
+          <div class="traffic"><i class="r"></i><i class="y"></i><i class="g"></i></div>
+          <div class="tb-name">messages-for-ai</div>
+          <div class="tb-spacer"></div>
+        </div>
+        <div class="win-body">
+          <div class="vig-title">Messages for AI</div>
+          <div class="vig-sub">AI proposes, you approve — plus tools built on your message history.</div>
+
+          <div class="zone">
+            <div class="section-label">Conversations</div>
+
+            <div class="thread-row">
+              <div class="avatar">ML</div>
+              <div class="thread-id">
+                <div class="thread-name">Mara Lin</div>
+                <div class="thread-handle">+1 (415) 555-0142</div>
+              </div>
+              <div class="chips">
+                <span class="chip blue">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>2
+                </span>
+                <span class="chip amber">
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>1
+                </span>
+              </div>
+            </div>
+
+            <div class="transcript">
+              <div class="row-l">
+                <div class="bubble in">Also happy to meet at 6:30 if that works</div>
+                <div class="stamp">10:53 AM</div>
+              </div>
+
+              <div class="draft-tag">AI Draft · Hold to send · iMessage</div>
+              <div class="row-r">
+                <div class="bubble out">1025 Mission St. I can meet at 6:30</div>
+              </div>
+
+              <div class="hold-rail">
+                <div class="hold-head">
+                  <span class="hold-l">&rarr; HOLD · 0.55s</span>
+                  <span class="hold-r">55%</span>
+                </div>
+                <div class="track"><div class="fill"></div></div>
+                <div class="hold-hint">Keep holding to send…</div>
+              </div>
+            </div>
+
+            <div class="values">
+              <span class="pill running"><span class="dot"></span>RUNNING</span>
+              <span class="keyval">sk-ant-•••••••••••••••3a9f</span>
+              <span class="verval">v0.5.1 (build 61)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="foot">OPERATOR · MESSAGES FOR AI · TYPE BOARD · LIGHT</div>
+
+</div>
+</body>
+</html>

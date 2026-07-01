@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security - Ghostie</title>
+  <meta name="description" content="Security notes for Ghostie, a local macOS app for Claude, Codex, iMessage, and WhatsApp drafting.">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+  <style>
+    :root {
+      --fg: #111317;
+      --muted: #66707f;
+      --bg: #f6f7f9;
+      --paper: #ffffff;
+      --line: #dfe4eb;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fg: #f4f6fa;
+        --muted: #9ea7b5;
+        --bg: #171b1f;
+        --paper: #101215;
+        --line: #2b323a;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 30px 22px 58px;
+    }
+
+    header,
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    a { color: inherit; }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--fg);
+      font-weight: 730;
+      text-decoration: none;
+    }
+
+    .brand img {
+      width: 32px;
+      height: auto;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    main {
+      margin: 56px 0 46px;
+      padding: 34px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--paper);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(36px, 6vw, 54px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .updated {
+      margin: 0 0 32px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    h2 {
+      margin: 30px 0 8px;
+      font-size: 21px;
+      line-height: 1.18;
+    }
+
+    p,
+    li {
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    ul {
+      padding-left: 20px;
+    }
+
+    strong { color: var(--fg); }
+
+    footer {
+      border-top: 1px solid var(--line);
+      padding-top: 22px;
+    }
+  </style>
+  <script defer src="/analytics.js"></script>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <a class="brand" href="/">
+        <img src="/assets/ghostie-hero.png" alt="">
+        <span>Ghostie</span>
+      </a>
+      <a href="/">Back to product</a>
+    </header>
+
+    <main>
+      <h1>Security</h1>
+      <p class="updated">Updated June 6, 2026</p>
+
+      <p>
+        Ghostie is built as a local macOS control center for AI-assisted texting. Security work focuses on
+        local permissions, signed releases, visible send controls, and clear disclosure when Labs use model providers.
+      </p>
+
+      <h2>Local permission model</h2>
+      <p>
+        iMessage reads require Full Disk Access for the Ghostie app. The app launches the local daemons that read
+        protected data, so Claude or Codex do not need their own Full Disk Access grant to use the bridge.
+      </p>
+
+      <h2>Signed and notarized releases</h2>
+      <p>
+        Public releases are Developer ID signed, notarized by Apple, and distributed through GitHub Releases. Sparkle
+        updates are signed so the app can verify downloaded updates before installing them.
+      </p>
+
+      <h2>Outbound control</h2>
+      <p>
+        Drafts, scheduled messages, and failed sends remain visible in the app. Users choose the send policy they want,
+        including hold-to-send review and approval for scheduled messages.
+      </p>
+
+      <h2>Labs and model providers</h2>
+      <p>
+        Labs that use Claude or ChatGPT disclose provider use in the UI. Some Labs use aggregate metadata, while others
+        may send selected excerpts to the model provider you configure. Treat generated analysis as AI-assisted output:
+        it can be incomplete or wrong.
+      </p>
+
+      <h2>Product analytics</h2>
+      <p>
+        Product analytics are presented during onboarding with a visible opt-out, event-allowlisted, and routed through
+        a privacy guard before any PostHog capture. Autocapture, session replay, screen capture, and prompt or message
+        logging are disabled. Existing installs keep their stored analytics setting unless setup is reset.
+      </p>
+
+      <h2>Connecting WhatsApp</h2>
+      <p>
+        WhatsApp support connects through a local linked-device session managed by the bundled background service. See
+        the <a href="/terms">Terms of Service</a> for the terms that govern WhatsApp support.
+      </p>
+
+      <h2>Responsible disclosure</h2>
+      <p>
+        If you find a security issue, please use the project's
+        <a href="https://github.com/Sunrise-Labs-Dot-AI/ghostie/blob/main/SECURITY.md">GitHub security guidance</a>
+        or file an issue if the report does not contain sensitive details.
+      </p>
+    </main>
+
+    <footer>
+      <span>&copy; 2016 <a href="https://sunriselabs.ai">Sunrise Labs</a></span>
+      <span>
+        <a href="/terms">Terms</a> &middot; <a href="/privacy">Privacy</a>
+      </span>
+    </footer>
+  </div>
+</body>
+</html>

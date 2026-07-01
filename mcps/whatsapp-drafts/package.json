@@ -1,0 +1,48 @@
+{
+  "name": "whatsapp-mcp",
+  "version": "0.11.2",
+  "description": "Local MCP server for WhatsApp on macOS: persistent Baileys daemon, draft-staging with thread-context snapshots, hold-to-fire approval. Sibling to imessage-mcp. Designed for Claude Desktop / Claude Code / Codex CLI.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "whatsapp",
+    "baileys",
+    "macos",
+    "claude",
+    "stdio",
+    "daemon"
+  ],
+  "license": "MIT",
+  "author": "whatsapp-mcp contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sunrise-Labs-Dot-AI/whatsapp-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Sunrise-Labs-Dot-AI/whatsapp-mcp/issues"
+  },
+  "homepage": "https://github.com/Sunrise-Labs-Dot-AI/whatsapp-mcp#readme",
+  "type": "module",
+  "scripts": {
+    "build:mcp": "bun build src/index.ts --compile --outfile bin/whatsapp-mcp",
+    "build:daemon": "bun build src/daemon/index.ts --compile --outfile bin/whatsapp-daemon --external jimp --external sharp --external link-preview-js --external audio-decode",
+    "build": "bun run build:mcp && bun run build:daemon",
+    "install:bin": "bash scripts/install.sh",
+    "dev:daemon": "bun run src/daemon/index.ts",
+    "dev:mcp": "bun run src/index.ts",
+    "pair": "bun run scripts/pair.ts",
+    "test": "bun test",
+    "typecheck": "bun --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "@whiskeysockets/baileys": "7.0.0-rc13",
+    "qrcode": "^1.5.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.13",
+    "@types/qrcode": "^1.5.5",
+    "typescript": "^5.6.0"
+  }
+}

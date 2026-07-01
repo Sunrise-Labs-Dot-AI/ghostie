@@ -1,0 +1,42 @@
+{
+  "name": "imessage-drafts-mcp",
+  "version": "0.11.2",
+  "description": "Local MCP server for macOS iMessages: read-only chat.db queries, draft staging with thread-context snapshots, AppleScript send. Designed for Claude Desktop / Claude Code / Codex CLI.",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "imessage",
+    "messages",
+    "macos",
+    "apple",
+    "chat.db",
+    "claude",
+    "stdio"
+  ],
+  "license": "MIT",
+  "author": "imessage-drafts-mcp contributors",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Sunrise-Labs-Dot-AI/messages-for-ai.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Sunrise-Labs-Dot-AI/messages-for-ai/issues"
+  },
+  "homepage": "https://github.com/Sunrise-Labs-Dot-AI/messages-for-ai#readme",
+  "type": "module",
+  "scripts": {
+    "build": "bun build src/index.ts --compile --outfile bin/imessage-drafts-mcp",
+    "install:bin": "bash scripts/dev-install.sh",
+    "dev": "bun run src/index.ts",
+    "test": "bun test",
+    "typecheck": "bun ./node_modules/typescript/bin/tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.13",
+    "typescript": "^5.6.0"
+  }
+}

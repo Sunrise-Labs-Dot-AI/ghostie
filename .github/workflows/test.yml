@@ -1,0 +1,277 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+    # Pure prose / memory / editor-config changes can't affect the Swift or Bun
+    # build or any test, so don't burn a (macOS-bearing) run on them. paths-ignore
+    # is evaluated per changed-file: a commit touching ANY non-ignored path still
+    # runs. Keep this list conservative so we never accidentally skip code.
+    paths-ignore:
+      - '**/*.md'
+      - 'memory/**'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'memory/**'
+      - 'docs/**'
+      - '.gitignore'
+      - 'LICENSE'
+
+# Cancel an in-flight run when a new commit lands on the same ref:
+# keeps PR latency low when someone pushes multiple times.
+concurrency:
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      app: ${{ steps.filter.outputs.app }}
+      site: ${{ steps.filter.outputs.site }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - id: filter
+        name: Detect changed surfaces
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${BASE_SHA:-}" || "$BASE_SHA" =~ ^0+$ ]]; then
+            changed=$(git diff-tree --no-commit-id --name-only -r "$HEAD_SHA")
+          else
+            changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          fi
+          printf '%s\n' "$changed"
+
+          if printf '%s\n' "$changed" | grep -Eq '^(\.github/workflows/test\.yml|menubar/|mcps/|skills/|scripts/)'; then
+            echo "app=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "app=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if printf '%s\n' "$changed" | grep -Eq '^(\.github/workflows/test\.yml|site/)'; then
+            echo "site=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "site=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  bun-test:
+    # REQUIRED status checks on main: "bun-test (mcps/imessage-drafts)" and
+    # "bun-test (mcps/whatsapp-drafts)". Keep the job name + matrix EXACTLY so
+    # both contexts keep reporting (a renamed/skipped required check blocks
+    # merge forever).
+    #
+    # Runner moved macos-latest -> ubuntu-latest (10x cheaper minute multiplier).
+    # Every test here is portable (node:fs / node:os / node:path / node:crypto /
+    # bun:sqlite / zod / @modelcontextprotocol/sdk); the daemon's three
+    # macOS-only suites (codesign, peer-pid FFI, and the peer-auth "#100" cache
+    # block that shells real /usr/bin/codesign) self-skip via skipIf(platform!=
+    # darwin). Their macOS coverage still runs on every developer machine and in
+    # the macOS swift-build leg's host; CI on Linux exercises everything else.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        mcp:
+          - mcps/imessage-drafts
+          - mcps/whatsapp-drafts
+    name: bun-test (${{ matrix.mcp }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.mcp }}
+        run: bun install --frozen-lockfile
+
+      - name: Type-check
+        working-directory: ${{ matrix.mcp }}
+        run: bun --bun tsc --noEmit
+
+      - name: Test
+        working-directory: ${{ matrix.mcp }}
+        run: bun test
+
+  bun-portable-tests:
+    # These packages exercise deterministic logic and fixture SQLite databases;
+    # they do not require macOS APIs in CI.
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.app == 'true'
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        mcp:
+          - mcps/ghostie
+          - mcps/wrapped-generator
+          - mcps/birthday-generator
+    name: bun-portable-test (${{ matrix.mcp }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: ${{ matrix.mcp }}
+        run: bun install --frozen-lockfile
+
+      # The ghostie facade imports source files from both transport packages,
+      # whose runtime deps resolve from the transports' own node_modules.
+      - name: Install transport dependencies (ghostie facade)
+        if: matrix.mcp == 'mcps/ghostie'
+        run: |
+          set -euo pipefail
+          (cd mcps/imessage-drafts && bun install --frozen-lockfile)
+          (cd mcps/whatsapp-drafts && bun install --frozen-lockfile)
+
+      - name: Type-check
+        working-directory: ${{ matrix.mcp }}
+        run: bun --bun tsc --noEmit
+
+      - name: Test
+        working-directory: ${{ matrix.mcp }}
+        run: bun test
+
+  swift-build:
+    # REQUIRED status check on main: "swift-build". Keep the name. This is the
+    # only thing that has to stay on macOS (AppKit / SwiftUI Window scenes /
+    # Sparkle.framework — not buildable on Linux). It is a COMPILE check only.
+    #
+    # Build mode release -> debug: the per-commit job only needs "does it still
+    # compile?", and the SIGNED release-mode compile already happens at ship
+    # time in scripts/build-release.sh (`swift build -c release`, line ~260).
+    # Measured on a clean checkout: debug ~31s vs release ~74s wall.
+    runs-on: macos-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift build (debug compile check)
+        working-directory: menubar
+        run: |
+          rm -f .build/build.db
+          swift build
+
+  swift-test:
+    # Unit tests cover the menu bar's safety, storage, scheduling, analytics,
+    # walkthrough, and preview seams. Keep this separate from the release build
+    # so compile regressions and behavioral regressions are visible by name.
+    runs-on: macos-latest
+    needs: detect-changes
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.app == 'true'
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift test
+        working-directory: menubar
+        run: |
+          rm -f .build/build.db
+          swift test
+
+  python-skill-tests:
+    # Skills are part of the user experience and privacy boundary, even though
+    # they do not ship through the Swift/Bun build. Run every skill unittest
+    # suite that exists.
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.app == 'true'
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python skill tests
+        run: |
+          set -euo pipefail
+          for dir in skills/*/tests; do
+            [ -d "$dir" ] || continue
+            skill_dir="$(dirname "$dir")"
+            echo "==> $skill_dir"
+            (cd "$skill_dir" && python3 -m unittest discover -s tests)
+          done
+
+  experience-evals:
+    # Fast deterministic evals that protect cross-boundary user promises:
+    # model-output parsing, Wrapped personalization/highlights, analytics
+    # privacy, MCP stdio contracts, and update/site metadata.
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.app == 'true'
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install MCP dependencies
+        run: |
+          set -euo pipefail
+          for mcp in mcps/ghostie mcps/imessage-drafts mcps/whatsapp-drafts mcps/wrapped-generator mcps/birthday-generator; do
+            (cd "$mcp" && bun install --frozen-lockfile)
+          done
+
+      - name: Experience evals
+        run: scripts/test-experience.sh
+
+  site-download-flow:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.site == 'true'
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Check public download contract
+        working-directory: site
+        run: npm run test:downloads
+
+  site-tip-jar:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.site == 'true'
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install site dependencies
+        working-directory: site
+        run: npm ci
+
+      - name: Check Stripe Tip Jar handler
+        working-directory: site
+        run: npm run test:tip-jar
+
+      - name: Check referral program handler
+        working-directory: site
+        run: npm run test:referral

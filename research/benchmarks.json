@@ -1,0 +1,136 @@
+{
+  "_meta": {
+    "title": "Texting Wrapped — Population Benchmarks (machine-readable)",
+    "description": "Structured benchmark distributions for computing user-vs-population comparisons. Each metric notes its population, geography, confidence, and source key (see sources.json).",
+    "generated": "2026-05-28",
+    "geography_default": "US",
+    "confidence_scale": ["high", "medium", "low"],
+    "usage_note": "These are the best publicly available benchmarks, not a clean nationally-representative 2026 dataset. Treat reply-latency and group-chat numbers as directional. Where you have your own product telemetry, prefer it over these and recompute percentiles from your own user base."
+  },
+
+  "reply_latency": {
+    "metric": "Time from message notification to opening/acting on it (NOT compose-and-send time)",
+    "unit": "minutes",
+    "population": "Android users, primarily messaging apps incl. WhatsApp; sample 84% male, Germany/Europe",
+    "geography": "EU",
+    "confidence": "medium",
+    "source_key": "stach_2024",
+    "caveats": [
+      "Measures open/interaction delay, not true reply latency (reply will be longer).",
+      "European Android-only sample; do not treat as US iMessage baseline.",
+      "No relationship-type breakdown exists in the literature."
+    ],
+    "by_age": [
+      {"age_band": "18-29", "median": 0.30, "mean": 11.1},
+      {"age_band": "30-44", "median": 0.32, "mean": 16.2},
+      {"age_band": "45-62", "median": 0.55, "mean": 20.4},
+      {"age_band": "62+",   "median": 0.83, "mean": 31.4}
+    ],
+    "age_effect": {
+      "description": "Each additional year of age adds ~0.39 min of mean interaction delay",
+      "beta_per_year": 0.39,
+      "p_value": "<0.001"
+    },
+    "whatsapp_specific": {"median_open_min": 0.23, "confidence": "medium", "source_key": "stach_2024"},
+    "read_within_time_us_adults": {
+      "note": "% who READ (not reply) within window; aggregator data, low confidence for personal texting",
+      "confidence": "low",
+      "source_key": "sellcell_2026",
+      "bands": [
+        {"window": "1_min", "pct_cumulative": 33},
+        {"window": "5_min", "pct_cumulative": 73},
+        {"window": "30_min", "pct_cumulative": 83},
+        {"window": "3_min_industry_claim", "pct_cumulative": 95, "confidence": "low"}
+      ]
+    },
+    "dating_context": {
+      "finding": "Gen Z daters 50% more likely than Millennials to deliberately delay responding",
+      "population": "Hinge users globally, n=15000, surveyed Aug 2023",
+      "confidence": "medium",
+      "source_key": "hinge_2024"
+    }
+  },
+
+  "message_volume": {
+    "metric": "Texts sent per day",
+    "unit": "texts_per_day",
+    "geography": "US",
+    "confidence": "medium",
+    "distribution_shape": "heavily right-skewed (mean >> median); a small share of young heavy-texters dominate the mean",
+    "by_age": [
+      {"age_band": "18-24", "mean": 109.5, "median": 50,  "confidence": "medium", "source_key": "pew_2011", "year": 2011},
+      {"age_band": "18-29", "mean": 87.7,  "median": 40,  "confidence": "medium", "source_key": "pew_2011", "year": 2011},
+      {"age_band": "25-34", "mean": 47.6,  "median": null, "confidence": "low", "note": "derived (~half of 109.5)", "source_key": "pew_2011", "year": 2011},
+      {"age_band": "35-44", "mean": 52,    "median": null, "confidence": "low", "source_key": "ebsco_99firms_2024", "year": 2024},
+      {"age_band": "65+",   "mean": 4.8,   "median": null, "confidence": "low", "note": "derived; 18-24 mean is ~23x this", "source_key": "pew_2011", "year": 2011}
+    ],
+    "all_us_adults": [
+      {"mean": 41.5, "median": 10, "confidence": "medium", "source_key": "pew_2011", "year": 2011},
+      {"mean": 32,   "median": 10, "confidence": "low", "note": "2024 overall avg, methodology not fully disclosed", "source_key": "ebsco_99firms_2024", "year": 2024}
+    ],
+    "context": {
+      "us_sms_mms_2024_total": "2.2 trillion", "per_person_per_day_lower_bound": 18,
+      "note": "Lower bound; excludes iMessage blue-bubble and app messaging counted separately",
+      "source_key": "sellcell_2026"
+    }
+  },
+
+  "leaving_on_read": {
+    "metric": "Unread/open response debt and on-read behavior",
+    "geography": "US",
+    "confidence": "low",
+    "findings": [
+      {"stat": "report zero unread texts", "pct": 74, "confidence": "low", "note": "no named primary source/methodology", "source_key": "messagedesk_2026"},
+      {"stat": "report 7+ unread texts", "pct": 4, "confidence": "low", "source_key": "messagedesk_2026"},
+      {"stat": "of all SMS get any response", "pct": 45, "confidence": "low", "note": "all SMS incl. commercial, not personal", "source_key": "intelligent_contacts"},
+      {"stat": "overanalyzed someone's digital body language (read receipts etc.)", "pct": 56, "population": "Hinge daters", "confidence": "medium", "source_key": "hinge_2024"}
+    ],
+    "concentration": {
+      "finding": "For most people, half of their texts go to just 3-5 people (Ling)",
+      "confidence": "medium",
+      "source_key": "wikipedia_textmsg_ling"
+    },
+    "data_gap": "No peer-reviewed study quantifies typical number of open/unanswered threads per person."
+  },
+
+  "group_chat_participation": {
+    "metric": "Contribution inequality in group chats",
+    "population": "WhatsApp users, Germany, 2016",
+    "geography": "EU",
+    "confidence": "medium",
+    "source_key": "seufert_2016",
+    "stats": {
+      "avg_group_size": 9,
+      "pct_groups_one_member_over_50pct_posts": 8.1,
+      "pct_groups_top_2to3_each_over_30pct": 19.2,
+      "avg_total_chats_per_user": 59,
+      "avg_group_chats_per_user": 10,
+      "share_of_chats_that_are_group": 18
+    },
+    "participation_inequality_rule": {
+      "name": "90-9-1 rule",
+      "description": "90% lurk, 9% contribute occasionally, 1% produce most content; power-law/Zipf",
+      "note": "Documented in large public communities; likely OVERSTATES inequality for small private group chats but directionally consistent",
+      "confidence": "medium",
+      "source_key": "nngroup_participation"
+    },
+    "age_relationship": "none found",
+    "caveats": ["WhatsApp Germany 2016; may not match US iMessage groups."]
+  },
+
+  "read_receipts": {
+    "metric": "Read-receipt / typing-indicator adoption by age",
+    "confidence": "low",
+    "data_gap": "No representative quantitative adoption-rate-by-age data exists. Strong product opportunity to measure from your own telemetry.",
+    "platform_defaults": {
+      "imessage": "read receipts OFF by default (opt-in)",
+      "whatsapp": "read receipts ON by default (opt-out)",
+      "selection_effect": "iMessage users with receipts ON have actively chosen visibility; WhatsApp privacy-conscious users opt out"
+    },
+    "directional_observation": {
+      "finding": "Read receipts less common among Gen Z/Millennials; more common with parents/older relatives",
+      "confidence": "low",
+      "source_key": "mashable_2021"
+    }
+  }
+}

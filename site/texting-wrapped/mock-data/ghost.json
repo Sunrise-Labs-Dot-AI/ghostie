@@ -1,0 +1,90 @@
+{
+  "filters": {
+    "window_days": 365,
+    "since_ts_ms": 1717200000000,
+    "until_ts_ms": 1748736000000
+  },
+  "latency": {
+    "total_reply_pairs": 1264,
+    "pct_within_5min": 44,
+    "pct_within_30min": 68,
+    "pct_within_1hr": 77,
+    "pct_within_4hr": 91,
+    "mean_minutes": 90,
+    "median_minutes": 8,
+    "thread_count": 96,
+    "window_label": "past 12 months"
+  },
+  "ball_in_court": {
+    "total_threads_sampled": 100,
+    "threads_with_ball_in_court": 93,
+    "pct_ball_in_court": 93,
+    "live_conversations_estimate": 42,
+    "snapshot_label": "June 2025"
+  },
+  "group_contribution": {
+    "total_groups_analyzed": 15,
+    "total_messages_in_groups": 4912,
+    "user_messages_in_groups": 34,
+    "user_contribution_pct": 0.7,
+    "user_reaction_rate_pct": 41,
+    "peer_reaction_rate_pct": 28,
+    "groups_where_user_silent": 12,
+    "groups_mostly_reactions": 6,
+    "worst_offender": {
+      "thread_label": "Kayak Crew",
+      "total": 1589,
+      "user_count": 0,
+      "user_pct": 0,
+      "user_reaction_pct": 0
+    },
+    "per_thread": [
+      { "thread_label": "Kayak Crew", "total": 1589, "user_count": 0, "user_pct": 0, "user_reaction_pct": 0 },
+      { "thread_label": "Dinner Logistics", "total": 712, "user_count": 2, "user_pct": 0.3, "user_reaction_pct": 100 },
+      { "thread_label": "Weekend People", "total": 620, "user_count": 3, "user_pct": 0.5, "user_reaction_pct": 67 }
+    ]
+  },
+  "top_people": [
+    { "name": "Maya Chen", "count": 2847 },
+    { "name": "Daniel Park", "count": 1962 },
+    { "name": "Jordan Reyes", "count": 1403 },
+    { "name": "Sophie Liu", "count": 982 },
+    { "name": "Alex Whitman", "count": 711 },
+    { "name": "Priya Nair", "count": 640 },
+    { "name": "Sam Okafor", "count": 588 },
+    { "name": "Lena Fischer", "count": 502 },
+    { "name": "Marcus Bell", "count": 477 },
+    { "name": "Nina Alvarez", "count": 401 }
+  ],
+  "emoji": {
+    "pct_messages_with_emoji": 23,
+    "emoji_per_message": 0.41,
+    "top": [
+      { "emoji": "😂", "count": 612 },
+      { "emoji": "❤️", "count": 388 },
+      { "emoji": "🙏", "count": 201 },
+      { "emoji": "🔥", "count": 144 },
+      { "emoji": "😭", "count": 97 }
+    ]
+  },
+  "style": {
+    "pct_end_period": 9,
+    "pct_all_lowercase": 61,
+    "laugh_tokens": { "lol": 240, "haha": 180, "joy": 612 },
+    "dominant_laugh": "joy",
+    "sample_size": 4000
+  },
+  "age": {
+    "estimated_age": 33,
+    "band": "millennial",
+    "label": "Millennial",
+    "approx_age": "28-43",
+    "confidence": "low",
+    "drivers": [
+      "All-lowercase typing",
+      "Uses face-with-tears for laughter",
+      "Rarely ends messages with periods"
+    ],
+    "sample_size": 4000
+  }
+}

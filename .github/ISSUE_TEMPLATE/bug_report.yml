@@ -1,0 +1,77 @@
+name: Bug report
+description: Something doesn't work as documented. Crashes, wrong results, install failures.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing a bug. Please fill out the fields below — the more concrete you are the faster I can reproduce and fix it.
+
+        ⚠️ **Do not paste real message content or recipient handles here.** Redact or paraphrase. Issue text is public.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened
+      description: One sentence is fine. What did you expect, what did you get?
+      placeholder: e.g. "list_threads returned authorization denied even though FDA is granted"
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps. Include the MCP client (Claude Desktop / Claude Code / Codex), the tool you called, and the arguments (redact bodies).
+      placeholder: |
+        1. Installed via `bun run install:bin` at commit `abc123`.
+        2. Granted FDA to ~/bin/imessage-drafts-mcp.
+        3. In Claude Desktop, asked it to call list_threads with limit=5, since=...
+        4. Got error: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostic
+    attributes:
+      label: Diagnostic info
+      description: Run the smoke test from the README. Paste the relevant output. For send issues, paste the `context_diagnostic` field from a freshly-staged draft if relevant.
+      render: shell
+
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: e.g. macOS 15.3 (Sequoia)
+    validations:
+      required: true
+
+  - type: input
+    id: client
+    attributes:
+      label: MCP client
+      placeholder: e.g. Claude Desktop 0.7.x, or Claude Code 2.1.x, or Codex CLI 1.x
+    validations:
+      required: true
+
+  - type: input
+    id: bun
+    attributes:
+      label: Bun version
+      description: Output of `bun --version`
+      placeholder: e.g. 1.3.14
+
+  - type: input
+    id: commit
+    attributes:
+      label: Repo commit
+      description: Output of `git rev-parse HEAD` from the repo
+      placeholder: e.g. d159540
+
+  - type: checkboxes
+    id: redaction
+    attributes:
+      label: Privacy checklist
+      options:
+        - label: I have redacted any real message bodies, contact names, phone numbers, and email addresses from this report.
+          required: true

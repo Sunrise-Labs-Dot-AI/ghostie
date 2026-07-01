@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Account — Messages for AI</title>
+  <style>
+    :root {
+      --bg: #f6f7f9; --fg: #111317; --muted: #5d6470; --line: #e3e6ea;
+      --blue: #0a7cff; --card: #ffffff; --radius: 14px;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root { --bg: #131619; --fg: #f2f4f6; --muted: #9aa3ad; --line: #2a2f35; --card: #1b1f24; }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: var(--bg); color: var(--fg);
+      font: 15px/1.55 -apple-system, "SF Pro Text", system-ui, sans-serif;
+      display: flex; min-height: 100vh; align-items: center; justify-content: center; padding: 24px;
+    }
+    .card {
+      width: 100%; max-width: 440px; background: var(--card);
+      border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 28px; box-shadow: 0 24px 80px rgba(18, 24, 34, .14);
+    }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    p.sub { color: var(--muted); margin: 0 0 20px; font-size: 13.5px; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+    button {
+      appearance: none; border: 1px solid var(--line); border-radius: 9px;
+      padding: 9px 16px; font: 600 13.5px/1 -apple-system, system-ui, sans-serif;
+      background: var(--card); color: var(--fg); cursor: pointer;
+    }
+    button.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
+    button:disabled { opacity: .5; cursor: default; }
+    input[type="text"] {
+      border: 1px solid var(--line); border-radius: 9px; padding: 9px 12px;
+      font: 600 13.5px/1 ui-monospace, "SF Mono", monospace; letter-spacing: .08em;
+      background: var(--bg); color: var(--fg); flex: 1; min-width: 0;
+      text-transform: uppercase;
+    }
+    .status {
+      margin-top: 16px; padding: 12px 14px; border: 1px solid var(--line);
+      border-radius: 10px; font-size: 13px; color: var(--muted);
+    }
+    .status strong { color: var(--fg); }
+    #clerk-mount { margin-top: 8px; }
+    .footer { margin-top: 22px; font-size: 12px; color: var(--muted); }
+    .footer a { color: var(--muted); }
+  </style>
+  <script defer src="/analytics.js"></script>
+</head>
+<body>
+  <main class="card">
+    <h1>Messages for AI account</h1>
+    <p class="sub">Sign in to manage Premium, or bring your own API key in the app and use everything free.</p>
+    <div id="clerk-mount"></div>
+    <div id="signed-in" hidden>
+      <div class="status" id="plan-status">Checking subscription…</div>
+      <div class="row">
+        <button class="primary" id="subscribe">Subscribe to Premium</button>
+        <button id="manage" hidden>Manage subscription</button>
+        <button id="connect">Connect the Mac app</button>
+        <button id="signout">Sign out</button>
+      </div>
+      <!-- Referral card: server-gated, stays hidden until /api/referral
+           config says the program is live (same dark default as accounts). -->
+      <div id="referral" hidden>
+        <div class="status" id="referral-status">Checking referral program…</div>
+        <div class="row">
+          <button id="copy-code" hidden>Copy invite link</button>
+        </div>
+        <div class="row" id="redeem-row" hidden>
+          <input type="text" id="redeem-input" placeholder="FRIEND'S CODE" maxlength="12" autocomplete="off" spellcheck="false" />
+          <button id="redeem-btn">Redeem</button>
+        </div>
+      </div>
+    </div>
+    <p class="footer"><a href="https://messagesfor.ai">&larr; messagesfor.ai</a> · <a href="privacy.html">Privacy</a> · &copy; 2026 Sunrise Labs</p>
+  </main>
+
+  <script>
+    async function boot() {
+      const config = await fetch("/api/premium?action=config").then((r) => r.json());
+      if (!config.clerkPublishableKey) {
+        document.getElementById("plan-status").textContent = "Accounts aren't live yet.";
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/@clerk/clerk-js@5/dist/clerk.browser.js";
+      script.setAttribute("data-clerk-publishable-key", config.clerkPublishableKey);
+      script.async = true;
+      script.addEventListener("load", async () => {
+        await window.Clerk.load();
+        render();
+        window.Clerk.addListener(render);
+      });
+      document.body.appendChild(script);
+    }
+
+    function render() {
+      const clerk = window.Clerk;
+      const mount = document.getElementById("clerk-mount");
+      const signedIn = document.getElementById("signed-in");
+      if (!clerk.user) {
+        signedIn.hidden = true;
+        document.getElementById("referral").hidden = true;
+        clerk.mountSignIn(mount);
+        return;
+      }
+      mount.innerHTML = "";
+      signedIn.hidden = false;
+      refreshEntitlement();
+      refreshReferral();
+    }
+
+    async function authedFetch(path, options = {}) {
+      const token = await window.Clerk.session.getToken();
+      return fetch(path, {
+        ...options,
+        headers: { ...(options.headers || {}), Authorization: `Bearer ${token}` },
+      });
+    }
+
+    async function refreshEntitlement() {
+      const status = document.getElementById("plan-status");
+      try {
+        const entitlement = await authedFetch("/api/premium?action=entitlement").then((r) => r.json());
+        const active = entitlement.subscription_active === true;
+        status.innerHTML = active
+          ? `<strong>Premium is active</strong> for ${entitlement.account_email}.`
+          : `Signed in as <strong>${entitlement.account_email}</strong>. No active subscription.`;
+        document.getElementById("subscribe").hidden = active;
+        document.getElementById("manage").hidden = !active;
+      } catch {
+        status.textContent = "Couldn't check your subscription.";
+      }
+    }
+
+    document.getElementById("subscribe").addEventListener("click", async () => {
+      const { url, error } = await authedFetch("/api/premium?action=checkout", { method: "POST" }).then((r) => r.json());
+      if (url) window.location.href = url;
+      else alert(error || "Checkout isn't available yet.");
+    });
+
+    document.getElementById("manage").addEventListener("click", async () => {
+      const { url, error } = await authedFetch("/api/premium?action=portal", { method: "POST" }).then((r) => r.json());
+      if (url) window.location.href = url;
+      else alert(error || "Portal isn't available.");
+    });
+
+    document.getElementById("connect").addEventListener("click", async () => {
+      // Hand a short-lived session token to the Mac app; it fetches the
+      // entitlement itself over HTTPS, so nothing trusted rides in the URL.
+      const token = await window.Clerk.session.getToken();
+      window.location.href = `messagesforai://auth?token=${encodeURIComponent(token)}`;
+    });
+
+    document.getElementById("signout").addEventListener("click", () => window.Clerk.signOut());
+
+    // --- Referral program (renders only when /api/referral says it's live;
+    // a 503 means the program is dark and the card never appears) ---
+    let referralShareUrl = null;
+
+    async function refreshReferral() {
+      const section = document.getElementById("referral");
+      try {
+        const configRes = await fetch("/api/referral?action=config");
+        const config = configRes.ok ? await configRes.json() : null;
+        if (!config || config.live !== true) { section.hidden = true; return; }
+        const [codeData, stats] = await Promise.all([
+          authedFetch("/api/referral?action=code").then((r) => r.json()),
+          authedFetch("/api/referral?action=stats").then((r) => r.json()),
+        ]);
+        // Charset-checked before innerHTML; codes are server-generated base32.
+        const code = /^[0-9A-Z]{8}$/.test(codeData.code || "") ? codeData.code : null;
+        referralShareUrl = code ? codeData.shareUrl : null;
+        const status = document.getElementById("referral-status");
+        if (code) {
+          status.innerHTML =
+            `Invite a friend: share <strong>${code}</strong>. They get ` +
+            `${config.grants.refereeSignup} bonus credits, you get ${config.grants.referrerSignup} ` +
+            `when they join (+${config.grants.referrerConversion} if they go Premium). ` +
+            `${stats.referrals}/${config.grants.maxReferrals} referrals used, ` +
+            `${stats.creditsEarned} credits earned.`;
+        } else {
+          status.textContent = "Couldn't load your referral code.";
+        }
+        document.getElementById("copy-code").hidden = !code;
+        document.getElementById("redeem-row").hidden = stats.redeemed === true;
+        section.hidden = false;
+      } catch {
+        section.hidden = true;
+      }
+    }
+
+    document.getElementById("copy-code").addEventListener("click", async () => {
+      if (!referralShareUrl) return;
+      await navigator.clipboard.writeText(referralShareUrl);
+      const btn = document.getElementById("copy-code");
+      btn.textContent = "Copied";
+      setTimeout(() => { btn.textContent = "Copy invite link"; }, 1500);
+    });
+
+    document.getElementById("redeem-btn").addEventListener("click", async () => {
+      const input = document.getElementById("redeem-input");
+      if (!input.value.trim()) return;
+      const res = await authedFetch("/api/referral?action=redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: input.value }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        input.value = "";
+        alert(`Code redeemed: ${data.granted} bonus credits added.`);
+        refreshReferral();
+      } else {
+        alert(data.error || "That code couldn't be redeemed.");
+      }
+    });
+
+    // Arriving via a share link pre-fills the redeem field.
+    const refParam = new URLSearchParams(location.search).get("ref");
+    if (refParam) document.getElementById("redeem-input").value = refParam;
+
+    boot();
+  </script>
+</body>
+</html>

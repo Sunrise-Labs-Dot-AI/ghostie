@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Ghostie macOS app icon</title>
+  <desc id="desc">A rounded macOS icon with a friendly ghost on a mint and honey field.</desc>
+  <defs>
+    <linearGradient id="bg" x1="180" y1="120" x2="840" y2="900" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FDF4E8"/>
+      <stop offset=".48" stop-color="#BFF2E8"/>
+      <stop offset="1" stop-color="#88DED2"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-10%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="38" stdDeviation="32" flood-color="#211A2A" flood-opacity=".22"/>
+    </filter>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="212" fill="url(#bg)"/>
+  <circle cx="730" cy="250" r="116" fill="#FFD66D" opacity=".9"/>
+  <path d="M196 712c-42 28-92-13-76-61l63-202c47-284 210-474 464-474 258 0 450 188 450 455v333c0 82-94 127-158 76l-85-69-89 108c-32 39-92 39-124 0l-89-108-85 69c-64 51-158 6-158-76v-52l-113 75Z" transform="translate(-128 78) scale(.86)" fill="#FFF9F2" stroke="#211A2A" stroke-width="28" stroke-linejoin="round" filter="url(#softShadow)"/>
+  <circle cx="400" cy="468" r="38" fill="#211A2A"/>
+  <circle cx="620" cy="468" r="38" fill="#211A2A"/>
+  <path d="M450 604c43 38 101 38 142 0" fill="none" stroke="#211A2A" stroke-width="32" stroke-linecap="round"/>
+  <circle cx="322" cy="566" r="35" fill="#FF8E7E" opacity=".82"/>
+  <circle cx="698" cy="566" r="35" fill="#FF8E7E" opacity=".82"/>
+  <path d="M696 274c36-58 94-80 168-64-42 26-60 59-54 98-34-20-72-31-114-34Z" fill="#FFFFFF" opacity=".82" stroke="#211A2A" stroke-width="20" stroke-linejoin="round"/>
+</svg>

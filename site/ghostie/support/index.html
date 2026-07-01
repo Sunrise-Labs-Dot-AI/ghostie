@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Support - Ghostie</title>
+  <meta name="description" content="Searchable support articles for Ghostie, Texting Wrapped, iMessage, WhatsApp, permissions, diagnostics, and privacy.">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+  <style>
+    :root {
+      --fg: #111317;
+      --muted: #66707f;
+      --bg: #f6f7f9;
+      --paper: #ffffff;
+      --line: #dfe4eb;
+      --blue: #0a7cff;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fg: #f4f6fa;
+        --muted: #9ea7b5;
+        --bg: #171b1f;
+        --paper: #101215;
+        --line: #2b323a;
+        --blue: #64a8ff;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 30px 22px 58px;
+    }
+
+    header,
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    a { color: inherit; }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--fg);
+      font-weight: 730;
+      text-decoration: none;
+    }
+
+    .brand img {
+      width: 32px;
+      height: auto;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    .hero {
+      margin: 56px 0 22px;
+      padding: 34px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--paper);
+    }
+
+    h1 {
+      margin: 0 0 10px;
+      font-size: clamp(42px, 8vw, 70px);
+      line-height: 0.95;
+      letter-spacing: 0;
+    }
+
+    .intro {
+      max-width: 720px;
+      margin: 0 0 26px;
+      color: var(--muted);
+      font-size: 17px;
+    }
+
+    .search-box {
+      display: grid;
+      gap: 8px;
+      max-width: 680px;
+    }
+
+    .search-box label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 760;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .search-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      align-items: center;
+      min-height: 52px;
+      padding: 0 16px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--bg);
+    }
+
+    .search-row svg {
+      width: 18px;
+      height: 18px;
+      margin-right: 10px;
+      color: var(--muted);
+      stroke-width: 2.2;
+    }
+
+    input[type="search"] {
+      width: 100%;
+      border: 0;
+      outline: 0;
+      color: var(--fg);
+      background: transparent;
+      font: inherit;
+      font-size: 17px;
+    }
+
+    .result-count {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .quick-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    .quick-links a {
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 650;
+      background: var(--bg);
+    }
+
+    .deeplink-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 18px 0 4px;
+    }
+
+    .deeplink-actions a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      min-height: 40px;
+      padding: 9px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--fg);
+      background: var(--bg);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 720;
+    }
+
+    .deeplink-actions a:hover {
+      border-color: var(--blue);
+    }
+
+    .deeplink-actions svg {
+      width: 15px;
+      height: 15px;
+      flex: none;
+      stroke-width: 2.3;
+    }
+
+    .articles {
+      display: grid;
+      gap: 14px;
+      margin: 22px 0 46px;
+    }
+
+    .support-article {
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--paper);
+    }
+
+    .support-article[hidden] {
+      display: none;
+    }
+
+    .article-kicker {
+      margin: 0 0 8px;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 780;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      margin: 0 0 10px;
+      font-size: 24px;
+      line-height: 1.12;
+    }
+
+    h3 {
+      margin: 18px 0 6px;
+      font-size: 16px;
+    }
+
+    p,
+    li {
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    ul,
+    ol {
+      padding-left: 20px;
+    }
+
+    code {
+      padding: 1px 5px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      color: var(--fg);
+      background: var(--bg);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    strong { color: var(--fg); }
+
+    .empty-state {
+      display: none;
+      padding: 24px;
+      border: 1px dashed var(--line);
+      border-radius: 12px;
+      color: var(--muted);
+      background: var(--paper);
+    }
+
+    .empty-state[aria-hidden="false"] {
+      display: block;
+    }
+
+    .contact-card {
+      padding: 24px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--paper);
+    }
+
+    .contact-card h2 {
+      margin-bottom: 8px;
+    }
+
+    footer {
+      border-top: 1px solid var(--line);
+      padding-top: 22px;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      justify-content: flex-end;
+    }
+
+    @media (max-width: 700px) {
+      header,
+      footer {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .hero,
+      .support-article,
+      .contact-card {
+        padding: 24px;
+      }
+
+      .footer-links {
+        justify-content: flex-start;
+      }
+    }
+  </style>
+  <script defer src="/analytics.js"></script>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <a class="brand" href="/">
+        <img src="/assets/ghostie-hero.png" alt="">
+        <span>Ghostie</span>
+      </a>
+      <a href="/">Back to product</a>
+    </header>
+
+    <main>
+      <section class="hero" aria-labelledby="support-title">
+        <h1 id="support-title">Support</h1>
+        <p class="intro">
+          Help for Ghostie, Texting Wrapped, local permissions, assistant setup, WhatsApp pairing, diagnostics,
+          and the small strange Labs that make your text history look back at you.
+        </p>
+
+        <div class="search-box">
+          <label for="supportSearch">Search articles</label>
+          <div class="search-row">
+            <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="7"></circle>
+              <path d="m16 16 4 4"></path>
+            </svg>
+            <input id="supportSearch" type="search" autocomplete="off" placeholder="Try Full Disk Access, WhatsApp, diagnostics, Texting Wrapped...">
+          </div>
+          <p class="result-count" id="resultCount">Showing all articles.</p>
+        </div>
+
+        <nav class="quick-links" aria-label="Popular support topics">
+          <a href="#install">Install</a>
+          <a href="#permissions">Permissions</a>
+          <a href="#assistant">Claude / Codex</a>
+          <a href="#whatsapp">WhatsApp</a>
+          <a href="#diagnostics">Diagnostics</a>
+        </nav>
+      </section>
+
+      <section class="articles" aria-label="Support articles">
+        <article class="support-article" id="install" data-search="install download mac app dmg notarized applications first launch onboarding setup macos apple silicon sonoma">
+          <p class="article-kicker">Install</p>
+          <h2>Install and launch Ghostie</h2>
+          <p>
+            Ghostie is a macOS app. Install the notarized app, move it to Applications, then launch it from your
+            Applications folder. First launch walks you through the transports you want to enable.
+          </p>
+          <h3>What to expect</h3>
+          <ul>
+            <li>iMessage is local to your Mac and needs Full Disk Access before thread reads work.</li>
+            <li>WhatsApp is optional and pairs with a QR code if you choose to enable it.</li>
+            <li>The menu bar app is the control center for drafts, scheduled messages, settings, and diagnostics.</li>
+          </ul>
+        </article>
+
+        <article class="support-article" id="permissions" data-search="full disk access fda permission denied authorization denied contacts names address book tcc privacy security system settings">
+          <p class="article-kicker">Permissions</p>
+          <h2>Grant Full Disk Access and Contacts</h2>
+          <p>
+            iMessage reads require Full Disk Access for <strong>Ghostie.app</strong>. Add the app bundle itself
+            in System Settings, not an inner helper binary or command-line symlink.
+          </p>
+          <div class="deeplink-actions" aria-label="Open macOS permission settings">
+            <a href="x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles">
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3v18"></path>
+                <path d="m8 7 4-4 4 4"></path>
+                <path d="M5 21h14"></path>
+              </svg>
+              Open Full Disk Access
+            </a>
+            <a href="x-apple.systempreferences:com.apple.preference.security?Privacy_Contacts">
+              <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-8 0v2"></path>
+                <circle cx="12" cy="7" r="4"></circle>
+                <path d="M20 8v6"></path>
+                <path d="M23 11h-6"></path>
+              </svg>
+              Open Contacts
+            </a>
+          </div>
+          <h3>Full Disk Access</h3>
+          <ol>
+            <li>Open System Settings.</li>
+            <li>Go to Privacy &amp; Security → Full Disk Access.</li>
+            <li>Add Ghostie from Applications and turn the toggle on.</li>
+            <li>Quit and reopen Ghostie and your assistant app if reads still fail.</li>
+          </ol>
+          <h3>Contacts</h3>
+          <p>
+            Contacts access lets the app show names instead of raw phone numbers. If names are missing, open System
+            Settings → Privacy &amp; Security → Contacts and turn on Ghostie.
+          </p>
+        </article>
+
+        <article class="support-article" id="assistant" data-search="claude codex mcp plugin local bridge assistant config command context drafts stage draft list threads health check">
+          <p class="article-kicker">Assistant setup</p>
+          <h2>Connect Claude or Codex</h2>
+          <p>
+            Ghostie works through a local MCP/plugin bridge. Your assistant can request message context and
+            stage drafts, while the Mac app remains the visible review and send surface.
+          </p>
+          <ul>
+            <li>After changing permissions, fully quit and reopen Claude, Codex, or whichever client is running the local bridge.</li>
+            <li>If a client cannot read threads, run its health check if available; it can usually identify missing Full Disk Access or Contacts access.</li>
+            <li>Keep the default approval flow on unless you really want direct sends from the assistant.</li>
+          </ul>
+        </article>
+
+        <article class="support-article" id="drafts" data-search="draft queue hold to send approval scheduled messages schedule send discard edit failed retry logs automations">
+          <p class="article-kicker">Drafts and sending</p>
+          <h2>Review drafts, scheduled messages, and sends</h2>
+          <p>
+            The app is built around the idea that AI proposes and you approve. Drafts appear in the menu bar app, grouped
+            with their conversation context. You can review, send, discard, or schedule them according to your settings.
+          </p>
+          <ul>
+            <li><strong>Drafts</strong> are pending messages that have not been sent.</li>
+            <li><strong>Scheduled messages</strong> are approved messages waiting for their send time.</li>
+            <li><strong>Failures</strong> stay visible so you can retry or discard instead of losing track.</li>
+          </ul>
+        </article>
+
+        <article class="support-article" id="whatsapp" data-search="whatsapp pairing qr code baileys unofficial tos terms risk ban link unlink daemon phone number session keychain">
+          <p class="article-kicker">WhatsApp</p>
+          <h2>Pair or unpair WhatsApp</h2>
+          <p>
+            WhatsApp support is optional. It pairs by QR code and uses an unofficial WhatsApp Web client. That means it
+            may carry account risk, including the possibility that WhatsApp flags or restricts your number.
+          </p>
+          <ul>
+            <li>Enable WhatsApp only if you understand that risk.</li>
+            <li>If pairing stalls, turn WhatsApp off in Settings, turn it back on, and reopen the pairing window.</li>
+            <li>If you no longer want WhatsApp connected, unpair it from Ghostie and from WhatsApp's linked devices screen.</li>
+          </ul>
+        </article>
+
+        <article class="support-article" id="labs" data-search="labs texting wrapped texting analytics texting style dont ghost eq birthday texts local dashboard story cards api key excerpts">
+          <p class="article-kicker">Labs</p>
+          <h2>Use Texting Wrapped, Texting Analytics, and Labs</h2>
+          <p>
+            Labs build on local message access. Some are metadata-only, like Texting Wrapped and Texting Analytics.
+            Others may use a model provider you configure.
+          </p>
+          <ul>
+            <li><strong>Texting Wrapped</strong> creates playful recap cards from local iMessage and WhatsApp metadata.</li>
+            <li><strong>Texting Analytics</strong> focuses on dashboards: reply speed, top people, volume, and ghost risk.</li>
+            <li><strong>Texting Style</strong> can use your API key to turn aggregate style patterns into a reusable drafting guide.</li>
+            <li><strong>EQ</strong> may send selected excerpts to your chosen model provider, because relationship analysis needs context.</li>
+          </ul>
+        </article>
+
+        <article class="support-article" id="analytics" data-search="privacy product analytics posthog opt in metadata no message bodies session replay autocapture installation id">
+          <p class="article-kicker">Privacy</p>
+          <h2>Understand product analytics</h2>
+          <p>
+            Product analytics are opt-in and off by default. If enabled, they use allowlisted metadata events such as
+            feature viewed, draft staged, draft sent, Lab scan started, and diagnostics export created.
+          </p>
+          <p>
+            Analytics do not include message bodies, drafts, prompts, model responses, contact names, phone numbers,
+            emails, chat IDs, message IDs, API keys, file contents, or user-identifying file paths. Session replay,
+            screen capture, and autocapture are disabled.
+          </p>
+        </article>
+
+        <article class="support-article" id="diagnostics" data-search="diagnostics export support logs crash reports local events daemon logs zip api keys message bodies prompts">
+          <p class="article-kicker">Diagnostics</p>
+          <h2>Export support diagnostics</h2>
+          <p>
+            Diagnostics exports are local files you create from Settings. They are not uploaded automatically. Use them
+            when support asks for more context.
+          </p>
+          <ul>
+            <li><strong>Local app events</strong> are metadata-only events like launches, status checks, and export actions.</li>
+            <li><strong>Crash reports</strong> can help diagnose app failures.</li>
+            <li><strong>Daemon logs</strong> may include transport identifiers, so leave them off unless support asks.</li>
+          </ul>
+          <p>
+            Exports should exclude message bodies, prompts, drafts, and API keys. Still, review files before sharing if
+            you have strict privacy requirements.
+          </p>
+        </article>
+
+        <article class="support-article" id="updates" data-search="updates sparkle signed notarized developer id appcast control message minimum version security disabled sending version">
+          <p class="article-kicker">Updates</p>
+          <h2>Updates, signing, and safety controls</h2>
+          <p>
+            Distributed builds are Developer ID signed and notarized by Apple. Updates are signed so the app can verify
+            them before installing.
+          </p>
+          <p>
+            Sunrise Labs may require a newer app version or temporarily disable a risky feature if a security issue or
+            third-party service problem appears. Update when prompted.
+          </p>
+        </article>
+
+        <article class="support-article" id="payments" data-search="tip jar stripe payment receipt card donation charitable bank save payment information">
+          <p class="article-kicker">Payments</p>
+          <h2>Tip jar payments</h2>
+          <p>
+            The tip jar is optional and handled by Stripe. It is a tip to Sunrise Labs, not a charitable donation. The
+            app does not see or store your card details.
+          </p>
+        </article>
+      </section>
+
+      <p class="empty-state" id="emptyState" aria-hidden="true">
+        No articles match that search. Try a shorter phrase like "permissions", "WhatsApp", "diagnostics", or "Wrapped".
+      </p>
+
+      <section class="contact-card" aria-labelledby="contact-title">
+        <h2 id="contact-title">Still stuck?</h2>
+        <p>
+          Email <a href="mailto:support@sunriselabs.ai">support@sunriselabs.ai</a>. Please do not include private
+          message content, API keys, payment details, or full diagnostics exports unless support specifically asks for
+          them.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <span>&copy; 2016 <a href="https://sunriselabs.ai">Sunrise Labs</a></span>
+      <span class="footer-links">
+        <a href="/terms">Terms</a>
+        <span>&middot;</span>
+        <a href="/privacy">Privacy</a>
+        <span>&middot;</span>
+        <a href="/security">Security</a>
+      </span>
+    </footer>
+  </div>
+
+  <script>
+    const searchInput = document.getElementById("supportSearch");
+    const resultCount = document.getElementById("resultCount");
+    const emptyState = document.getElementById("emptyState");
+    const articles = Array.from(document.querySelectorAll(".support-article"));
+
+    function normalize(value) {
+      return value.toLowerCase().replace(/\s+/g, " ").trim();
+    }
+
+    function updateSearch() {
+      const query = normalize(searchInput.value);
+      let visible = 0;
+
+      articles.forEach((article) => {
+        const haystack = normalize(`${article.dataset.search || ""} ${article.textContent}`);
+        const matches = !query || haystack.includes(query);
+        article.hidden = !matches;
+        if (matches) visible += 1;
+      });
+
+      emptyState.setAttribute("aria-hidden", visible === 0 ? "false" : "true");
+      if (!query) {
+        resultCount.textContent = "Showing all articles.";
+      } else if (visible === 1) {
+        resultCount.textContent = "Showing 1 matching article.";
+      } else {
+        resultCount.textContent = `Showing ${visible} matching articles.`;
+      }
+    }
+
+    searchInput.addEventListener("input", updateSearch);
+  </script>
+</body>
+</html>

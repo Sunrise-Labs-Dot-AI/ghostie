@@ -1,0 +1,17 @@
+{
+  "name": "birthday-generator",
+  "version": "0.11.2",
+  "description": "Deterministic upcoming-birthday surfacing + suggestion engine. Reads the Contacts birthdays sidecar (and the hand-maintained birthdays.json) and chat.db (read-only) to rank who to text, stage a happy-birthday draft, and persist pin/mute curation. No LLM. Spawned by the Messages for AI menu-bar app (which holds Full Disk Access via launcher attribution). Shares the iMessage daemon's chat.db decode + draft-storage layer at build time.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "bun build src/index.ts --compile --outfile bin/birthday-generator",
+    "dev": "bun run src/index.ts",
+    "test": "bun test",
+    "typecheck": "bun --bun tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.13",
+    "typescript": "^5.6.0"
+  }
+}

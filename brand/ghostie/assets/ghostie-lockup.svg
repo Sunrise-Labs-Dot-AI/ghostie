@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 386 104" role="img" aria-labelledby="title desc">
+  <title id="title">Ghostie logo lockup</title>
+  <desc id="desc">Ghostie ghost mark paired with the Ghostie wordmark.</desc>
+  <circle cx="52" cy="52" r="44" fill="#E6F8F4"/>
+  <path d="M22 70.8c-2.8 1.8-6.1-.9-5.1-4.1l4.2-13.4C24.2 34.4 35.1 21.8 52 21.8c17.2 0 30 12.5 30 30.3v22.1c0 5.4-6.3 8.4-10.5 5l-5.7-4.6-5.9 7.2a4.3 4.3 0 0 1-6.8 0l-5.9-7.2-5.7 4.6c-4.2 3.4-10.5.4-10.5-5v-3.5l-9 6Z" fill="#FFF9F2" stroke="#211A2A" stroke-width="3.4" stroke-linejoin="round"/>
+  <circle cx="42.4" cy="50.8" r="4.4" fill="#211A2A"/>
+  <circle cx="62.2" cy="50.8" r="4.4" fill="#211A2A"/>
+  <path d="M46.6 63c3.4 3 7.9 3 11.1 0" fill="none" stroke="#211A2A" stroke-width="3.2" stroke-linecap="round"/>
+  <circle cx="35.7" cy="60.3" r="3.5" fill="#FF8E7E" opacity=".82"/>
+  <circle cx="68.8" cy="60.3" r="3.5" fill="#FF8E7E" opacity=".82"/>
+  <text x="116" y="70" fill="#2B2148" font-family="Fraunces, Georgia, serif" font-size="66" font-weight="850" letter-spacing="0">Ghostie</text>
+</svg>

@@ -1,0 +1,30 @@
+# ============================================================================
+# Sparkle update-signing PUBLIC key.  (Safe to commit — this is the PUBLIC half,
+# embedded in every shipped build as SUPublicEDKey. The PRIVATE key stays in your
+# login keychain; never put it here.)
+#
+# HOW TO FILL THIS IN (one time, on the release machine):
+#
+#   1. Generate the keypair (see RELEASE.md → Auto-update). It PRINTS a block:
+#
+#          <key>SUPublicEDKey</key>
+#          <string>rH3zK9xv0Qe...about 44 chars... aB=</string>
+#
+#   2. Copy ONLY the key — the text BETWEEN <string> and </string>. It is one
+#      line, about 44 characters, and ends with "=".
+#
+#   3. Replace the PLACEHOLDER line at the very bottom of this file with that key.
+#
+#   CORRECT  (just the key, one line):
+#       rH3zK9xv0Qe...aB=
+#
+#   WRONG (do NOT include the tags or quotes):
+#       <string>rH3zK9xv0Qe...aB=</string>
+#       "rH3zK9xv0Qe...aB="
+#
+# Don't stress about getting it exactly clean: the build scripts auto-extract the
+# key, so even if you paste the whole "<string>...</string>" line it still works.
+# Lines starting with "#" are ignored. build-release.sh refuses to ship until a
+# real key is present here (the placeholder below does NOT count).
+# ============================================================================
+AIBthhXpByRlrje9eWEBE0lE4w1/PwVJDFs6VGLqOHQ=

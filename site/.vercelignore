@@ -1,0 +1,6 @@
+.claude
+.vercel
+.git
+# Internal docs/runbooks must never deploy to the public domain. Nothing in
+# the site references a served .md at runtime (security.html links GitHub).
+*.md

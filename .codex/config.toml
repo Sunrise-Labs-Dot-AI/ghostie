@@ -1,0 +1,5 @@
+[mcp_servers.imessage-drafts]
+command = "/Applications/Messages for AI.app/Contents/MacOS/imessage-drafts-mcp"
+
+[mcp_servers.whatsapp-drafts]
+command = "/Applications/Messages for AI.app/Contents/MacOS/whatsapp-drafts-mcp"

@@ -1,0 +1,37 @@
+node_modules/
+bin/
+*.log
+.DS_Store
+bun.lock
+bun.lockb
+.*.bun-build
+
+# Swift / SPM
+menubar/.build/
+menubar/.swiftpm/
+# Package.resolved IS committed (was previously ignored): it pins Sparkle — a
+# security-critical, code-installing dependency — to an exact, auditable revision
+# so CI, release builds, and every maintainer resolve the identical framework.
+
+# Release artifacts produced by scripts/build-release.sh.
+# Built locally + uploaded to GitHub Releases — never committed.
+dist/
+
+# Python bytecode (analytics scripts)
+__pycache__/
+*.pyc
+
+# Sparkle EdDSA PRIVATE key — lives in the login keychain, never on disk/in git.
+# Belt-and-suspenders ignore in case a maintainer ever exports one to a file.
+# (Only the PUBLIC key, menubar/scripts/sparkle_public_ed_key.txt, is committed.)
+*.pem
+*sparkle*priv*
+*_priv_*
+*eddsa*priv*
+
+# Vercel local config (site/)
+.vercel/
+
+# Personal editor launch config (contains an absolute machine path). Removed
+# from tracking; ignored so it cannot re-enter the public snapshot.
+site/.claude/

@@ -1,0 +1,148 @@
+{
+  "top_people": [
+    {
+      "name": "Sample Contact A",
+      "count": 2847
+    },
+    {
+      "name": "Sample Contact B",
+      "count": 1962
+    },
+    {
+      "name": "Sample Contact C",
+      "count": 1403
+    },
+    {
+      "name": "Sample Contact D",
+      "count": 982
+    },
+    {
+      "name": "Sample Contact E",
+      "count": 711
+    },
+    {
+      "name": "Sample Contact F",
+      "count": 640
+    },
+    {
+      "name": "Sample Contact G",
+      "count": 588
+    },
+    {
+      "name": "Sample Contact H",
+      "count": 502
+    },
+    {
+      "name": "Sample Contact I",
+      "count": 477
+    },
+    {
+      "name": "Sample Contact J",
+      "count": 401
+    }
+  ],
+  "latency": {
+    "total_reply_pairs": 800,
+    "pct_within_5min": 82,
+    "pct_within_30min": 95,
+    "pct_within_1hr": 97,
+    "pct_within_4hr": 99,
+    "mean_minutes": 4,
+    "median_minutes": 1,
+    "thread_count": 90,
+    "window_label": "past 12 months"
+  },
+  "ball_in_court": {
+    "total_threads_sampled": 100,
+    "threads_with_ball_in_court": 44,
+    "pct_ball_in_court": 44,
+    "live_conversations_estimate": 40,
+    "snapshot_label": "May 2026"
+  },
+  "group_contribution": {
+    "total_groups_analyzed": 10,
+    "total_messages_in_groups": 900,
+    "user_messages_in_groups": 126,
+    "user_contribution_pct": 14,
+    "user_reaction_rate_pct": 30,
+    "peer_reaction_rate_pct": 32,
+    "groups_where_user_silent": 1,
+    "groups_mostly_reactions": 5,
+    "per_thread": [
+      {
+        "thread_label": "the worst offender crew",
+        "total": 80,
+        "user_count": 3,
+        "user_pct": 0,
+        "user_reaction_pct": 0
+      },
+      {
+        "thread_label": "weekend plans",
+        "total": 60,
+        "user_count": 14,
+        "user_pct": 23,
+        "user_reaction_pct": 10
+      }
+    ]
+  },
+  "emoji": {
+    "pct_messages_with_emoji": 23.0,
+    "emoji_per_message": 0.41,
+    "top": [
+      {
+        "emoji": "\ud83d\ude02",
+        "count": 612
+      },
+      {
+        "emoji": "\u2764\ufe0f",
+        "count": 388
+      },
+      {
+        "emoji": "\ud83d\ude4f",
+        "count": 201
+      },
+      {
+        "emoji": "\ud83d\udd25",
+        "count": 144
+      },
+      {
+        "emoji": "\ud83d\ude2d",
+        "count": 97
+      }
+    ]
+  },
+  "style": {
+    "pct_end_period": 9.0,
+    "pct_all_lowercase": 61.0,
+    "laugh_tokens": {
+      "lol": 240,
+      "haha": 180,
+      "joy": 612
+    },
+    "dominant_laugh": "joy",
+    "sample_size": 4000,
+    "active_days": 120
+  },
+  "age": {
+    "estimated_age": 33,
+    "band": "millennial",
+    "generation_band": "millennial",
+    "generation_scores": {
+      "gen_z": 2.4285714285714284,
+      "millennial": 2.2857142857142856,
+      "gen_x": 0.8571428571428571,
+      "boomer_plus": 0.2857142857142857
+    },
+    "label": "Millennial",
+    "approx_age": "28-43",
+    "confidence": "low",
+    "drivers": [
+      "Uses \ud83d\ude02 for laughter (non-ironic)",
+      "All-lowercase typing",
+      "No period even on multi-sentence messages"
+    ],
+    "sample_size": 4000,
+    "active_days": 120,
+    "evidence_count": 4
+  }
+}

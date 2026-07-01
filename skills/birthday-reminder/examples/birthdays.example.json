@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Allison",
+    "contact_handle": "+15551234567",
+    "birthday": "1990-06-04",
+    "relationship": "partner",
+    "notes": "lives for tiramisu; met at the SF Architecture Society talk"
+  },
+  {
+    "name": "Mark Williams",
+    "contact_handle": "+15555550100",
+    "birthday": "07-12",
+    "relationship": "friend",
+    "notes": "college roommate; always sends a meme reply"
+  },
+  {
+    "name": "Mom",
+    "contact_handle": "mom@example.com",
+    "birthday": "1960-02-01",
+    "relationship": "family",
+    "notes": "prefers a phone call, not a text — surface the reminder, suggest calling"
+  },
+  {
+    "name": "Priya",
+    "contact_handle": "+15555550199",
+    "birthday": "02-29",
+    "relationship": "colleague",
+    "notes": "leap-day baby — celebrates Feb 28 in non-leap years"
+  }
+]

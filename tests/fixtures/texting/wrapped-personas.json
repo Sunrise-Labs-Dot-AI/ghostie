@@ -1,0 +1,2313 @@
+{
+  "schema_version": "1.0",
+  "description": "Public-safe synthetic aggregate fixtures for Texting Wrapped personalization evals. No real message bodies, handles, or contacts.",
+  "generated_by": "tests/fixtures/texting/generate-wrapped-fixtures.mjs",
+  "fixtures": [
+    {
+      "id": "archetype_ghost_genz",
+      "family": "archetype",
+      "expected_archetype": "The Group Chat Ghost",
+      "expected_age_band": "gen_z",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 44,
+          "pct_within_30min": 66,
+          "pct_within_1hr": 75,
+          "pct_within_4hr": 90,
+          "mean_minutes": 90,
+          "median_minutes": 8,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 93,
+          "pct_ball_in_court": 93,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 15,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 6,
+          "user_contribution_pct": 0.7,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 12,
+          "groups_mostly_reactions": 4,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 0,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 0
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "sob",
+          "pct_all_lowercase": 78,
+          "pct_end_period": 4,
+          "pct_emoji_ending": 24,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 920,
+          "active_days": 120
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 12400
+      }
+    },
+    {
+      "id": "archetype_last_word_genx",
+      "family": "archetype",
+      "expected_archetype": "The Last Word",
+      "expected_age_band": "gen_x",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 20,
+          "pct_within_30min": 42,
+          "pct_within_1hr": 51,
+          "pct_within_4hr": 66,
+          "mean_minutes": 35,
+          "median_minutes": 18,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 82,
+          "pct_ball_in_court": 82,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 14,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 108,
+          "user_contribution_pct": 12,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 3,
+          "groups_mostly_reactions": 3,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "lol",
+          "pct_all_lowercase": 7,
+          "pct_end_period": 34,
+          "pct_repeated_exclaim": 10,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 760,
+          "active_days": 95
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 6200
+      }
+    },
+    {
+      "id": "archetype_royalty_millennial",
+      "family": "archetype",
+      "expected_archetype": "Left-on-Read Royalty",
+      "expected_age_band": "millennial",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 45,
+          "pct_within_30min": 67,
+          "pct_within_1hr": 76,
+          "pct_within_4hr": 91,
+          "mean_minutes": 20,
+          "median_minutes": 10,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 12,
+          "pct_ball_in_court": 12,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 12,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 135,
+          "user_contribution_pct": 15,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 2,
+          "groups_mostly_reactions": 2,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "joy",
+          "pct_all_lowercase": 52,
+          "pct_end_period": 7,
+          "pct_emoji_ending": 17,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 870,
+          "active_days": 110
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 8400
+      }
+    },
+    {
+      "id": "archetype_mvp_genz",
+      "family": "archetype",
+      "expected_archetype": "The Group MVP",
+      "expected_age_band": "gen_z",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 50,
+          "pct_within_30min": 72,
+          "pct_within_1hr": 81,
+          "pct_within_4hr": 96,
+          "mean_minutes": 15,
+          "median_minutes": 6,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 45,
+          "pct_ball_in_court": 45,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 8,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 342,
+          "user_contribution_pct": 38,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 0,
+          "groups_mostly_reactions": 0,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "sob",
+          "pct_all_lowercase": 78,
+          "pct_end_period": 4,
+          "pct_emoji_ending": 24,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 920,
+          "active_days": 120
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 11200
+      }
+    },
+    {
+      "id": "archetype_maximalist_millennial",
+      "family": "archetype",
+      "expected_age_band": "millennial",
+      "expected_archetype": "The Emoji Maximalist",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 55,
+          "pct_within_30min": 77,
+          "pct_within_1hr": 86,
+          "pct_within_4hr": 99,
+          "mean_minutes": 12,
+          "median_minutes": 5,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 40,
+          "pct_ball_in_court": 40,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 10,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 135,
+          "user_contribution_pct": 15,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 1,
+          "groups_mostly_reactions": 1,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 52,
+          "emoji_per_message": 0.93,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "joy",
+          "pct_all_lowercase": 52,
+          "pct_end_period": 7,
+          "pct_emoji_ending": 17,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 870,
+          "active_days": 110
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 9300
+      }
+    },
+    {
+      "id": "archetype_fast_starter_millennial",
+      "family": "archetype",
+      "expected_archetype": "The Fast Starter",
+      "expected_age_band": "millennial",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 47,
+          "pct_within_30min": 69,
+          "pct_within_1hr": 78,
+          "pct_within_4hr": 93,
+          "mean_minutes": 77,
+          "median_minutes": 4,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 60,
+          "pct_ball_in_court": 60,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 19,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 79,
+          "user_contribution_pct": 8.8,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 2,
+          "groups_mostly_reactions": 2,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "joy",
+          "pct_all_lowercase": 52,
+          "pct_end_period": 7,
+          "pct_emoji_ending": 17,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 870,
+          "active_days": 110
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 7800
+      }
+    },
+    {
+      "id": "archetype_lightning_genz",
+      "family": "archetype",
+      "expected_archetype": "The Lightning Round",
+      "expected_age_band": "gen_z",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 72,
+          "pct_within_30min": 94,
+          "pct_within_1hr": 98,
+          "pct_within_4hr": 99,
+          "mean_minutes": 8,
+          "median_minutes": 0.8,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 45,
+          "pct_ball_in_court": 45,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 10,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 162,
+          "user_contribution_pct": 18,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 1,
+          "groups_mostly_reactions": 1,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "sob",
+          "pct_all_lowercase": 78,
+          "pct_end_period": 4,
+          "pct_emoji_ending": 24,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 920,
+          "active_days": 120
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 7200
+      }
+    },
+    {
+      "id": "archetype_slow_burn_boomer",
+      "family": "archetype",
+      "expected_archetype": "The Slow Burn",
+      "expected_age_band": "boomer_plus",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 8,
+          "pct_within_30min": 30,
+          "pct_within_1hr": 39,
+          "pct_within_4hr": 54,
+          "mean_minutes": 96,
+          "median_minutes": 70,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 55,
+          "pct_ball_in_court": 55,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 14,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 36,
+          "user_contribution_pct": 4,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 8,
+          "groups_mostly_reactions": 4,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 0,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 0
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "lol",
+          "pct_all_lowercase": 4,
+          "pct_end_period": 48,
+          "pct_ellipsis": 16,
+          "pct_repeated_exclaim": 13,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 640,
+          "active_days": 80
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 2100
+      }
+    },
+    {
+      "id": "archetype_diplomat_genx",
+      "family": "archetype",
+      "expected_archetype": "The Diplomat",
+      "expected_age_band": "gen_x",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 22,
+          "pct_within_30min": 44,
+          "pct_within_1hr": 53,
+          "pct_within_4hr": 68,
+          "mean_minutes": 30,
+          "median_minutes": 18,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 50,
+          "pct_ball_in_court": 50,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 12,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 198,
+          "user_contribution_pct": 22,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 1,
+          "groups_mostly_reactions": 1,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "lol",
+          "pct_all_lowercase": 7,
+          "pct_end_period": 34,
+          "pct_repeated_exclaim": 10,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 760,
+          "active_days": 95
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 6500
+      }
+    },
+    {
+      "id": "steady_deliberate_boomer",
+      "family": "same_archetype_different_reason",
+      "expected_archetype": "The Steady Hand",
+      "expected_age_band": "boomer_plus",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 9,
+          "pct_within_30min": 31,
+          "pct_within_1hr": 40,
+          "pct_within_4hr": 55,
+          "mean_minutes": 64,
+          "median_minutes": 54,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 52,
+          "pct_ball_in_court": 52,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 11,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 162,
+          "user_contribution_pct": 18,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 3,
+          "groups_mostly_reactions": 3,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "lol",
+          "pct_all_lowercase": 4,
+          "pct_end_period": 48,
+          "pct_ellipsis": 16,
+          "pct_repeated_exclaim": 13,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 640,
+          "active_days": 80
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 1900
+      }
+    },
+    {
+      "id": "steady_group_regular_millennial",
+      "family": "same_archetype_different_reason",
+      "expected_archetype": "The Steady Hand",
+      "expected_age_band": "millennial",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 30,
+          "pct_within_30min": 52,
+          "pct_within_1hr": 61,
+          "pct_within_4hr": 76,
+          "mean_minutes": 19,
+          "median_minutes": 14,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 62,
+          "pct_ball_in_court": 62,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 9,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 243,
+          "user_contribution_pct": 27,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 0,
+          "groups_mostly_reactions": 0,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "joy",
+          "pct_all_lowercase": 52,
+          "pct_end_period": 7,
+          "pct_emoji_ending": 17,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 870,
+          "active_days": 110
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 8200
+      }
+    },
+    {
+      "id": "synthetic_user_a_like",
+      "family": "near_collision",
+      "expected_archetype": "The Fast Starter",
+      "expected_age_band": "millennial",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 54,
+          "pct_within_30min": 76,
+          "pct_within_1hr": 85,
+          "pct_within_4hr": 99,
+          "mean_minutes": 65,
+          "median_minutes": 3.5,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 58,
+          "pct_ball_in_court": 58,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 16,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 108,
+          "user_contribution_pct": 12,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 2,
+          "groups_mostly_reactions": 2,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "joy",
+          "pct_all_lowercase": 52,
+          "pct_end_period": 7,
+          "pct_emoji_ending": 17,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 870,
+          "active_days": 110
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 8200
+      }
+    },
+    {
+      "id": "synthetic_partner_like",
+      "family": "near_collision",
+      "expected_archetype": "The Emoji Maximalist",
+      "expected_age_band": "gen_z",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 48,
+          "pct_within_30min": 70,
+          "pct_within_1hr": 79,
+          "pct_within_4hr": 94,
+          "mean_minutes": 12,
+          "median_minutes": 7,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 42,
+          "pct_ball_in_court": 42,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 12,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 144,
+          "user_contribution_pct": 16,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 1,
+          "groups_mostly_reactions": 1,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 55,
+          "emoji_per_message": 0.98,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "sob",
+          "pct_all_lowercase": 78,
+          "pct_end_period": 4,
+          "pct_emoji_ending": 24,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 920,
+          "active_days": 120
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 10100
+      }
+    },
+    {
+      "id": "privacy_red_team_group_name",
+      "family": "privacy_red_team",
+      "expected_archetype": "The Group Chat Ghost",
+      "expected_age_band": "gen_z",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 40,
+          "pct_within_30min": 62,
+          "pct_within_1hr": 71,
+          "pct_within_4hr": 86,
+          "mean_minutes": 88,
+          "median_minutes": 7,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 90,
+          "pct_ball_in_court": 90,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 9,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 14,
+          "user_contribution_pct": 1.5,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 7,
+          "groups_mostly_reactions": 4,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic </script> Crew",
+              "total": 700,
+              "user_count": 0,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic </script> Crew",
+            "total": 700,
+            "user_count": 0
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "sob",
+          "pct_all_lowercase": 78,
+          "pct_end_period": 4,
+          "pct_emoji_ending": 24,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 920,
+          "active_days": 120
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 7000
+      }
+    },
+    {
+      "id": "thin_age_evidence",
+      "family": "age_guardrail",
+      "expected_archetype": "The Diplomat",
+      "expected_age_band": null,
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 28,
+          "pct_within_30min": 50,
+          "pct_within_1hr": 59,
+          "pct_within_4hr": 74,
+          "mean_minutes": 22,
+          "median_minutes": 16,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 48,
+          "pct_ball_in_court": 48,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 8,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 162,
+          "user_contribution_pct": 18,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 1,
+          "groups_mostly_reactions": 1,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "joy",
+          "pct_all_lowercase": null,
+          "pct_end_period": null,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 22,
+          "active_days": 2
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 8000
+      }
+    },
+    {
+      "id": "scale_large_history",
+      "family": "scale",
+      "expected_archetype": "The High-Volume Texter",
+      "expected_age_band": "gen_x",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 18,
+          "pct_within_30min": 40,
+          "pct_within_1hr": 49,
+          "pct_within_4hr": 64,
+          "mean_minutes": 39,
+          "median_minutes": 24,
+          "thread_count": 42,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 43,
+          "pct_ball_in_court": 43,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 24,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 216,
+          "user_contribution_pct": 24,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 2,
+          "groups_mostly_reactions": 2,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 2400,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 2400,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "lol",
+          "pct_all_lowercase": 7,
+          "pct_end_period": 34,
+          "pct_repeated_exclaim": 10,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 760,
+          "active_days": 95
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 42000
+      }
+    },
+    {
+      "id": "reaction_regular_millennial",
+      "family": "reaction_heavy",
+      "expected_archetype": "The Reaction Regular",
+      "expected_age_band": "millennial",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 26,
+          "pct_within_30min": 48,
+          "pct_within_1hr": 57,
+          "pct_within_4hr": 72,
+          "mean_minutes": 24,
+          "median_minutes": 12,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 42,
+          "pct_ball_in_court": 42,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 10,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 162,
+          "user_contribution_pct": 18,
+          "user_reaction_rate_pct": 58,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 1,
+          "groups_mostly_reactions": 1,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "joy",
+          "pct_all_lowercase": 52,
+          "pct_end_period": 7,
+          "pct_emoji_ending": 17,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 870,
+          "active_days": 110
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 7600
+      }
+    },
+    {
+      "id": "social_connector_genz",
+      "family": "contact_breadth",
+      "expected_archetype": "The Social Connector",
+      "expected_age_band": "gen_z",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 900
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 760
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 640
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 225
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 190
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 48,
+          "pct_within_30min": 70,
+          "pct_within_1hr": 79,
+          "pct_within_4hr": 94,
+          "mean_minutes": 18,
+          "median_minutes": 8,
+          "thread_count": 84,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 46,
+          "pct_ball_in_court": 46,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 15,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 162,
+          "user_contribution_pct": 18,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 1,
+          "groups_mostly_reactions": 1,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "sob",
+          "pct_all_lowercase": 78,
+          "pct_end_period": 4,
+          "pct_emoji_ending": 24,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 920,
+          "active_days": 120
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 12000
+      }
+    },
+    {
+      "id": "inner_circle_genx",
+      "family": "contact_concentration",
+      "expected_archetype": "The Inner-Circle Texter",
+      "expected_age_band": "gen_x",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 1600
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 500
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 280
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 400
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 125
+          }
+        ],
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 16,
+          "pct_within_30min": 38,
+          "pct_within_1hr": 47,
+          "pct_within_4hr": 62,
+          "mean_minutes": 34,
+          "median_minutes": 22,
+          "thread_count": 18,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 44,
+          "pct_ball_in_court": 44,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 8,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 108,
+          "user_contribution_pct": 12,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 2,
+          "groups_mostly_reactions": 2,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "lol",
+          "pct_all_lowercase": 7,
+          "pct_end_period": 34,
+          "pct_repeated_exclaim": 10,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 760,
+          "active_days": 95
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 4200
+      }
+    },
+    {
+      "id": "balanced_talk_listen_millennial",
+      "family": "talk_listen",
+      "expected_archetype": "The Steady Hand",
+      "expected_age_band": "millennial",
+      "analysis": {
+        "top_people": [
+          {
+            "name": "Sample Contact A",
+            "count": 310
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 220
+          },
+          {
+            "name": "Sample Contact C",
+            "count": 140
+          }
+        ],
+        "top_people_l30": [
+          {
+            "name": "Sample Contact A",
+            "count": 78
+          },
+          {
+            "name": "Sample Contact B",
+            "count": 55
+          }
+        ],
+        "talk_listen": {
+          "you_words": 12000,
+          "them_words": 12390,
+          "your_share_pct": 49.2
+        },
+        "latency": {
+          "total_reply_pairs": 520,
+          "pct_within_5min": 20,
+          "pct_within_30min": 42,
+          "pct_within_1hr": 51,
+          "pct_within_4hr": 66,
+          "mean_minutes": 28,
+          "median_minutes": 18,
+          "thread_count": 48,
+          "window_label": "synthetic past year"
+        },
+        "ball_in_court": {
+          "total_threads_sampled": 100,
+          "threads_with_ball_in_court": 44,
+          "pct_ball_in_court": 44,
+          "live_conversations_estimate": 37,
+          "snapshot_label": "synthetic now"
+        },
+        "group_contribution": {
+          "total_groups_analyzed": 9,
+          "total_messages_in_groups": 900,
+          "user_messages_in_groups": 162,
+          "user_contribution_pct": 18,
+          "user_reaction_rate_pct": 28,
+          "peer_reaction_rate_pct": 30,
+          "groups_where_user_silent": 1,
+          "groups_mostly_reactions": 1,
+          "per_thread": [
+            {
+              "thread_label": "Synthetic Crew",
+              "total": 120,
+              "user_count": 3,
+              "user_pct": 0,
+              "user_reaction_pct": 0
+            },
+            {
+              "thread_label": "Synthetic Weekend Plans",
+              "total": 80,
+              "user_count": 18,
+              "user_pct": 22.5,
+              "user_reaction_pct": 10
+            }
+          ],
+          "worst_offender": {
+            "thread_label": "Synthetic Crew",
+            "total": 120,
+            "user_count": 3
+          }
+        },
+        "emoji": {
+          "pct_messages_with_emoji": 18,
+          "emoji_per_message": 0.32,
+          "top": [
+            {
+              "emoji": "😂",
+              "count": 140
+            },
+            {
+              "emoji": "❤️",
+              "count": 90
+            },
+            {
+              "emoji": "🔥",
+              "count": 40
+            }
+          ]
+        },
+        "style": {
+          "dominant_laugh": "joy",
+          "pct_all_lowercase": 52,
+          "pct_end_period": 7,
+          "pct_emoji_ending": 17,
+          "genz_slang_breakdown": {},
+          "aging_slang_breakdown": {},
+          "sample_size": 870,
+          "active_days": 110
+        },
+        "filters": {
+          "window_days": 365,
+          "since_ts_ms": 1748736000000,
+          "until_ts_ms": 1780272000000
+        },
+        "fixture_total_sent": 7200
+      }
+    }
+  ]
+}

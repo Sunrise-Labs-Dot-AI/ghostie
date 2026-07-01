@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Direction A — Continuum · Messages for AI</title>
+<style>
+  /* ============================================================
+     DIRECTION A — CONTINUUM (Refined Native)
+     Apple HIG fidelity, elevated. Light appearance, system
+     materials, proper SF Pro hierarchy, grouped inset settings.
+     ============================================================ */
+
+  :root {
+    /* Brand tokens */
+    --blue:        #0a7cff;
+    --blue-deep:   #0763d6;   /* deeper sweep for the hold fill */
+    --blue-press:  #0556bd;
+    --green:       #11b981;
+    --green-deep:  #0e9a6c;
+    --amber:       #f5a623;
+    --amber-soft:  #fbbf3b;
+    --red:         #ff5f57;
+
+    --ink:         #111317;
+    --soft-ink:    #363d47;
+    --muted:       #68707d;
+    --faint:       #9aa2ad;
+
+    --bg:          #f6f7f9;
+    --paper:       #ffffff;
+    --paper-tint:  #f0f4f8;
+    --hairline:    #dfe4eb;
+    --hairline-2:  #e7ebf1;
+
+    --radius:      8px;
+    --radius-lg:   12px;
+    --radius-card: 11px;
+
+    --shadow-win:  0 24px 80px rgba(18,24,34,.14), 0 2px 8px rgba(18,24,34,.06);
+    --shadow-soft: 0 1px 2px rgba(18,24,34,.05), 0 6px 18px rgba(18,24,34,.06);
+    --shadow-pop:  0 8px 28px rgba(18,24,34,.16), 0 1px 3px rgba(18,24,34,.10);
+
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+            "Helvetica Neue", Helvetica, Arial, sans-serif;
+
+    --sp: 8px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Desktop backdrop — a calm cool-neutral wash with a faint
+     vignette + grain so the windows float on real atmosphere */
+  body {
+    background:
+      radial-gradient(1200px 760px at 18% -8%, #ffffff 0%, rgba(255,255,255,0) 55%),
+      radial-gradient(1100px 900px at 100% 0%, #eef2f7 0%, rgba(238,242,247,0) 60%),
+      linear-gradient(180deg, #eef1f5 0%, #e7ebf1 48%, #e2e7ee 100%);
+    min-height: 100vh;
+  }
+  body::before {
+    /* fine grain overlay */
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: .35;
+    z-index: 0;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='saturate' values='0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/></svg>");
+  }
+
+  .page {
+    position: relative;
+    z-index: 1;
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 40px 48px 96px;
+  }
+
+  /* ===================== HEADER BAND ===================== */
+  .band {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 32px;
+    padding: 18px 22px;
+    margin-bottom: 44px;
+    background: rgba(255,255,255,.72);
+    border: 1px solid rgba(255,255,255,.9);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-soft);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+  }
+  .band-left { display: flex; flex-direction: column; gap: 7px; max-width: 640px; }
+  .band-eyebrow {
+    font-size: 11px; font-weight: 600; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--blue);
+  }
+  .band-title {
+    font-size: 25px; font-weight: 700; letter-spacing: -.02em;
+    line-height: 1.05; color: var(--ink);
+  }
+  .band-title span { color: var(--muted); font-weight: 600; }
+  .band-rationale { font-size: 13.5px; line-height: 1.5; color: var(--soft-ink); }
+
+  .band-right { display: flex; flex-direction: column; gap: 12px; align-items: flex-end; }
+  .swatches { display: flex; gap: 7px; }
+  .sw {
+    width: 26px; height: 26px; border-radius: 7px;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.06), 0 1px 2px rgba(18,24,34,.12);
+    position: relative;
+  }
+  .sw::after {
+    content: attr(data-label);
+    position: absolute; bottom: -16px; left: 50%; transform: translateX(-50%);
+    font-size: 8.5px; color: var(--faint); white-space: nowrap; letter-spacing: .02em;
+  }
+  .typerow {
+    display: flex; gap: 10px; align-items: baseline;
+    font-size: 11.5px; color: var(--muted);
+    border-top: 1px solid var(--hairline); padding-top: 11px; margin-top: 6px;
+  }
+  .typerow b { color: var(--soft-ink); font-weight: 600; }
+  .typerow .display-sample { font-size: 17px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
+  .typerow .body-sample { font-size: 13px; font-weight: 400; color: var(--soft-ink); }
+
+  /* ===================== WINDOW SHELL ===================== */
+  .caption {
+    display: flex; align-items: center; gap: 9px;
+    font-size: 12px; font-weight: 600; color: var(--muted);
+    letter-spacing: .01em; margin: 0 0 12px 6px;
+  }
+  .caption .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--blue); }
+  .caption .dot.green { background: var(--green); }
+  .caption .dot.amber { background: var(--amber); }
+
+  .window {
+    width: 1180px;
+    max-width: 100%;
+    margin: 0 auto 64px;
+    background: var(--paper);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-win);
+    overflow: hidden;
+    border: 1px solid rgba(18,24,34,.06);
+  }
+
+  .titlebar {
+    height: 40px;
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    background: linear-gradient(180deg, #fbfcfd 0%, #f3f5f8 100%);
+    border-bottom: 1px solid var(--hairline);
+    position: relative;
+  }
+  .traffic { display: flex; gap: 8px; }
+  .light { width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 .5px rgba(0,0,0,.12); }
+  .light.r { background: #ff5f57; }
+  .light.y { background: #febc2e; }
+  .light.g { background: #28c840; }
+  .titlebar .winname {
+    position: absolute; left: 0; right: 0; text-align: center;
+    font-size: 13px; font-weight: 600; color: var(--soft-ink);
+    pointer-events: none; letter-spacing: -.01em;
+  }
+
+  .shell { display: flex; min-height: 660px; }
+
+  /* ===================== SIDEBAR (vibrancy) ===================== */
+  .sidebar {
+    width: 232px;
+    flex: 0 0 232px;
+    padding: 14px 12px 16px;
+    background:
+      linear-gradient(180deg, rgba(247,249,251,.96) 0%, rgba(240,244,248,.96) 100%);
+    border-right: 1px solid var(--hairline);
+    backdrop-filter: saturate(180%) blur(24px);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    display: flex; flex-direction: column;
+  }
+  .wordmark {
+    display: flex; align-items: center; gap: 9px;
+    padding: 6px 8px 16px;
+  }
+  .wordmark .glyph {
+    width: 26px; height: 26px; border-radius: 7px;
+    background: linear-gradient(155deg, var(--blue) 0%, #0a63d6 60%, var(--green) 165%);
+    display: grid; place-items: center;
+    box-shadow: 0 2px 6px rgba(10,124,255,.35), inset 0 1px 0 rgba(255,255,255,.4);
+    flex: 0 0 auto;
+  }
+  .wordmark .name {
+    font-size: 14px; font-weight: 700; letter-spacing: -.02em; color: var(--ink);
+    line-height: 1;
+  }
+  .wordmark .name small { display: block; font-size: 10.5px; font-weight: 500; color: var(--muted); margin-top: 3px; letter-spacing: 0; }
+
+  .navgroup { display: flex; flex-direction: column; gap: 2px; }
+  .navlabel {
+    font-size: 10.5px; font-weight: 600; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--faint);
+    padding: 6px 10px 5px;
+  }
+  .navitem {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    font-size: 13px; font-weight: 500; color: var(--soft-ink);
+    cursor: default; position: relative;
+    transition: background .12s ease;
+  }
+  .navitem svg { width: 16px; height: 16px; flex: 0 0 16px; color: var(--muted); }
+  .navitem .nav-text { flex: 1; }
+  .navitem:hover { background: rgba(10,124,255,.06); }
+  .navitem.active {
+    background: linear-gradient(180deg, var(--blue) 0%, #0a70ea 100%);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(10,124,255,.30), inset 0 1px 0 rgba(255,255,255,.25);
+  }
+  .navitem.active svg { color: #fff; }
+  .navitem.active .badge { background: rgba(255,255,255,.26); color: #fff; }
+
+  .badge {
+    font-size: 11px; font-weight: 600; line-height: 1;
+    min-width: 19px; height: 19px; padding: 0 6px;
+    border-radius: 10px; background: rgba(104,112,125,.16); color: var(--soft-ink);
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .attn-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--red);
+    box-shadow: 0 0 0 2px rgba(255,95,87,.18);
+  }
+  .nav-divider { height: 1px; background: var(--hairline); margin: 12px 8px; }
+
+  .sidebar-foot {
+    margin-top: auto; padding: 10px 8px 2px;
+    display: flex; align-items: center; gap: 9px;
+  }
+  .sidebar-foot .ava {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: linear-gradient(150deg, #c9d4e2, #aab8cc);
+    display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff;
+  }
+  .sidebar-foot .who { font-size: 12px; line-height: 1.2; }
+  .sidebar-foot .who b { display: block; color: var(--soft-ink); font-weight: 600; }
+  .sidebar-foot .who span { color: var(--faint); font-size: 10.5px; }
+
+  /* ===================== CONTENT PANE ===================== */
+  .content { flex: 1; display: flex; min-width: 0; background: var(--paper); }
+
+  /* ---- THREAD LIST COLUMN ---- */
+  .threadcol {
+    width: 312px; flex: 0 0 312px;
+    border-right: 1px solid var(--hairline);
+    background: linear-gradient(180deg, #fcfdfe 0%, #f8fafc 100%);
+    display: flex; flex-direction: column;
+  }
+  .threadcol-head { padding: 22px 22px 14px; }
+  .threadcol-titlerow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .h-title { font-size: 26px; font-weight: 700; letter-spacing: -.025em; color: var(--ink); line-height: 1.05; }
+  .h-sub { font-size: 12.5px; line-height: 1.45; color: var(--muted); margin-top: 7px; max-width: 250px; }
+  .iconbtn {
+    width: 30px; height: 30px; border-radius: 8px; flex: 0 0 auto;
+    border: 1px solid var(--hairline); background: #fff;
+    display: grid; place-items: center; cursor: default;
+    box-shadow: var(--shadow-soft); color: var(--soft-ink);
+    transition: background .12s;
+  }
+  .iconbtn:hover { background: var(--paper-tint); }
+  .iconbtn svg { width: 15px; height: 15px; }
+
+  .sectlabel {
+    font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--faint); padding: 6px 22px 8px;
+  }
+  .threadlist { padding: 0 10px 12px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+  .thread {
+    display: flex; gap: 11px; padding: 11px 12px; border-radius: 10px;
+    cursor: default; align-items: center; transition: background .12s;
+  }
+  .thread:hover { background: rgba(10,124,255,.05); }
+  .thread.active { background: #fff; box-shadow: var(--shadow-soft); border: 1px solid var(--hairline-2); }
+  .t-ava {
+    width: 38px; height: 38px; border-radius: 50%; flex: 0 0 38px;
+    display: grid; place-items: center; font-size: 14px; font-weight: 600; color: #fff;
+    box-shadow: inset 0 0 0 .5px rgba(0,0,0,.06);
+  }
+  .t-ava.a1 { background: linear-gradient(150deg, #5aa0ff, #2a6fe0); }
+  .t-ava.a2 { background: linear-gradient(150deg, #8e9aab, #5f6b7c); }
+  .t-ava.a3 { background: linear-gradient(150deg, #f0a64a, #d97b1f); }
+  .t-ava.a4 { background: linear-gradient(150deg, #34d39b, #0e9a6c); }
+  .t-body { flex: 1; min-width: 0; }
+  .t-toprow { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .t-name { font-size: 13.5px; font-weight: 600; color: var(--ink); letter-spacing: -.01em; }
+  .t-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; display: flex; align-items: center; gap: 6px; }
+  .wa-badge {
+    font-size: 9.5px; font-weight: 600; color: var(--green-deep);
+    background: rgba(17,185,129,.12); border: 1px solid rgba(17,185,129,.25);
+    padding: 1px 6px; border-radius: 5px; letter-spacing: .01em;
+  }
+  .chips { display: flex; gap: 5px; margin-top: 7px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 11px; font-weight: 600; line-height: 1;
+    padding: 3px 8px 3px 6px; border-radius: 7px;
+  }
+  .chip svg { width: 11px; height: 11px; }
+  .chip.draft { background: rgba(10,124,255,.10); color: var(--blue); }
+  .chip.draft.green { background: rgba(17,185,129,.12); color: var(--green-deep); }
+  .chip.sched { background: rgba(245,166,35,.14); color: #b97608; }
+
+  /* ---- THREAD DETAIL COLUMN ---- */
+  .detail { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--paper); }
+  .detail-head {
+    display: flex; align-items: center; gap: 13px;
+    padding: 16px 26px; border-bottom: 1px solid var(--hairline);
+    background: rgba(252,253,254,.85);
+    backdrop-filter: blur(12px) saturate(160%);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+  }
+  .detail-head .t-ava { width: 40px; height: 40px; flex-basis: 40px; }
+  .dh-text { flex: 1; }
+  .dh-name { font-size: 16px; font-weight: 700; letter-spacing: -.02em; color: var(--ink); }
+  .dh-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .dh-meta {
+    font-size: 11.5px; font-weight: 600; color: var(--soft-ink);
+    background: var(--paper-tint); border: 1px solid var(--hairline);
+    padding: 5px 11px; border-radius: 8px; white-space: nowrap;
+  }
+
+  .transcript {
+    flex: 1; padding: 26px 30px 30px;
+    display: flex; flex-direction: column; gap: 6px;
+    background:
+      radial-gradient(680px 420px at 88% 8%, rgba(10,124,255,.035), rgba(10,124,255,0) 60%),
+      var(--paper);
+  }
+
+  .row { display: flex; flex-direction: column; max-width: 78%; }
+  .row.in { align-self: flex-start; align-items: flex-start; }
+  .row.out { align-self: flex-end; align-items: flex-end; }
+
+  .bubble {
+    font-size: 14.5px; line-height: 1.36; letter-spacing: -.005em;
+    padding: 10px 15px; border-radius: 19px; position: relative;
+    max-width: 100%; word-wrap: break-word;
+  }
+  .bubble.in {
+    background: #e9edf2; color: var(--ink);
+    border-bottom-left-radius: 6px;
+  }
+  .bubble.sent {
+    background: linear-gradient(180deg, #1f8bff 0%, var(--blue) 100%);
+    color: #fff; border-bottom-right-radius: 6px;
+  }
+  .stamp { font-size: 10.5px; color: var(--faint); margin: 4px 6px 8px; letter-spacing: .01em; }
+
+  .pending-divider {
+    align-self: center; display: flex; align-items: center; gap: 10px;
+    width: 100%; max-width: 420px; margin: 16px auto 14px;
+    color: var(--muted); font-size: 11px; font-weight: 600;
+    letter-spacing: .05em; text-transform: uppercase;
+  }
+  .pending-divider::before, .pending-divider::after {
+    content: ""; flex: 1; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--hairline), transparent);
+  }
+
+  /* ===== THE HERO: pending / hold-to-send approval bubble ===== */
+  .approval { align-self: flex-end; align-items: flex-end; max-width: 80%; }
+  .approval-wrap { position: relative; display: flex; gap: 8px; align-items: flex-end; }
+
+  /* hover action buttons */
+  .bubble-actions { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; opacity: 1; }
+  .round-btn {
+    width: 28px; height: 28px; border-radius: 50%;
+    border: 1px solid var(--hairline); background: #fff;
+    display: grid; place-items: center; cursor: default;
+    box-shadow: var(--shadow-soft); color: var(--soft-ink);
+  }
+  .round-btn:hover { background: var(--paper-tint); }
+  .round-btn.danger:hover { background: rgba(255,95,87,.10); color: #e0473f; }
+  .round-btn svg { width: 13px; height: 13px; }
+
+  .pending-bubble {
+    position: relative;
+    font-size: 14.5px; line-height: 1.36; letter-spacing: -.005em;
+    color: #fff;
+    padding: 11px 17px 12px;
+    border-radius: 19px; border-bottom-right-radius: 6px;
+    overflow: hidden;
+    /* base = a real iMessage blue, but a touch lighter/awaiting */
+    background: linear-gradient(180deg, #4ea0ff 0%, #2c8bff 100%);
+    box-shadow:
+      0 8px 22px rgba(10,124,255,.30),
+      0 0 0 1px rgba(10,124,255,.45),
+      0 0 0 4px rgba(10,124,255,.12),
+      inset 0 1px 0 rgba(255,255,255,.28);
+  }
+  /* "approval object" ring — a deliberate halo that marks it pending */
+  .pending-bubble::after {
+    content: "";
+    position: absolute; inset: 0;
+    border-radius: inherit;
+    box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.30);
+    pointer-events: none;
+  }
+
+  /* the sweep fill: deeper blue, left→right, frozen at 55% */
+  .hold-fill {
+    position: absolute; top: 0; left: 0; bottom: 0;
+    width: 55%;
+    background: linear-gradient(180deg, var(--blue-deep) 0%, var(--blue-press) 100%);
+    box-shadow: 2px 0 14px rgba(5,86,189,.55);
+    z-index: 0;
+    animation: holdSweep 2.6s cubic-bezier(.45,.05,.35,1) infinite alternate;
+  }
+  /* leading edge shimmer line */
+  .hold-fill::after {
+    content: "";
+    position: absolute; top: 0; right: 0; bottom: 0; width: 2px;
+    background: linear-gradient(180deg, rgba(255,255,255,.75), rgba(255,255,255,.25));
+    box-shadow: 0 0 10px 1px rgba(255,255,255,.6);
+  }
+  @keyframes holdSweep {
+    0%   { width: 44%; }
+    100% { width: 66%; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hold-fill { animation: none; width: 55%; }
+  }
+  .pending-bubble .ptext { position: relative; z-index: 1; }
+
+  .pending-label {
+    display: flex; align-items: center; gap: 9px;
+    margin: 9px 4px 4px; align-self: flex-end;
+  }
+  .keep-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 600; color: var(--blue);
+    background: rgba(10,124,255,.10);
+    border: 1px solid rgba(10,124,255,.24);
+    padding: 5px 12px 5px 10px; border-radius: 999px;
+    box-shadow: 0 1px 2px rgba(10,124,255,.10);
+  }
+  .keep-pill .fingerprint { width: 14px; height: 14px; color: var(--blue); }
+  /* tiny linear hold meter inside the pill */
+  .pill-meter {
+    width: 46px; height: 4px; border-radius: 999px;
+    background: rgba(10,124,255,.18); overflow: hidden; position: relative;
+  }
+  .pill-meter > i {
+    position: absolute; inset: 0 45% 0 0; border-radius: 999px;
+    background: var(--blue);
+    animation: holdSweep 2.6s cubic-bezier(.45,.05,.35,1) infinite alternate;
+  }
+  .drafted-meta { font-size: 10.5px; color: var(--faint); margin: 2px 6px 4px; }
+
+  /* scheduled (resting) draft bubble */
+  .sched-bubble {
+    position: relative;
+    font-size: 14.5px; line-height: 1.36; letter-spacing: -.005em;
+    color: var(--ink);
+    padding: 11px 16px;
+    border-radius: 19px; border-bottom-right-radius: 6px;
+    background: #fff;
+    border: 1.5px dashed rgba(245,166,35,.55);
+    box-shadow: 0 4px 14px rgba(245,166,35,.10), inset 0 1px 0 rgba(255,255,255,.6);
+  }
+  .sched-bubble .corner-clock {
+    position: absolute; top: -8px; right: -6px;
+    width: 22px; height: 22px; border-radius: 50%;
+    background: var(--amber); color: #fff; display: grid; place-items: center;
+    box-shadow: 0 2px 6px rgba(245,166,35,.4); border: 2px solid #fff;
+  }
+  .sched-bubble .corner-clock svg { width: 11px; height: 11px; }
+  .sched-meta { display: flex; align-items: center; gap: 9px; margin: 8px 6px 2px; align-self: flex-end; }
+  .sched-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 11px; font-weight: 600; color: #b97608;
+    background: rgba(245,166,35,.13); border: 1px solid rgba(245,166,35,.3);
+    padding: 3px 9px; border-radius: 7px;
+  }
+  .sched-chip svg { width: 11px; height: 11px; }
+  .sched-when { font-size: 11px; color: var(--muted); }
+  .sched-hint {
+    font-size: 10.5px; color: var(--faint); margin: 5px 6px 2px;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .sched-hint svg { width: 11px; height: 11px; opacity: .8; }
+
+  /* ===================== SETTINGS PANE ===================== */
+  .pane {
+    flex: 1; min-width: 0; overflow-y: auto;
+    background: linear-gradient(180deg, #fbfcfd 0%, #f6f8fa 100%);
+  }
+  .pane-inner { max-width: 720px; margin: 0 auto; padding: 30px 40px 56px; }
+  .pane-title { font-size: 27px; font-weight: 700; letter-spacing: -.025em; color: var(--ink); }
+  .pane-sub { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.45; }
+
+  .group { margin-top: 30px; }
+  .group-label {
+    font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--faint); padding: 0 4px 9px;
+  }
+  /* grouped inset card */
+  .card {
+    background: var(--paper);
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-soft);
+    overflow: hidden;
+  }
+  .srow {
+    display: flex; align-items: center; gap: 14px;
+    padding: 13px 16px;
+    position: relative;
+  }
+  .srow + .srow::before,
+  .subsection + .srow::before,
+  .srow + .subsection::before {
+    content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px;
+    background: var(--hairline-2);
+  }
+  .srow .s-ico {
+    width: 28px; height: 28px; border-radius: 7px; flex: 0 0 28px;
+    display: grid; place-items: center; color: #fff;
+  }
+  .s-ico.blue { background: linear-gradient(160deg, #4ea0ff, var(--blue)); }
+  .s-ico.green { background: linear-gradient(160deg, #34d39b, var(--green)); }
+  .s-ico.amber { background: linear-gradient(160deg, #fbbf3b, var(--amber)); }
+  .s-ico.gray { background: linear-gradient(160deg, #aab4c2, #7c8696); }
+  .s-ico.ink { background: linear-gradient(160deg, #4a525e, #2c333c); }
+  .s-ico svg { width: 15px; height: 15px; }
+  .s-main { flex: 1; min-width: 0; }
+  .s-label { font-size: 13.5px; font-weight: 600; color: var(--ink); letter-spacing: -.01em; }
+  .s-help { font-size: 11.5px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+  .s-right { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+
+  .status-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 11.5px; font-weight: 600;
+    padding: 4px 10px; border-radius: 999px;
+  }
+  .status-pill .pdot { width: 6px; height: 6px; border-radius: 50%; }
+  .status-pill.ok { background: rgba(17,185,129,.12); color: var(--green-deep); }
+  .status-pill.ok .pdot { background: var(--green); box-shadow: 0 0 0 2px rgba(17,185,129,.18); }
+
+  .mini-btn {
+    font-size: 12px; font-weight: 600; color: var(--soft-ink);
+    background: #fff; border: 1px solid var(--hairline);
+    padding: 5px 11px; border-radius: 7px; cursor: default;
+    box-shadow: var(--shadow-soft); white-space: nowrap;
+  }
+  .mini-btn:hover { background: var(--paper-tint); }
+  .mini-btn.primary { color: #fff; background: linear-gradient(180deg, #1f8bff, var(--blue)); border-color: transparent; box-shadow: 0 2px 6px rgba(10,124,255,.3); }
+
+  /* toggle */
+  .toggle {
+    width: 40px; height: 24px; border-radius: 999px; position: relative;
+    background: linear-gradient(180deg, #2fbb6b, var(--green));
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,.06), inset 0 1px 2px rgba(0,0,0,.08);
+    flex: 0 0 40px;
+  }
+  .toggle::after {
+    content: ""; position: absolute; top: 2px; left: 18px;
+    width: 20px; height: 20px; border-radius: 50%; background: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.25), 0 0 0 .5px rgba(0,0,0,.04);
+    transition: left .15s;
+  }
+  .toggle.off { background: #d6dbe2; }
+  .toggle.off::after { left: 2px; }
+
+  /* nested subsection (indented inset block) */
+  .subsection {
+    margin: 0 0 0 0; padding: 12px 16px 14px 58px; position: relative;
+    background: linear-gradient(180deg, rgba(240,244,248,.55), rgba(240,244,248,.30));
+  }
+  .subsection .sub-title { font-size: 12.5px; font-weight: 600; color: var(--soft-ink); }
+  .sub-rail {
+    position: absolute; left: 30px; top: 14px; bottom: 14px; width: 2px;
+    border-radius: 2px; background: var(--hairline);
+  }
+  .time-control {
+    display: inline-flex; align-items: center; gap: 8px; margin-top: 9px;
+  }
+  .time-control .tc-label { font-size: 11.5px; color: var(--muted); }
+  .time-pill {
+    font-size: 12.5px; font-weight: 600; color: var(--ink);
+    background: #fff; border: 1px solid var(--hairline);
+    padding: 5px 11px; border-radius: 7px; box-shadow: var(--shadow-soft);
+  }
+  .time-arrow { font-size: 11px; color: var(--faint); }
+
+  .nested-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 8px 0; position: relative;
+  }
+  .nested-row + .nested-row { border-top: 1px solid var(--hairline-2); }
+  .nested-row .nr-main { flex: 1; }
+  .nested-row .nr-label { font-size: 12.5px; font-weight: 600; color: var(--ink); }
+  .nested-row .nr-help { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .nested-row .nr-val { font-size: 12.5px; font-weight: 600; color: var(--blue); }
+
+  /* masked key field */
+  .key-field {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--paper-tint); border: 1px solid var(--hairline);
+    border-radius: 8px; padding: 8px 12px; margin-top: 2px;
+    font-size: 13px; font-weight: 500; color: var(--soft-ink);
+    font-feature-settings: "tnum";
+  }
+  .key-field .keymono { letter-spacing: .04em; flex: 1; }
+  .key-field svg { width: 15px; height: 15px; color: var(--muted); }
+
+  /* diagnostics checklist */
+  .diag-grid { display: flex; flex-direction: column; }
+  .diag-item {
+    display: flex; align-items: center; gap: 11px;
+    padding: 11px 16px; position: relative;
+    font-size: 13px; color: var(--ink);
+  }
+  .diag-item + .diag-item::before {
+    content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--hairline-2);
+  }
+  .diag-check {
+    width: 20px; height: 20px; border-radius: 50%; flex: 0 0 20px;
+    background: rgba(17,185,129,.14); display: grid; place-items: center; color: var(--green-deep);
+  }
+  .diag-check svg { width: 12px; height: 12px; }
+  .diag-item .di-label { flex: 1; font-weight: 500; }
+  .diag-item .di-status { font-size: 12px; font-weight: 600; color: var(--green-deep); }
+  .diag-actions { display: flex; gap: 9px; padding: 13px 16px; position: relative; }
+  .diag-actions::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--hairline-2); }
+
+  /* ===================== HOME PANE ===================== */
+  .home-inner { max-width: 760px; margin: 0 auto; padding: 38px 44px 54px; }
+  .home-title { font-size: 28px; font-weight: 700; letter-spacing: -.03em; color: var(--ink); line-height: 1.05; }
+  .home-sub { font-size: 14px; color: var(--muted); margin-top: 9px; line-height: 1.5; max-width: 560px; }
+
+  .status-card {
+    margin-top: 28px;
+    background: var(--paper); border: 1px solid var(--hairline);
+    border-radius: var(--radius-card); box-shadow: var(--shadow-soft); overflow: hidden;
+  }
+  .status-card .sc-head {
+    padding: 14px 18px; border-bottom: 1px solid var(--hairline-2);
+    font-size: 11.5px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--faint);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .hrow {
+    display: flex; align-items: center; gap: 13px;
+    padding: 15px 18px; position: relative;
+  }
+  .hrow + .hrow::before { content: ""; position: absolute; top: 0; left: 18px; right: 0; height: 1px; background: var(--hairline-2); }
+  .hrow .h-ico {
+    width: 30px; height: 30px; border-radius: 8px; flex: 0 0 30px;
+    display: grid; place-items: center;
+    background: var(--paper-tint); color: var(--soft-ink);
+  }
+  .hrow .h-ico svg { width: 16px; height: 16px; }
+  .hrow .h-label { flex: 1; font-size: 14px; font-weight: 600; color: var(--ink); letter-spacing: -.01em; }
+  .hrow .h-value { display: flex; align-items: center; gap: 9px; font-size: 13px; font-weight: 600; }
+  .sdot { width: 9px; height: 9px; border-radius: 50%; }
+  .sdot.green { background: var(--green); box-shadow: 0 0 0 3px rgba(17,185,129,.16); }
+  .sdot.amber { background: var(--amber); box-shadow: 0 0 0 3px rgba(245,166,35,.18); }
+  .hrow .h-value.green { color: var(--green-deep); }
+  .hrow .h-value.amber { color: #b97608; }
+
+  .home-foot {
+    margin-top: 24px;
+    display: flex; align-items: center; gap: 11px;
+    padding: 15px 18px;
+    background: linear-gradient(180deg, rgba(10,124,255,.05), rgba(17,185,129,.04));
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-card);
+    font-size: 13.5px; color: var(--soft-ink); font-weight: 500;
+  }
+  .home-foot .spark {
+    width: 30px; height: 30px; border-radius: 8px; flex: 0 0 30px;
+    display: grid; place-items: center; color: #fff;
+    background: linear-gradient(150deg, var(--blue), var(--green) 180%);
+    box-shadow: 0 2px 8px rgba(10,124,255,.3);
+  }
+  .home-foot .spark svg { width: 16px; height: 16px; }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ================= HEADER BAND ================= -->
+  <div class="band">
+    <div class="band-left">
+      <div class="band-eyebrow">Creative Direction</div>
+      <div class="band-title">Direction A — Continuum <span>· Refined Native</span></div>
+      <div class="band-rationale">
+        It should feel like it shipped inside macOS: Human Interface fidelity, elevated. Translucent
+        materials, a confident SF Pro type scale, grouped inset rows, and two chromatic accents only —
+        iMessage blue and WhatsApp green — over a calm cool-neutral system. Restraint is the aesthetic.
+      </div>
+    </div>
+    <div class="band-right">
+      <div class="swatches">
+        <span class="sw" style="background:#0a7cff" data-label="blue"></span>
+        <span class="sw" style="background:#11b981" data-label="green"></span>
+        <span class="sw" style="background:#111317" data-label="ink"></span>
+        <span class="sw" style="background:#68707d" data-label="muted"></span>
+        <span class="sw" style="background:#f0f4f8" data-label="tint"></span>
+        <span class="sw" style="background:#ffffff" data-label="paper"></span>
+        <span class="sw" style="background:#dfe4eb" data-label="hairline"></span>
+      </div>
+      <div class="typerow">
+        <span class="display-sample">SF&nbsp;Pro&nbsp;Display</span>
+        <span class="body-sample">SF&nbsp;Pro&nbsp;Text</span>
+        <b>·</b> system stack
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= WINDOW 1 — MESSAGES (HERO) ================= -->
+  <div class="caption"><span class="dot"></span>Messages · the approval gate (hero)</div>
+  <div class="window">
+    <div class="titlebar">
+      <div class="traffic"><span class="light r"></span><span class="light y"></span><span class="light g"></span></div>
+      <div class="winname">Messages for AI</div>
+    </div>
+    <div class="shell">
+
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="wordmark">
+          <div class="glyph">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1.5c3.59 0 6.5 2.46 6.5 5.5 0 3.04-2.91 5.5-6.5 5.5-.83 0-1.62-.13-2.35-.37L2.5 13.5l.86-2.43C2.5 10.1 1.5 8.6 1.5 7 1.5 3.96 4.41 1.5 8 1.5Z" fill="#fff"/></svg>
+          </div>
+          <div class="name">Messages for AI</div>
+        </div>
+
+        <div class="navgroup">
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M2 7.2 8 2l6 5.2V14a.5.5 0 0 1-.5.5H10v-4H6v4H2.5A.5.5 0 0 1 2 14V7.2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+            <span class="nav-text">Home</span>
+          </div>
+          <div class="navitem active">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h9A1.5 1.5 0 0 1 14 4.5v5A1.5 1.5 0 0 1 12.5 11H7l-3 2.5V11H3.5A1.5 1.5 0 0 1 2 9.5v-5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+            <span class="nav-text">Messages</span>
+            <span class="badge">2</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M8 2.2 9.6 5l3.1.45-2.25 2.2.53 3.1L8 9.3 5.02 10.7l.53-3.1L3.3 5.45 6.4 5 8 2.2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+            <span class="nav-text">Automations</span>
+            <span class="badge">1</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v3.2l2 1.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <span class="nav-text">Scheduled</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M2 8.5 5 8l1.4-3.3L8.6 12l1.6-4 1 2.4 1.8-.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="nav-text">Health</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M6.4 2.5h3.2l.4 1.7 1.5.86 1.7-.5 1.6 2.8-1.3 1.16v1.74l1.3 1.16-1.6 2.8-1.7-.5-1.5.86-.4 1.7H6.4l-.4-1.7-1.5-.86-1.7.5L1.2 11.6 2.5 10.44V8.7L1.2 7.54 2.8 4.74l1.7.5 1.5-.86.4-1.7Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/><circle cx="8" cy="8" r="1.9" stroke="currentColor" stroke-width="1.2"/></svg>
+            <span class="nav-text">Settings</span>
+            <span class="attn-dot"></span>
+          </div>
+        </div>
+
+        <div class="nav-divider"></div>
+        <div class="navlabel">Labs</div>
+        <div class="navgroup">
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M3 4h10M3 8h7M3 12h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <span class="nav-text">Texting Style</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M8 2a6 6 0 1 0 6 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="11.5" cy="4.5" r="1.4" fill="currentColor"/></svg>
+            <span class="nav-text">Don't Ghost</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M5 11c-1.5 0-2.5-1-2.5-2.6C2.5 6.5 4 5.4 5.6 5.6 6 4 7.3 3 8.7 3.3c1.2.25 2 1.2 2 2.5 1.4.1 2.3 1.1 2.3 2.4 0 1.5-1.1 2.5-2.6 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 9v4M6.5 11.5 8 13l1.5-1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="nav-text">EQ</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M3 13V7M6.5 13V4M10 13V9M13.5 13V3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            <span class="nav-text">Texting Analytics</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M8 1.8 9.7 5.4l3.9.4-2.9 2.6.83 3.85L8 10.3 4.47 12.25l.83-3.85L2.4 5.8l3.9-.4L8 1.8Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg>
+            <span class="nav-text">Texting Wrapped</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M4 6.5h8V13a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 4 13V6.5Z" stroke="currentColor" stroke-width="1.3"/><path d="M8 6.5V4.2M6.4 4.2c-1.1 0-1.6-2-.2-2 1 0 1.8 2 1.8 2m0 0c0-.0.8-2 1.8-2 1.4 0 .9 2-.2 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            <span class="nav-text">Birthday Texts</span>
+          </div>
+        </div>
+
+        <div class="sidebar-foot">
+          <div class="ava">JH</div>
+          <div class="who"><b>James</b><span>v0.5.1 · all systems go</span></div>
+        </div>
+      </aside>
+
+      <!-- CONTENT: thread list | detail -->
+      <div class="content">
+
+        <!-- THREAD LIST -->
+        <div class="threadcol">
+          <div class="threadcol-head">
+            <div class="threadcol-titlerow">
+              <div class="h-title">Messages</div>
+              <div class="iconbtn" title="Compose">
+                <svg viewBox="0 0 16 16" fill="none"><path d="M11.5 2.5l2 2L6 12l-2.6.6.6-2.6 7.5-7.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 13.5h11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+              </div>
+            </div>
+            <div class="h-sub">Review staged and scheduled messages by conversation. Nothing sends without your hold.</div>
+          </div>
+
+          <div class="sectlabel">Conversations</div>
+          <div class="threadlist">
+
+            <div class="thread active">
+              <div class="t-ava a1">ML</div>
+              <div class="t-body">
+                <div class="t-toprow"><span class="t-name">Mara Lin</span></div>
+                <div class="t-sub">+1 (415) 555-0142</div>
+                <div class="chips">
+                  <span class="chip draft">
+                    <svg viewBox="0 0 16 16" fill="none"><path d="M11 2.5l2.5 2.5L6 12.5 3 13l.5-3L11 2.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>2
+                  </span>
+                  <span class="chip sched">
+                    <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.4"/><path d="M8 5v3.2l2 1.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>1
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="thread">
+              <div class="t-ava a2">D</div>
+              <div class="t-body">
+                <div class="t-toprow"><span class="t-name">Dad</span></div>
+                <div class="t-sub">iMessage</div>
+                <div class="chips">
+                  <span class="chip draft">
+                    <svg viewBox="0 0 16 16" fill="none"><path d="M11 2.5l2.5 2.5L6 12.5 3 13l.5-3L11 2.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>1
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="thread">
+              <div class="t-ava a2" style="background:linear-gradient(150deg,#9aa6b8,#6b7787)">WC</div>
+              <div class="t-body">
+                <div class="t-toprow"><span class="t-name">Weekend Crew</span></div>
+                <div class="t-sub">Group · 4 people</div>
+                <div class="chips">
+                  <span class="chip draft">
+                    <svg viewBox="0 0 16 16" fill="none"><path d="M11 2.5l2.5 2.5L6 12.5 3 13l.5-3L11 2.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>1
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="thread">
+              <div class="t-ava a4">P</div>
+              <div class="t-body">
+                <div class="t-toprow">
+                  <span class="t-name">Priya</span>
+                  <span class="wa-badge">WhatsApp</span>
+                </div>
+                <div class="t-sub">+44 7700 900812</div>
+                <div class="chips">
+                  <span class="chip draft green">
+                    <svg viewBox="0 0 16 16" fill="none"><path d="M11 2.5l2.5 2.5L6 12.5 3 13l.5-3L11 2.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>1
+                  </span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- THREAD DETAIL -->
+        <div class="detail">
+          <div class="detail-head">
+            <div class="t-ava a1">ML</div>
+            <div class="dh-text">
+              <div class="dh-name">Mara Lin</div>
+              <div class="dh-sub">+1 (415) 555-0142</div>
+            </div>
+            <div class="dh-meta">2 drafts · 1 scheduled</div>
+          </div>
+
+          <div class="transcript">
+
+            <div class="row in">
+              <div class="bubble in">Also happy to meet at 6:30 if that works</div>
+              <div class="stamp">10:53 AM</div>
+            </div>
+
+            <div class="pending-divider">Pending messages</div>
+
+            <!-- HERO: mid-hold approval bubble -->
+            <div class="row approval">
+              <div class="approval-wrap">
+                <div class="bubble-actions">
+                  <div class="round-btn" title="Edit">
+                    <svg viewBox="0 0 16 16" fill="none"><path d="M11 2.5l2.5 2.5L6 12.5 3 13l.5-3L11 2.5Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+                  </div>
+                  <div class="round-btn danger" title="Delete">
+                    <svg viewBox="0 0 16 16" fill="none"><path d="M3.5 4.5h9M6 4.5V3.2A.7.7 0 0 1 6.7 2.5h2.6a.7.7 0 0 1 .7.7V4.5M5 4.5l.5 8.3a.7.7 0 0 0 .7.7h3.6a.7.7 0 0 0 .7-.7L11 4.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </div>
+                </div>
+                <div class="pending-bubble">
+                  <div class="hold-fill"></div>
+                  <span class="ptext">1025 Mission St. I can meet at 6:30</span>
+                </div>
+              </div>
+              <div class="pending-label">
+                <span class="keep-pill">
+                  <svg class="fingerprint" viewBox="0 0 16 16" fill="none"><path d="M8 2.2c-2.4 0-4.3 1.8-4.3 4.3 0 1 .1 2.1.1 2.1M8 4.6a1.9 1.9 0 0 0-1.9 1.9c0 1.7.2 4 .2 4M8 6.5v4.3M12.3 6.5c0-2.5-1.9-4.3-4.3-4.3-1 0-1.9.3-2.6.8M10.1 6.5c0 3.4-.4 5.6-.4 5.6" stroke="currentColor" stroke-width="1.15" stroke-linecap="round"/></svg>
+                  Keep holding to send…
+                  <span class="pill-meter"><i></i></span>
+                </span>
+              </div>
+              <div class="drafted-meta">Drafted 17m ago</div>
+            </div>
+
+            <!-- SCHEDULED resting draft -->
+            <div class="row approval">
+              <div class="sched-bubble">
+                <div class="corner-clock">
+                  <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3.2l2 1.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </div>
+                I'll follow up tomorrow morning with the final plan
+              </div>
+              <div class="sched-meta">
+                <span class="sched-chip">
+                  <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="1.4"/><path d="M8 5v3.2l2 1.2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+                  Scheduled
+                </span>
+                <span class="sched-when">Sending on Jun 6, 12:02 PM</span>
+              </div>
+              <div class="sched-hint">
+                <svg viewBox="0 0 16 16" fill="none"><path d="M8 2.2c-2.4 0-4.3 1.8-4.3 4.3M8 6.5v4.3M10.1 6.5c0 3.4-.4 5.6-.4 5.6" stroke="currentColor" stroke-width="1.15" stroke-linecap="round"/></svg>
+                Press &amp; hold to send now
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= WINDOW 2 — SETTINGS ================= -->
+  <div class="caption"><span class="dot"></span>Settings · nested &amp; legible</div>
+  <div class="window">
+    <div class="titlebar">
+      <div class="traffic"><span class="light r"></span><span class="light y"></span><span class="light g"></span></div>
+      <div class="winname">Messages for AI — Settings</div>
+    </div>
+    <div class="shell">
+
+      <!-- SIDEBAR (Settings active) -->
+      <aside class="sidebar">
+        <div class="wordmark">
+          <div class="glyph">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1.5c3.59 0 6.5 2.46 6.5 5.5 0 3.04-2.91 5.5-6.5 5.5-.83 0-1.62-.13-2.35-.37L2.5 13.5l.86-2.43C2.5 10.1 1.5 8.6 1.5 7 1.5 3.96 4.41 1.5 8 1.5Z" fill="#fff"/></svg>
+          </div>
+          <div class="name">Messages for AI</div>
+        </div>
+        <div class="navgroup">
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M2 7.2 8 2l6 5.2V14a.5.5 0 0 1-.5.5H10v-4H6v4H2.5A.5.5 0 0 1 2 14V7.2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+            <span class="nav-text">Home</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h9A1.5 1.5 0 0 1 14 4.5v5A1.5 1.5 0 0 1 12.5 11H7l-3 2.5V11H3.5A1.5 1.5 0 0 1 2 9.5v-5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+            <span class="nav-text">Messages</span>
+            <span class="badge">2</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M8 2.2 9.6 5l3.1.45-2.25 2.2.53 3.1L8 9.3 5.02 10.7l.53-3.1L3.3 5.45 6.4 5 8 2.2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+            <span class="nav-text">Automations</span>
+            <span class="badge">1</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v3.2l2 1.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <span class="nav-text">Scheduled</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M2 8.5 5 8l1.4-3.3L8.6 12l1.6-4 1 2.4 1.8-.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="nav-text">Health</span>
+          </div>
+          <div class="navitem active">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M6.4 2.5h3.2l.4 1.7 1.5.86 1.7-.5 1.6 2.8-1.3 1.16v1.74l1.3 1.16-1.6 2.8-1.7-.5-1.5.86-.4 1.7H6.4l-.4-1.7-1.5-.86-1.7.5L1.2 11.6 2.5 10.44V8.7L1.2 7.54 2.8 4.74l1.7.5 1.5-.86.4-1.7Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/><circle cx="8" cy="8" r="1.9" stroke="currentColor" stroke-width="1.2"/></svg>
+            <span class="nav-text">Settings</span>
+            <span class="attn-dot"></span>
+          </div>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="navlabel">Labs</div>
+        <div class="navgroup">
+          <div class="navitem"><svg viewBox="0 0 16 16" fill="none"><path d="M3 4h10M3 8h7M3 12h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span class="nav-text">Texting Style</span></div>
+          <div class="navitem"><svg viewBox="0 0 16 16" fill="none"><path d="M8 2a6 6 0 1 0 6 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="11.5" cy="4.5" r="1.4" fill="currentColor"/></svg><span class="nav-text">Don't Ghost</span></div>
+          <div class="navitem"><svg viewBox="0 0 16 16" fill="none"><path d="M5 11c-1.5 0-2.5-1-2.5-2.6C2.5 6.5 4 5.4 5.6 5.6 6 4 7.3 3 8.7 3.3c1.2.25 2 1.2 2 2.5 1.4.1 2.3 1.1 2.3 2.4 0 1.5-1.1 2.5-2.6 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 9v4M6.5 11.5 8 13l1.5-1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="nav-text">EQ</span></div>
+          <div class="navitem"><svg viewBox="0 0 16 16" fill="none"><path d="M3 13V7M6.5 13V4M10 13V9M13.5 13V3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg><span class="nav-text">Texting Analytics</span></div>
+          <div class="navitem"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1.8 9.7 5.4l3.9.4-2.9 2.6.83 3.85L8 10.3 4.47 12.25l.83-3.85L2.4 5.8l3.9-.4L8 1.8Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg><span class="nav-text">Texting Wrapped</span></div>
+          <div class="navitem"><svg viewBox="0 0 16 16" fill="none"><path d="M4 6.5h8V13a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 4 13V6.5Z" stroke="currentColor" stroke-width="1.3"/><path d="M8 6.5V4.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg><span class="nav-text">Birthday Texts</span></div>
+        </div>
+        <div class="sidebar-foot">
+          <div class="ava">JH</div>
+          <div class="who"><b>James</b><span>v0.5.1 · all systems go</span></div>
+        </div>
+      </aside>
+
+      <!-- SETTINGS PANE -->
+      <div class="pane">
+        <div class="pane-inner">
+          <div class="pane-title">Settings</div>
+          <div class="pane-sub">Connections, scheduling, and how Claude drafts on your behalf.</div>
+
+          <!-- MESSAGING -->
+          <div class="group">
+            <div class="group-label">Messaging</div>
+            <div class="card">
+              <div class="srow">
+                <div class="s-ico blue"><svg viewBox="0 0 16 16" fill="none"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h9A1.5 1.5 0 0 1 14 4.5v5A1.5 1.5 0 0 1 12.5 11H7l-3 2.5V11H3.5A1.5 1.5 0 0 1 2 9.5v-5Z" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></svg></div>
+                <div class="s-main"><div class="s-label">iMessage</div></div>
+                <div class="s-right">
+                  <span class="status-pill ok"><span class="pdot"></span>Running</span>
+                  <span class="mini-btn">Restart</span>
+                  <span class="toggle"></span>
+                </div>
+              </div>
+              <div class="srow">
+                <div class="s-ico green"><svg viewBox="0 0 16 16" fill="none"><path d="M8 2.2c3.2 0 5.8 2.3 5.8 5.2 0 2.9-2.6 5.2-5.8 5.2-.74 0-1.45-.12-2.1-.34L3 13.3l.78-2.2C2.9 10.2 2.2 8.96 2.2 7.4 2.2 4.5 4.8 2.2 8 2.2Z" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></svg></div>
+                <div class="s-main"><div class="s-label">WhatsApp</div></div>
+                <div class="s-right">
+                  <span class="status-pill ok"><span class="pdot"></span>Connected</span>
+                  <span class="mini-btn">Reconnect</span>
+                  <span class="toggle"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- SCHEDULING -->
+          <div class="group">
+            <div class="group-label">Scheduling</div>
+            <div class="card">
+              <div class="srow">
+                <div class="s-ico amber"><svg viewBox="0 0 16 16" fill="none"><path d="M5.5 1.5h5M8 5.5v3l2 1.2" stroke="#fff" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="9" r="4.5" stroke="#fff" stroke-width="1.3"/></svg></div>
+                <div class="s-main"><div class="s-label">Quiet hours</div></div>
+                <div class="s-right"><span class="toggle"></span></div>
+              </div>
+              <div class="subsection">
+                <div class="sub-rail"></div>
+                <div class="sub-title">Don't send during these hours</div>
+                <div class="time-control">
+                  <span class="tc-label">From</span>
+                  <span class="time-pill">10:00 PM</span>
+                  <span class="time-arrow">→</span>
+                  <span class="tc-label">To</span>
+                  <span class="time-pill">8:00 AM</span>
+                </div>
+              </div>
+              <div class="srow">
+                <div class="s-ico amber"><svg viewBox="0 0 16 16" fill="none"><path d="M4 8.3l2.6 2.6L12 5.3" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                <div class="s-main">
+                  <div class="s-label">Require approval before sending scheduled drafts</div>
+                  <div class="s-help">If off, approved scheduled drafts send automatically at their time.</div>
+                </div>
+                <div class="s-right"><span class="toggle"></span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- AI -->
+          <div class="group">
+            <div class="group-label">AI</div>
+            <div class="card">
+              <div class="srow" style="align-items:flex-start">
+                <div class="s-ico ink"><svg viewBox="0 0 16 16" fill="none"><path d="M5 11c-1.5 0-2.5-1-2.5-2.6C2.5 6.5 4 5.4 5.6 5.6 6 4 7.3 3 8.7 3.3c1.2.25 2 1.2 2 2.5 1.4.1 2.3 1.1 2.3 2.4 0 1.5-1.1 2.5-2.6 2.5" stroke="#fff" stroke-width="1.3" stroke-linejoin="round"/></svg></div>
+                <div class="s-main">
+                  <div class="s-label">Anthropic API key</div>
+                  <div class="key-field">
+                    <span class="keymono">sk-ant-•••••••••••••••3a9f</span>
+                    <svg viewBox="0 0 16 16" fill="none"><rect x="3.5" y="7" width="9" height="6.5" rx="1.2" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" stroke="currentColor" stroke-width="1.3"/></svg>
+                  </div>
+                  <div class="s-help">Used to generate your texting style and draft replies. Stored locally.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- APP -->
+          <div class="group">
+            <div class="group-label">App</div>
+            <div class="card">
+              <div class="srow">
+                <div class="s-ico gray"><svg viewBox="0 0 16 16" fill="none"><path d="M6 2.5H4A1.5 1.5 0 0 0 2.5 4v8A1.5 1.5 0 0 0 4 13.5h2M9.5 4.5 13 8l-3.5 3.5M13 8H6" stroke="#fff" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                <div class="s-main"><div class="s-label">Launch on login</div></div>
+                <div class="s-right"><span class="toggle"></span></div>
+              </div>
+              <div class="subsection">
+                <div class="sub-rail"></div>
+                <div class="sub-title">Updates</div>
+                <div class="nested-row">
+                  <div class="nr-main"><div class="nr-label">Check automatically</div></div>
+                  <span class="nr-val">Daily</span>
+                </div>
+                <div class="nested-row">
+                  <div class="nr-main">
+                    <div class="nr-label">Software version</div>
+                    <div class="nr-help">You're on v0.5.1 (build 61).</div>
+                  </div>
+                  <span class="mini-btn">Check for updates</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- DIAGNOSTICS -->
+          <div class="group">
+            <div class="group-label">Diagnostics</div>
+            <div class="card">
+              <div class="diag-grid">
+                <div class="diag-item">
+                  <div class="diag-check"><svg viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3 6-6.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                  <span class="di-label">Full Disk Access</span><span class="di-status">Granted</span>
+                </div>
+                <div class="diag-item">
+                  <div class="diag-check"><svg viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3 6-6.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                  <span class="di-label">iMessage engine</span><span class="di-status">Running</span>
+                </div>
+                <div class="diag-item">
+                  <div class="diag-check"><svg viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3 6-6.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                  <span class="di-label">WhatsApp engine</span><span class="di-status">Connected</span>
+                </div>
+                <div class="diag-item">
+                  <div class="diag-check"><svg viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3 6-6.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+                  <span class="di-label">Claude Desktop wiring</span><span class="di-status">Configured</span>
+                </div>
+              </div>
+              <div class="diag-actions">
+                <span class="mini-btn">Export diagnostic log</span>
+                <span class="mini-btn">Reveal logs folder</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================= WINDOW 3 — HOME ================= -->
+  <div class="caption"><span class="dot green"></span>Home · status at a glance</div>
+  <div class="window">
+    <div class="titlebar">
+      <div class="traffic"><span class="light r"></span><span class="light y"></span><span class="light g"></span></div>
+      <div class="winname">Messages for AI</div>
+    </div>
+    <div class="shell">
+
+      <!-- SIDEBAR (Home active) -->
+      <aside class="sidebar">
+        <div class="wordmark">
+          <div class="glyph">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M8 1.5c3.59 0 6.5 2.46 6.5 5.5 0 3.04-2.91 5.5-6.5 5.5-.83 0-1.62-.13-2.35-.37L2.5 13.5l.86-2.43C2.5 10.1 1.5 8.6 1.5 7 1.5 3.96 4.41 1.5 8 1.5Z" fill="#fff"/></svg>
+          </div>
+          <div class="name">Messages for AI</div>
+        </div>
+        <div class="navgroup">
+          <div class="navitem active">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M2 7.2 8 2l6 5.2V14a.5.5 0 0 1-.5.5H10v-4H6v4H2.5A.5.5 0 0 1 2 14V7.2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+            <span class="nav-text">Home</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h9A1.5 1.5 0 0 1 14 4.5v5A1.5 1.5 0 0 1 12.5 11H7l-3 2.5V11H3.5A1.5 1.5 0 0 1 2 9.5v-5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+            <span class="nav-text">Messages</span>
+            <span class="badge">2</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M8 2.2 9.6 5l3.1.45-2.25 2.2.53 3.1L8 9.3 5.02 10.7l.53-3.1L3.3 5.45 6.4 5 8 2.2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+            <span class="nav-text">Automations</span>
+            <span class="badge">1</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M8 5v3.2l2 1.3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <span class="nav-text">Scheduled</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M2 8.5 5 8l1.4-3.3L8.6 12l1.6-4 1 2.4 1.8-.4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span class="nav-text">Health</span>
+          </div>
+          <div class="navitem">
+            <svg viewBox="0 0 16 16" fill="none"><path d="M6.4 2.5h3.2l.4 1.7 1.5.86 1.7-.5 1.6 2.8-1.3 1.16v1.74l1.3 1.16-1.6 2.8-1.7-.5-1.5.86-.4 1.7H6.4l-.4-1.7-1.5-.86-1.7.5L1.2 11.6 2.5 10.44V8.7L1.2 7.54 2.8 4.74l1.7.5 1.5-.86.4-1.7Z" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/><circle cx="8" cy="8" r="1.9" stroke="currentColor" stroke-width="1.2"/></svg>
+            <span class="nav-text">Settings</span>
+            <span class="attn-dot"></span>
+          </div>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="navlabel">Labs</div>
+        <div class="navgroup">
+          <div class="navitem"><svg viewBox="0 0 16 16" fill="none"><path d="M3 4h10M3 8h7M3 12h9" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg><span class="nav-text">Texting Style</span></div>
+          <div class="navitem"><svg viewBox="0 0 16 16" fill="none"><path d="M8 2a6 6 0 1 0 6 6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="11.5" cy="4.5" r="1.4" fill="currentColor"/></svg><span class="nav-text">Don't Ghost</span></div>
+          <div class="navitem"><svg viewBox="0 0 16 16" fill="none"><path d="M5 11c-1.5 0-2.5-1-2.5-2.6C2.5 6.5 4 5.4 5.6 5.6 6 4 7.3 3 8.7 3.3c1.2.25 2 1.2 2 2.5 1.4.1 2.3 1.1 2.3 2.4 0 1.5-1.1 2.5-2.6 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 9v4M6.5 11.5 8 13l1.5-1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="nav-text">EQ</span></div>
+          <div class="navitem"><svg viewBox="0 0 16 16" fill="none"><path d="M3 13V7M6.5 13V4M10 13V9M13.5 13V3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg><span class="nav-text">Texting Analytics</span></div>
+          <div class="navitem"><svg viewBox="0 0 16 16" fill="none"><path d="M8 1.8 9.7 5.4l3.9.4-2.9 2.6.83 3.85L8 10.3 4.47 12.25l.83-3.85L2.4 5.8l3.9-.4L8 1.8Z" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/></svg><span class="nav-text">Texting Wrapped</span></div>
+          <div class="navitem"><svg viewBox="0 0 16 16" fill="none"><path d="M4 6.5h8V13a.5.5 0 0 1-.5.5h-7A.5.5 0 0 1 4 13V6.5Z" stroke="currentColor" stroke-width="1.3"/><path d="M8 6.5V4.2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg><span class="nav-text">Birthday Texts</span></div>
+        </div>
+        <div class="sidebar-foot">
+          <div class="ava">JH</div>
+          <div class="who"><b>James</b><span>v0.5.1 · all systems go</span></div>
+        </div>
+      </aside>
+
+      <!-- HOME PANE -->
+      <div class="pane">
+        <div class="home-inner">
+          <div class="home-title">Messages for AI</div>
+          <div class="home-sub">AI proposes, you approve — plus tools built on your message history.</div>
+
+          <div class="status-card">
+            <div class="sc-head">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#9aa2ad" stroke-width="1.3"/><path d="M8 5v3.2l2 1.3" stroke="#9aa2ad" stroke-width="1.3" stroke-linecap="round"/></svg>
+              System status
+            </div>
+
+            <div class="hrow">
+              <div class="h-ico"><svg viewBox="0 0 16 16" fill="none"><path d="M2 4.5A1.5 1.5 0 0 1 3.5 3h9A1.5 1.5 0 0 1 14 4.5v5A1.5 1.5 0 0 1 12.5 11H7l-3 2.5V11H3.5A1.5 1.5 0 0 1 2 9.5v-5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></div>
+              <span class="h-label">iMessage engine</span>
+              <span class="h-value green"><span class="sdot green"></span>Running</span>
+            </div>
+            <div class="hrow">
+              <div class="h-ico"><svg viewBox="0 0 16 16" fill="none"><rect x="3" y="6.5" width="10" height="7" rx="1.3" stroke="currentColor" stroke-width="1.3"/><path d="M5 6.5V5a3 3 0 0 1 6 0v1.5" stroke="currentColor" stroke-width="1.3"/></svg></div>
+              <span class="h-label">Full Disk Access</span>
+              <span class="h-value green"><span class="sdot green"></span>Granted</span>
+            </div>
+            <div class="hrow">
+              <div class="h-ico"><svg viewBox="0 0 16 16" fill="none"><path d="M11 2.5l2.5 2.5L6 12.5 3 13l.5-3L11 2.5Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></div>
+              <span class="h-label">Pending drafts</span>
+              <span class="h-value amber"><span class="sdot amber"></span>2 awaiting approval</span>
+            </div>
+            <div class="hrow">
+              <div class="h-ico"><svg viewBox="0 0 16 16" fill="none"><path d="M8 2.2c3.2 0 5.8 2.3 5.8 5.2 0 2.9-2.6 5.2-5.8 5.2-.74 0-1.45-.12-2.1-.34L3 13.3l.78-2.2C2.9 10.2 2.2 8.96 2.2 7.4 2.2 4.5 4.8 2.2 8 2.2Z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></div>
+              <span class="h-label">WhatsApp</span>
+              <span class="h-value green"><span class="sdot green"></span>Connected</span>
+            </div>
+          </div>
+
+          <div class="home-foot">
+            <div class="spark">
+              <svg viewBox="0 0 16 16" fill="none"><path d="M8 1.6l1.3 3.4L12.7 6 9.3 7l-1.3 3.4L6.7 7 3.3 6l3.4-1L8 1.6Z" fill="#fff"/><path d="M12.5 9.5l.6 1.5 1.5.6-1.5.6-.6 1.5-.6-1.5-1.5-.6 1.5-.6.6-1.5Z" fill="#fff"/></svg>
+            </div>
+            Open Labs in the sidebar to generate your Texting Wrapped.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

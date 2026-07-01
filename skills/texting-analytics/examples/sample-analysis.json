@@ -1,0 +1,82 @@
+{
+  "latency": {
+    "total_reply_pairs": 1071,
+    "pct_within_5min": 46,
+    "pct_within_30min": 63,
+    "pct_within_1hr": 74,
+    "pct_within_4hr": 90,
+    "mean_minutes": 77,
+    "median_minutes": 4,
+    "thread_count": 99,
+    "window_label": "past 12 months"
+  },
+  "ball_in_court": {
+    "total_threads_sampled": 100,
+    "threads_with_ball_in_court": 68,
+    "pct_ball_in_court": 59,
+    "live_conversations_estimate": 47,
+    "snapshot_label": "May 2026"
+  },
+  "group_contribution": {
+    "total_groups_analyzed": 19,
+    "total_messages_in_groups": 884,
+    "user_messages_in_groups": 78,
+    "user_contribution_pct": 8.8,
+    "user_reaction_rate_pct": 30.8,
+    "peer_reaction_rate_pct": 32.5,
+    "groups_where_user_silent": 2,
+    "groups_mostly_reactions": 8,
+    "per_thread": [
+      {"thread_label": "Ashley + Lena (Mill)", "total": 29, "user_count": 8, "user_pct": 28, "user_reaction_pct": 12},
+      {"thread_label": "Federico + Ari + Jimmy (Bandon)", "total": 41, "user_count": 11, "user_pct": 27, "user_reaction_pct": 18},
+      {"thread_label": "Avery + Barrett + Erin", "total": 48, "user_count": 10, "user_pct": 21, "user_reaction_pct": 0},
+      {"thread_label": "Federico + Jimmy + Nolan", "total": 51, "user_count": 9, "user_pct": 18, "user_reaction_pct": 33},
+      {"thread_label": "Avery + Harper + Holloway", "total": 51, "user_count": 8, "user_pct": 16, "user_reaction_pct": 50},
+      {"thread_label": "Immature Dumpy Dads", "total": 51, "user_count": 7, "user_pct": 14, "user_reaction_pct": 43},
+      {"thread_label": "Healdsburg (Ari group)", "total": 50, "user_count": 6, "user_pct": 12, "user_reaction_pct": 30},
+      {"thread_label": "Bandon 2026", "total": 50, "user_count": 5, "user_pct": 10, "user_reaction_pct": 25},
+      {"thread_label": "Friendship is Best Ship", "total": 43, "user_count": 1, "user_pct": 2, "user_reaction_pct": 100},
+      {"thread_label": "Golf of America", "total": 49, "user_count": 1, "user_pct": 2, "user_reaction_pct": 0},
+      {"thread_label": "Debbie Sample family", "total": 50, "user_count": 1, "user_pct": 2, "user_reaction_pct": 100},
+      {"thread_label": "Margo-verse", "total": 48, "user_count": 0, "user_pct": 0, "user_reaction_pct": 0}
+    ]
+  },
+  "top_people": [
+    {"name": "Maya Chen", "count": 2847}, {"name": "Daniel Park", "count": 1962},
+    {"name": "Jordan Reyes", "count": 1403}, {"name": "Sophie Liu", "count": 982},
+    {"name": "Alex Whitman", "count": 711}, {"name": "Priya Nair", "count": 640},
+    {"name": "Sam Okafor", "count": 588}, {"name": "Lena Fischer", "count": 502},
+    {"name": "Marcus Bell", "count": 477}, {"name": "Nina Alvarez", "count": 401}
+  ],
+  "emoji": {
+    "pct_messages_with_emoji": 23,
+    "emoji_per_message": 0.41,
+    "top": [
+      {"emoji": "😂", "count": 612},
+      {"emoji": "❤️", "count": 388},
+      {"emoji": "🙏", "count": 201},
+      {"emoji": "🔥", "count": 144},
+      {"emoji": "😭", "count": 97}
+    ]
+  },
+  "style": {
+    "pct_end_period": 9,
+    "pct_all_lowercase": 61,
+    "laugh_tokens": {"lol": 240, "haha": 180, "joy": 612},
+    "dominant_laugh": "joy",
+    "sample_size": 4000
+  },
+  "age": {
+    "estimated_age": 33,
+    "band": "millennial",
+    "label": "Millennial",
+    "approx_age": "28-43",
+    "confidence": "low",
+    "drivers": [
+      "All-lowercase typing",
+      "Uses 😂 for laughter (non-ironic)",
+      "No period even on multi-sentence messages"
+    ],
+    "sample_size": 4000
+  }
+}

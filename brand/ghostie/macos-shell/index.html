@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ghostie macOS Shell Prototype</title>
+  <link rel="stylesheet" href="shell.css">
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+  <main class="page">
+    <header class="intro">
+      <div>
+        <p class="eyebrow">corrected pass</p>
+        <h1>Ghostie shell, not tab interiors.</h1>
+        <p>The app-level direction: icon, window chrome, navigation, status, settings, approval queues, and general utility pages. Feature tabs get a clear handoff boundary and keep their own UI.</p>
+      </div>
+      <figure class="icon-note">
+        <img src="../sprites/out/app/ghostie-macos-icon-classic-clean-v3.png" alt="Ghostie app icon">
+        <figcaption>
+          <span>Dock icon baseline</span>
+          <strong>large Ghostie, soft tile, product cue stays subtle</strong>
+        </figcaption>
+      </figure>
+    </header>
+
+    <section class="window">
+      <div class="app">
+        <aside class="sidebar">
+          <div class="brand">
+            <img
+              id="contextGhostie"
+              src="../sprites/out/app/ghostie-macos-icon-classic-clean-v3.png"
+              alt="Ghostie for Messages"
+            >
+            <div>
+              <strong>Ghostie</strong>
+              <span>Local texting companion</span>
+            </div>
+          </div>
+
+          <nav>
+            <button class="nav-item active" type="button" data-panel="messages">
+              <i data-lucide="message-circle"></i>
+              <span>Messages</span>
+            </button>
+
+            <p>Messaging Tools</p>
+            <button class="nav-item" type="button" data-panel="drafts">
+              <i data-lucide="pencil-line"></i>
+              <span>Drafts</span>
+              <b>3</b>
+            </button>
+            <button class="nav-item" type="button" data-panel="scheduled">
+              <i data-lucide="clock-3"></i>
+              <span>Scheduled</span>
+              <b>1</b>
+            </button>
+            <button class="nav-item" type="button" data-panel="automations">
+              <i data-lucide="repeat-2"></i>
+              <span>Automations</span>
+              <b>2</b>
+            </button>
+
+            <p>Human Tools</p>
+            <button class="nav-item" type="button" data-panel="dontghost">
+              <i data-lucide="corner-up-left"></i>
+              <span>Don't Ghost</span>
+            </button>
+            <button class="nav-item" type="button" data-panel="eq">
+              <i data-lucide="heart-handshake"></i>
+              <span>EQ</span>
+            </button>
+            <button class="nav-item" type="button" data-panel="birthdays">
+              <i data-lucide="cake"></i>
+              <span>Birthdays</span>
+            </button>
+            <button class="nav-item" type="button" data-panel="wrapped">
+              <i data-lucide="sparkles"></i>
+              <span>Wrapped</span>
+            </button>
+            <button class="nav-item" type="button" data-panel="severance">
+              <i data-lucide="briefcase-business"></i>
+              <span>Severance</span>
+            </button>
+            <button class="nav-item" type="button" data-panel="analytics">
+              <i data-lucide="chart-no-axes-combined"></i>
+              <span>Analytics</span>
+            </button>
+
+            <p>AI Tools</p>
+            <button class="nav-item" type="button" data-panel="voice">
+              <i data-lucide="audio-lines"></i>
+              <span>Style</span>
+            </button>
+            <button class="nav-item" type="button" data-panel="history">
+              <i data-lucide="history"></i>
+              <span>History</span>
+            </button>
+          </nav>
+
+          <footer>
+            <button class="nav-item settings-link" type="button" data-panel="settings">
+              <i data-lucide="settings"></i>
+              <span>Settings</span>
+              <em></em>
+            </button>
+          </footer>
+        </aside>
+
+        <section class="content">
+          <article class="panel active" id="messages">
+            <header class="panel-header">
+              <div>
+                <p class="eyebrow">tab boundary</p>
+                <h2>Messages</h2>
+                <p>Shared chrome stops here. The Messages tab owns this interior.</p>
+              </div>
+              <div class="header-actions">
+                <button type="button"><i data-lucide="sliders-horizontal"></i> Priority</button>
+                <button type="button"><i data-lucide="square-pen"></i> Draft</button>
+              </div>
+            </header>
+            <div class="tab-slot">
+              <span>Messages tab canvas</span>
+            </div>
+          </article>
+
+          <article class="panel" id="dontghost">
+            <header class="panel-header">
+              <div>
+                <p class="eyebrow">tab boundary</p>
+                <h2>Don't Ghost</h2>
+                <p>This feature keeps its own visual language inside the shared shell.</p>
+              </div>
+            </header>
+            <div class="tab-slot tool-slot">
+              <span>Tool-owned UI surface</span>
+            </div>
+          </article>
+
+          <article class="panel" id="eq">
+            <header class="panel-header">
+              <div>
+                <p class="eyebrow">tab boundary</p>
+                <h2>EQ</h2>
+                <p>Shell only. The EQ tab can still become its own room.</p>
+              </div>
+            </header>
+            <div class="tab-slot tool-slot"><span>Tool-owned UI surface</span></div>
+          </article>
+
+          <article class="panel" id="birthdays">
+            <header class="panel-header">
+              <div>
+                <p class="eyebrow">tab boundary</p>
+                <h2>Birthdays</h2>
+                <p>Shared navigation and app chrome, feature-specific page untouched.</p>
+              </div>
+            </header>
+            <div class="tab-slot tool-slot"><span>Tool-owned UI surface</span></div>
+          </article>
+
+          <article class="panel" id="wrapped">
+            <header class="panel-header">
+              <div>
+                <p class="eyebrow">tab boundary</p>
+                <h2>Wrapped</h2>
+                <p>Full-bleed story UI stays independent from the app shell.</p>
+              </div>
+            </header>
+            <div class="tab-slot tool-slot dark-slot"><span>Tool-owned UI surface</span></div>
+          </article>
+
+          <article class="panel" id="severance">
+            <header class="panel-header">
+              <div>
+                <p class="eyebrow">tab boundary</p>
+                <h2>Severance</h2>
+                <p>The tab can keep its forced-dark CRT personality inside this boundary.</p>
+              </div>
+            </header>
+            <div class="tab-slot tool-slot dark-slot"><span>Tool-owned UI surface</span></div>
+          </article>
+
+          <article class="panel" id="analytics">
+            <header class="panel-header">
+              <div>
+                <p class="eyebrow">tab boundary</p>
+                <h2>Analytics</h2>
+                <p>Charts and analysis styling are intentionally left to the tab.</p>
+              </div>
+            </header>
+            <div class="tab-slot tool-slot"><span>Tool-owned UI surface</span></div>
+          </article>
+
+          <article class="panel" id="voice">
+            <header class="panel-header">
+              <div>
+                <p class="eyebrow">tab boundary</p>
+                <h2>Style</h2>
+                <p>Agent tool content stays separate from the shared shell styling.</p>
+              </div>
+            </header>
+            <div class="tab-slot tool-slot"><span>Tool-owned UI surface</span></div>
+          </article>
+
+          <article class="panel" id="automations">
+            <header class="panel-header">
+              <div>
+                <p class="eyebrow">tab boundary</p>
+                <h2>Automations</h2>
+                <p>Rule-building can have its own density and controls later.</p>
+              </div>
+              <div class="header-actions">
+                <button type="button"><i data-lucide="plus"></i> Rule</button>
+              </div>
+            </header>
+            <div class="tab-slot tool-slot"><span>Tool-owned UI surface</span></div>
+          </article>
+
+          <article class="panel" id="drafts">
+            <header class="panel-header">
+              <div>
+                <p class="eyebrow">general page</p>
+                <h2>Drafts</h2>
+                <p>The approval queue uses the shared Ghostie system because it is app-level behavior.</p>
+              </div>
+            </header>
+            <section class="approval-grid">
+              <div class="approval-card urgent">
+                <div>
+                  <span>Needs approval</span>
+                  <strong>Ashley</strong>
+                </div>
+                <p>Saturday still works. I may show up a little fried, but I really want to see you.</p>
+                <footer>
+                  <button type="button">Approve</button>
+                  <button class="secondary" type="button">Edit</button>
+                  <button class="quiet" type="button">Discard</button>
+                </footer>
+              </div>
+              <div class="approval-card">
+                <div>
+                  <span>Birthday text</span>
+                  <strong>Maya</strong>
+                </div>
+                <p>Happy birthday. I hope today feels easy and a little indulgent.</p>
+                <footer>
+                  <button type="button">Approve</button>
+                  <button class="secondary" type="button">Schedule</button>
+                </footer>
+              </div>
+              <div class="approval-card">
+                <div>
+                  <span>Automation draft</span>
+                  <strong>Dad</strong>
+                </div>
+                <p>Checking in before the appointment. Want me to call after?</p>
+                <footer>
+                  <button type="button">Approve</button>
+                  <button class="secondary" type="button">Hold</button>
+                </footer>
+              </div>
+            </section>
+          </article>
+
+          <article class="panel" id="scheduled">
+            <header class="panel-header">
+              <div>
+                <p class="eyebrow">general page</p>
+                <h2>Scheduled</h2>
+                <p>A utility page for approved sends, quiet-hour holds, and scheduling state.</p>
+              </div>
+              <div class="header-actions">
+                <button type="button"><i data-lucide="calendar-plus"></i> Add</button>
+              </div>
+            </header>
+            <section class="list-page">
+              <div>
+                <strong>Tomorrow, 8:30 AM</strong>
+                <span>Maya birthday text</span>
+                <b>Approved</b>
+              </div>
+              <div>
+                <strong>Friday, 5:00 PM</strong>
+                <span>Roommates trip check-in</span>
+                <b class="hold">Quiet hours hold</b>
+              </div>
+              <div>
+                <strong>June 21, 10:00 AM</strong>
+                <span>Dad appointment follow-up</span>
+                <b>Automation</b>
+              </div>
+            </section>
+          </article>
+
+          <article class="panel" id="history">
+            <header class="panel-header">
+              <div>
+                <p class="eyebrow">general page</p>
+                <h2>History</h2>
+                <p>A simple audit trail for generated drafts, approvals, holds, and sends.</p>
+              </div>
+            </header>
+            <section class="timeline">
+              <div><span></span><strong>Draft approved</strong><p>Ashley, edited once before send</p></div>
+              <div><span></span><strong>Quiet thread flagged</strong><p>Jordan, no draft created</p></div>
+              <div><span></span><strong>WhatsApp reconnected</strong><p>Daemon healthy after refresh</p></div>
+              <div><span></span><strong>Scheduled send held</strong><p>Quiet hours protected the send window</p></div>
+            </section>
+          </article>
+
+          <article class="panel settings-panel" id="settings">
+            <header class="panel-header">
+              <div>
+                <p class="eyebrow">general page</p>
+                <h2>Settings</h2>
+                <p>Settings gets the shared Ghostie system: calm rows, clear status, and no tab-specific weirdness.</p>
+              </div>
+            </header>
+
+            <section class="settings-layout">
+              <div class="settings-card">
+                <h3><i data-lucide="user-round"></i> Account</h3>
+                <div class="setting-row">
+                  <div><strong>Free to start</strong><span>25 house credits ready</span></div>
+                  <button type="button">Manage</button>
+                </div>
+              </div>
+
+              <div class="settings-card">
+                <h3><i data-lucide="message-square-lock"></i> Messaging</h3>
+                <div class="setting-row">
+                  <div><strong>iMessage</strong><span>Read locally through app daemon</span></div>
+                  <label class="switch"><input type="checkbox" checked><i></i></label>
+                </div>
+                <div class="setting-row">
+                  <div><strong>WhatsApp</strong><span>Paired, approval-gated sends</span></div>
+                  <label class="switch"><input type="checkbox" checked><i></i></label>
+                </div>
+                <div class="setting-row">
+                  <div><strong>Quiet hours</strong><span>Hold sends from 10 PM to 7 AM</span></div>
+                  <button type="button">Edit</button>
+                </div>
+              </div>
+
+              <div class="settings-card">
+                <h3><i data-lucide="square-grid-2x2"></i> Tools</h3>
+                <div class="tool-toggles">
+                  <label><input type="checkbox" checked> Don't Ghost</label>
+                  <label><input type="checkbox" checked> EQ</label>
+                  <label><input type="checkbox" checked> Birthdays</label>
+                  <label><input type="checkbox" checked> Wrapped</label>
+                  <label><input type="checkbox" checked> Severance</label>
+                  <label><input type="checkbox" checked> Analytics</label>
+                </div>
+              </div>
+
+              <div class="settings-card">
+                <h3><i data-lucide="key-round"></i> Advanced</h3>
+                <div class="setting-row">
+                  <div><strong>BYOK</strong><span>Claude key saved for advanced tools</span></div>
+                  <button type="button">Change</button>
+                </div>
+                <div class="setting-row">
+                  <div><strong>Per-tool models</strong><span>Model routing lives here</span></div>
+                  <button type="button">Configure</button>
+                </div>
+                <div class="setting-row">
+                  <div><strong>Diagnostics</strong><span>Metadata-only export</span></div>
+                  <button type="button">Export</button>
+                </div>
+              </div>
+            </section>
+          </article>
+        </section>
+      </div>
+    </section>
+
+    <section class="notes">
+      <article>
+        <i data-lucide="layout-panel-left"></i>
+        <strong>Shell owns</strong>
+        <span>window chrome, sidebar, status, settings, queues</span>
+      </article>
+      <article>
+        <i data-lucide="badge-check"></i>
+        <strong>Approval owns</strong>
+        <span>draft state, scheduled state, audit language</span>
+      </article>
+      <article>
+        <i data-lucide="paintbrush"></i>
+        <strong>Tabs own</strong>
+        <span>feature-specific room styling and dense controls</span>
+      </article>
+    </section>
+  </main>
+  <script src="shell.js"></script>
+</body>
+</html>

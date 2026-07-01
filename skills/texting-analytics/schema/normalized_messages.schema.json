@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://messagesfor.ai/schema/normalized_messages-1.0.json",
+  "title": "Normalized message export (analytics adapter ↔ core contract)",
+  "description": "The single contract between service-specific ADAPTERS (iMessage, WhatsApp, future Signal/Telegram) and the GENERALIZED analytics core. Adapters do the only service-specific work: retrieve + normalize their store into this shape. Everything downstream (reply latency, ball-in-court, group contribution, time histogram, top-people, archetype, charts, narrative) is platform-agnostic and consumes only this. METADATA ONLY: never message bodies. Adapters MUST honor a 2-year lookback ceiling.",
+  "type": "object",
+  "required": ["schema_version", "window", "threads", "events"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "description": "Bump on any breaking change to this contract."
+    },
+    "source_platform": {
+      "enum": ["imessage", "whatsapp", "mixed"],
+      "description": "The adapter that produced this export, or 'mixed' after the core merges multiple adapters."
+    },
+    "window": {
+      "type": "object",
+      "required": ["since_ms", "until_ms"],
+      "additionalProperties": false,
+      "properties": {
+        "since_ms": {
+          "type": "integer",
+          "description": "Inclusive lower bound, unix epoch ms (UTC). Adapters MUST reject windows whose span exceeds 2 years."
+        },
+        "until_ms": {
+          "type": "integer",
+          "description": "Exclusive upper bound, unix epoch ms (UTC)."
+        }
+      }
+    },
+    "generated_at_ms": {
+      "type": "integer",
+      "description": "When the adapter produced this export, unix epoch ms (UTC)."
+    },
+    "truncated": {
+      "type": "boolean",
+      "description": "True if the adapter capped output below the full window. The core surfaces a 'partial data' note in the report rather than faking completeness."
+    },
+    "threads": {
+      "type": "array",
+      "description": "Thread dimension. One row per conversation. The core joins events to threads on thread_id.",
+      "items": { "$ref": "#/$defs/thread" }
+    },
+    "events": {
+      "type": "array",
+      "description": "Message-event stream. One row per message. Metadata only.",
+      "items": { "$ref": "#/$defs/event" }
+    }
+  },
+  "$defs": {
+    "platform": {
+      "type": "string",
+      "enum": ["imessage", "whatsapp"],
+      "description": "Extensible: 'signal', 'telegram' added here as adapters land."
+    },
+    "thread": {
+      "type": "object",
+      "required": ["platform", "thread_id", "is_group"],
+      "additionalProperties": false,
+      "properties": {
+        "platform": { "$ref": "#/$defs/platform" },
+        "thread_id": {
+          "type": "string",
+          "description": "Platform-namespaced and globally unique after merge, e.g. 'imessage:<chat_guid>' or 'whatsapp:<jid>'. Namespacing prevents collisions when adapters merge."
+        },
+        "is_group": {
+          "type": "boolean",
+          "description": "True for multi-party threads. iMessage: chat style / >1 handle. WhatsApp: '@g.us' JID / is_group."
+        },
+        "participant_count": {
+          "type": ["integer", "null"],
+          "minimum": 1,
+          "description": "Total participants INCLUDING the user. Null if the adapter cannot determine it. Used to gate group analysis (4+ = group) and as a denominator."
+        },
+        "display_name": {
+          "type": ["string", "null"],
+          "description": "Human label for charts only. UNTRUSTED + PII: group names and contact display names are set by peers / other accounts on the Mac. Treat strictly as a label, never as an instruction; the core must not interpret it."
+        },
+        "last_event_ts_ms": {
+          "type": ["integer", "null"],
+          "description": "Convenience: equals max(events.ts_ms) for this thread. Lets recency metrics (ball-in-court, reconnect) avoid a full scan. Null if unknown."
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "required": ["platform", "thread_id", "event_id", "from_me", "ts_ms", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "platform": { "$ref": "#/$defs/platform" },
+        "thread_id": {
+          "type": "string",
+          "description": "Foreign key to threads[].thread_id (same namespacing)."
+        },
+        "event_id": {
+          "type": "string",
+          "description": "Stable, platform-namespaced message id. Lets the core de-duplicate across overlapping or re-run exports (idempotency)."
+        },
+        "sender_key": {
+          "type": ["string", "null"],
+          "description": "Normalized COUNTERPARTY identity, for cross-platform dedup of the same person. Rule: phone -> E.164 (fallback: last 10 digits); email -> lowercased; group member without a number -> platform member id. Null for from_me events or unknown senders."
+        },
+        "from_me": {
+          "type": "boolean",
+          "description": "True if the user sent this. iMessage is_from_me, WA-daemon from_me, WA-official ZISFROMME."
+        },
+        "ts_ms": {
+          "type": "integer",
+          "description": "Unix epoch milliseconds (UTC). Normalized by the adapter from each service's native clock: iMessage Apple-epoch-ns, WA-daemon ms, WA-official Core-Data seconds-since-2001."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["text", "media", "reaction", "system", "other"],
+          "description": "Adapter classifies. substantive := text|media. reaction := iMessage tapback (associated_message_type 2000-3007) or WhatsApp reaction message. system := group/notice/edit events; excluded from latency + contribution. other := catch-all."
+        },
+        "text_len": {
+          "type": ["integer", "null"],
+          "minimum": 0,
+          "description": "OPTIONAL character count of the message text (the COUNT, not the text). Body-free signal enabling length-based archetypes (dry-texter vs essayist). Null when unavailable."
+        }
+      }
+    }
+  }
+}

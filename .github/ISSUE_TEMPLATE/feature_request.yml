@@ -1,0 +1,48 @@
+name: Feature request
+description: Propose a new tool, a new guardrail, a UI change, or a different scoping decision.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing something. Keep in mind the scope of this project: it's a single-user local MCP for macOS iMessages, with a hard preference for safety (draft-first, human-approval-default) over convenience.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve
+      description: What are you trying to do that the current tools don't let you do (or make hard)? Concrete scenarios beat abstract feature names.
+      placeholder: e.g. "I want to ask Claude to summarize my Slack DMs alongside iMessages, but I have to invoke two different MCP servers..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Tool name + args, UI mockup, or just prose. Doesn't have to be polished.
+    validations:
+      required: true
+
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety / trust impact
+      description: Does this widen the attack surface? Bypass an existing guardrail? Need a new permission? Be honest — features that erode the safety story will get pushback.
+      placeholder: e.g. "this would let agents send without staging, which bypasses guardrail #2..."
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Who is this for
+      options:
+        - Just me (single user)
+        - A handful of users I know
+        - General audience
+      default: 0
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Did you consider workarounds with the existing tools, or other servers? Briefly — what didn't work?

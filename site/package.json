@@ -1,0 +1,14 @@
+{
+  "scripts": {
+    "test:downloads": "node scripts/check-download-flow.js",
+    "test:downloads:live": "node scripts/check-download-flow.js --live",
+    "test:tip-jar": "node scripts/check-tip-jar.js",
+    "test:referral": "node scripts/check-referral.js",
+    "test:ai-proxy": "node scripts/check-ai-proxy.js"
+  },
+  "dependencies": {
+    "@clerk/backend": "^1.21.0",
+    "@vercel/edge": "^1.3.1",
+    "stripe": "^18.0.0"
+  }
+}

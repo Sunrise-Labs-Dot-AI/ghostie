@@ -1,0 +1,353 @@
+{
+  "kind": "birthday-voice",
+  "sample_size": 27,
+  "window": "2024-01-14 to 2024-09-14",
+  "group_count": 5,
+  "untiered_count": 5,
+  "overall": {
+    "sample_size": 27,
+    "length": {
+      "median_chars": 30,
+      "p25_chars": 19,
+      "p75_chars": 39,
+      "pct_under_20_chars": 0.2963
+    },
+    "capitalization": {
+      "pct_lowercase_start": 0.6667,
+      "pct_all_lowercase": 0.5926
+    },
+    "punctuation": {
+      "pct_ending_with_period": 0.1111,
+      "pct_ending_with_nothing": 0.6667,
+      "pct_ending_with_exclaim": 0.2222,
+      "pct_ending_with_question": 0.0
+    },
+    "emoji": {
+      "pct_messages_with_emoji": 0.7407,
+      "top_5": [
+        {
+          "emoji": "🎉",
+          "count": 11
+        },
+        {
+          "emoji": "🎂",
+          "count": 8
+        },
+        {
+          "emoji": "❤",
+          "count": 3
+        },
+        {
+          "emoji": "🎈",
+          "count": 1
+        }
+      ]
+    },
+    "abbreviations": {
+      "hbd": 6
+    },
+    "bursts": {
+      "median_messages_per_burst": 1,
+      "p75_messages_per_burst": 1,
+      "burst_definition_minutes": 2
+    },
+    "openers": {
+      "top_3": [
+        {
+          "phrase": "happy",
+          "count": 21
+        }
+      ]
+    },
+    "closers": {
+      "top_3": [
+        {
+          "phrase": "soon",
+          "count": 2
+        },
+        {
+          "phrase": "best",
+          "count": 1
+        },
+        {
+          "phrase": "great",
+          "count": 1
+        }
+      ]
+    },
+    "birthday": {
+      "pct_with_birthday_emoji": 0.7407,
+      "pct_with_double_exclaim": 0.5926
+    }
+  },
+  "tiers": {
+    "family": {
+      "sample_size": 10,
+      "length": {
+        "median_chars": 39,
+        "p25_chars": 35,
+        "p75_chars": 39,
+        "pct_under_20_chars": 0.1
+      },
+      "capitalization": {
+        "pct_lowercase_start": 0.5,
+        "pct_all_lowercase": 0.5
+      },
+      "punctuation": {
+        "pct_ending_with_period": 0.0,
+        "pct_ending_with_nothing": 1.0,
+        "pct_ending_with_exclaim": 0.0,
+        "pct_ending_with_question": 0.0
+      },
+      "emoji": {
+        "pct_messages_with_emoji": 0.9,
+        "top_5": [
+          {
+            "emoji": "🎂",
+            "count": 4
+          },
+          {
+            "emoji": "❤",
+            "count": 3
+          },
+          {
+            "emoji": "🎉",
+            "count": 2
+          },
+          {
+            "emoji": "🎈",
+            "count": 1
+          }
+        ]
+      },
+      "abbreviations": {
+        "hbd": 2
+      },
+      "bursts": {
+        "median_messages_per_burst": 1,
+        "p75_messages_per_burst": 1,
+        "burst_definition_minutes": 2
+      },
+      "openers": {
+        "top_3": [
+          {
+            "phrase": "happy",
+            "count": 8
+          }
+        ]
+      },
+      "closers": {
+        "top_3": [
+          {
+            "phrase": "soon",
+            "count": 1
+          }
+        ]
+      },
+      "birthday": {
+        "pct_with_birthday_emoji": 0.9,
+        "pct_with_double_exclaim": 0.7
+      }
+    },
+    "friend": {
+      "sample_size": 9,
+      "length": {
+        "median_chars": 24,
+        "p25_chars": 19,
+        "p75_chars": 29,
+        "pct_under_20_chars": 0.4444
+      },
+      "capitalization": {
+        "pct_lowercase_start": 1.0,
+        "pct_all_lowercase": 1.0
+      },
+      "punctuation": {
+        "pct_ending_with_period": 0.0,
+        "pct_ending_with_nothing": 0.7778,
+        "pct_ending_with_exclaim": 0.2222,
+        "pct_ending_with_question": 0.0
+      },
+      "emoji": {
+        "pct_messages_with_emoji": 0.6667,
+        "top_5": [
+          {
+            "emoji": "🎉",
+            "count": 5
+          },
+          {
+            "emoji": "🎂",
+            "count": 2
+          }
+        ]
+      },
+      "abbreviations": {
+        "hbd": 3
+      },
+      "bursts": {
+        "median_messages_per_burst": 1,
+        "p75_messages_per_burst": 1,
+        "burst_definition_minutes": 2
+      },
+      "openers": {
+        "top_3": [
+          {
+            "phrase": "happy",
+            "count": 6
+          }
+        ]
+      },
+      "closers": {
+        "top_3": [
+          {
+            "phrase": "soon",
+            "count": 1
+          }
+        ]
+      },
+      "birthday": {
+        "pct_with_birthday_emoji": 0.6667,
+        "pct_with_double_exclaim": 0.5556
+      }
+    }
+  },
+  "genders": {
+    "f": {
+      "sample_size": 10,
+      "length": {
+        "median_chars": 39,
+        "p25_chars": 35,
+        "p75_chars": 39,
+        "pct_under_20_chars": 0.1
+      },
+      "capitalization": {
+        "pct_lowercase_start": 0.5,
+        "pct_all_lowercase": 0.5
+      },
+      "punctuation": {
+        "pct_ending_with_period": 0.0,
+        "pct_ending_with_nothing": 1.0,
+        "pct_ending_with_exclaim": 0.0,
+        "pct_ending_with_question": 0.0
+      },
+      "emoji": {
+        "pct_messages_with_emoji": 0.9,
+        "top_5": [
+          {
+            "emoji": "🎂",
+            "count": 4
+          },
+          {
+            "emoji": "❤",
+            "count": 3
+          },
+          {
+            "emoji": "🎉",
+            "count": 2
+          },
+          {
+            "emoji": "🎈",
+            "count": 1
+          }
+        ]
+      },
+      "abbreviations": {
+        "hbd": 2
+      },
+      "bursts": {
+        "median_messages_per_burst": 1,
+        "p75_messages_per_burst": 1,
+        "burst_definition_minutes": 2
+      },
+      "openers": {
+        "top_3": [
+          {
+            "phrase": "happy",
+            "count": 8
+          }
+        ]
+      },
+      "closers": {
+        "top_3": [
+          {
+            "phrase": "soon",
+            "count": 1
+          }
+        ]
+      },
+      "birthday": {
+        "pct_with_birthday_emoji": 0.9,
+        "pct_with_double_exclaim": 0.7
+      }
+    },
+    "m": {
+      "sample_size": 9,
+      "length": {
+        "median_chars": 24,
+        "p25_chars": 19,
+        "p75_chars": 29,
+        "pct_under_20_chars": 0.4444
+      },
+      "capitalization": {
+        "pct_lowercase_start": 1.0,
+        "pct_all_lowercase": 1.0
+      },
+      "punctuation": {
+        "pct_ending_with_period": 0.0,
+        "pct_ending_with_nothing": 0.7778,
+        "pct_ending_with_exclaim": 0.2222,
+        "pct_ending_with_question": 0.0
+      },
+      "emoji": {
+        "pct_messages_with_emoji": 0.6667,
+        "top_5": [
+          {
+            "emoji": "🎉",
+            "count": 5
+          },
+          {
+            "emoji": "🎂",
+            "count": 2
+          }
+        ]
+      },
+      "abbreviations": {
+        "hbd": 3
+      },
+      "bursts": {
+        "median_messages_per_burst": 1,
+        "p75_messages_per_burst": 1,
+        "burst_definition_minutes": 2
+      },
+      "openers": {
+        "top_3": [
+          {
+            "phrase": "happy",
+            "count": 6
+          }
+        ]
+      },
+      "closers": {
+        "top_3": [
+          {
+            "phrase": "soon",
+            "count": 1
+          }
+        ]
+      },
+      "birthday": {
+        "pct_with_birthday_emoji": 0.6667,
+        "pct_with_double_exclaim": 0.5556
+      }
+    }
+  },
+  "segments_omitted": [
+    {
+      "segment": "tier:colleague",
+      "count": 3,
+      "reason": "only 3 wishes (< 8)"
+    }
+  ],
+  "warnings": [
+    "Overall sample 27 is under 40 — patterns are suggestive, not strongly statistical. Tier segments are coarser still."
+  ]
+}

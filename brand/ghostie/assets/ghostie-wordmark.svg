@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 312 96" role="img" aria-labelledby="title desc">
+  <title id="title">Ghostie wordmark</title>
+  <desc id="desc">Ghostie wordmark in a warm display serif.</desc>
+  <text x="8" y="67" fill="#2B2148" font-family="Fraunces, Georgia, serif" font-size="64" font-weight="850" letter-spacing="0">Ghostie</text>
+  <circle cx="282" cy="24" r="8" fill="#FF8E7E"/>
+  <path d="M274 51c0-10.6 7-18.2 17.4-18.2 10.2 0 17.6 7.6 17.6 18.2v14.8c0 3.4-4 5.4-6.7 3.2l-3.3-2.6-3.5 4.3a3 3 0 0 1-4.7 0l-3.5-4.3-3.3 2.6c-2.7 2.2-6.7.2-6.7-3.2V51Z" fill="#FFF9F2" stroke="#2B2148" stroke-width="2.4" stroke-linejoin="round"/>
+  <circle cx="286" cy="52" r="2.8" fill="#2B2148"/>
+  <path d="M296 50.6c1.5 1.8 3.2 1.8 4.8 0" fill="none" stroke="#2B2148" stroke-width="2.1" stroke-linecap="round"/>
+</svg>

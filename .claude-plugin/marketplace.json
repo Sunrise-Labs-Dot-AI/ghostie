@@ -1,0 +1,15 @@
+{
+  "name": "ghostie",
+  "owner": {
+    "name": "Sunrise Labs",
+    "url": "https://messagesfor.ai"
+  },
+  "plugins": [
+    {
+      "name": "ghostie",
+      "source": "../",
+      "description": "Ghostie: iMessage + WhatsApp MCPs with a hold-to-fire approval gate, paired with curated skills (texting analytics, draft-in-your-voice, etc.). Requires Ghostie.app installed locally from https://github.com/Sunrise-Labs-Dot-AI/messages-for-ai/releases.",
+      "homepage": "https://messagesfor.ai"
+    }
+  ]
+}

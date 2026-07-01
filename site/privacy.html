@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy Policy - Messages for AI</title>
+  <meta name="description" content="Privacy policy for Messages for AI, a local macOS app for Claude, Codex, iMessage, and WhatsApp drafting.">
+  <link rel="icon" type="image/png" href="icon.png">
+  <style>
+    :root {
+      --fg: #111317;
+      --muted: #66707f;
+      --bg: #f6f7f9;
+      --paper: #ffffff;
+      --line: #dfe4eb;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fg: #f4f6fa;
+        --muted: #9ea7b5;
+        --bg: #171b1f;
+        --paper: #101215;
+        --line: #2b323a;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 30px 22px 58px;
+    }
+
+    header,
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    a { color: inherit; }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--fg);
+      font-weight: 730;
+      text-decoration: none;
+    }
+
+    .brand img {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+    }
+
+    main {
+      margin: 56px 0 46px;
+      padding: 34px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--paper);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(36px, 6vw, 54px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .updated {
+      margin: 0 0 32px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    h2 {
+      margin: 30px 0 8px;
+      font-size: 21px;
+      line-height: 1.18;
+    }
+
+    p,
+    li {
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    ul {
+      padding-left: 20px;
+    }
+
+    strong { color: var(--fg); }
+
+    footer {
+      border-top: 1px solid var(--line);
+      padding-top: 22px;
+    }
+  </style>
+  <script defer src="/analytics.js"></script>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <a class="brand" href="/">
+        <img src="icon.png" alt="">
+        <span>Messages for AI</span>
+      </a>
+      <a href="/">Back to product</a>
+    </header>
+
+    <main>
+      <h1>Privacy Policy</h1>
+      <p class="updated">Effective June 6, 2026 &middot; Updated June 7, 2026</p>
+
+      <p>
+        Messages for AI is a local macOS app that connects Claude or Codex to your iMessage and WhatsApp context.
+        The app is designed so your Mac remains the control center for message access, drafting, scheduling, and sending.
+        Your use of the app is also governed by our <a href="terms.html">Terms of Service</a>.
+      </p>
+
+      <h2>What the app reads</h2>
+      <p>
+        With your permission, Messages for AI can read local iMessage data from your Mac, WhatsApp data from your linked
+        WhatsApp account, and Contacts data when you grant Contacts access. This access is used to show conversation
+        context, stage drafts, resolve names, and run local diagnostics or analytics.
+      </p>
+
+      <h2>What stays local</h2>
+      <p>
+        Core message browsing, draft staging, send-state tracking, settings, diagnostics, and local analytics are stored
+        on your Mac. Sunrise Labs does not operate a server that receives your message history from the core app.
+      </p>
+
+      <h2>Product analytics</h2>
+      <p>
+        Product analytics are shown during first-run onboarding with the toggle off by default. You can turn them on
+        before continuing and can change the setting any time in Settings. When enabled, Messages for AI sends a small
+        allowlisted set of product events to Sunrise Labs through PostHog, such as app version seen, feature viewed,
+        draft staged, draft sent, and Lab scan started or completed. These events use coarse enums and buckets only.
+        Existing installs keep their stored analytics setting and do not see first-run onboarding again unless setup is
+        reset.
+      </p>
+      <p>
+        Product analytics never include message bodies, draft text, prompts, model responses, contact names, phone
+        numbers, emails, Apple IDs, WhatsApp IDs, raw chat IDs, recipient identifiers, message identifiers, API keys, file
+        contents, or file paths containing user names. Session replay, screen capture, element autocapture, and automatic
+        page or window capture are disabled.
+      </p>
+      <p>
+        The app uses a random local installation ID for analytics. It is not derived from your Apple ID, phone number,
+        email, contacts, messages, or WhatsApp account.
+      </p>
+
+      <h2>Website analytics</h2>
+      <p>
+        The marketing website (messagesfor.ai and ghostie.app) uses privacy-preserving, cookieless analytics
+        through PostHog to understand traffic and how many visitors begin a download. It sets no cookies and
+        uses no local storage, creates no per-person profiles, and records no sessions or screens. It captures
+        only coarse, anonymous events: page views, and clicks on the Download button along with the page path
+        and the button's visible label. It never receives names, emails, phone numbers, message data, or any
+        other personal information, and there is nothing that identifies you across visits.
+      </p>
+
+      <h2>When models may receive content</h2>
+      <p>
+        Some Labs can use a Claude or ChatGPT API key that you configure. Those Labs identify when they send aggregate
+        fingerprints, sanitized identity hints, or selected message excerpts to your chosen model provider. For example,
+        Texting Style can use aggregate style data, while EQ may send recent excerpts from a selected thread so the model
+        can produce a relationship reflection. Provider use is governed by the provider and model you select.
+      </p>
+
+      <h2>Outbound messages</h2>
+      <p>
+        Assistant-generated replies are staged in the app. Depending on your settings, you may keep hold-to-send review
+        for every outbound message, approve scheduled sends before they queue, or choose more automated behavior. The app
+        keeps this workflow visible so you can inspect drafts, failures, and sent states.
+      </p>
+
+      <h2>API keys and settings</h2>
+      <p>
+        API keys and app settings are stored locally on your Mac and are not sent to Sunrise Labs. Do not share logs or
+        diagnostic files publicly if they contain private configuration details.
+      </p>
+
+      <h2>Diagnostics exports</h2>
+      <p>
+        Diagnostics exports are local files created only when you click Export Diagnostics. Settings let you choose
+        whether to include local app events, daemon logs, and relevant macOS crash reports. Daemon logs are off by default
+        because local bridge logs can include transport identifiers. These exports are not uploaded automatically.
+      </p>
+
+      <h2>What we do not do</h2>
+      <ul>
+        <li>We do not sell your message data.</li>
+        <li>We do not run a hosted message-sync service for your conversations.</li>
+        <li>We do not receive your local app logs unless you choose to share them for support.</li>
+        <li>We do not use session replay or autocapture for this app.</li>
+      </ul>
+
+      <h2>Information about other people</h2>
+      <p>
+        Because the app reads your conversations and contacts, it necessarily processes information about the people you
+        communicate with, such as their names, numbers, and message content. That processing happens locally on your Mac
+        to provide context and draft replies. You are responsible for having a lawful basis to process that information
+        and for any consent or notice obligations to others, as described in our
+        <a href="terms.html">Terms of Service</a>. If a person you have communicated with contacts us about their data,
+        we will generally direct them to you, since the data lives on your device and under your control.
+      </p>
+
+      <h2>WhatsApp</h2>
+      <p>
+        WhatsApp support uses a local linked-device connection. Locally cached WhatsApp message content is encrypted
+        at rest on your Mac. Your use of WhatsApp support is governed by the
+        <a href="terms.html">Terms of Service</a>.
+      </p>
+
+      <h2>Your choices, access, and deletion</h2>
+      <p>
+        Because the core app stores message, draft, settings, and analytics data locally, you control that data directly:
+        you can turn product analytics off at any time in Settings, choose what diagnostics exports include, and delete
+        the app's local data by removing its support folders and uninstalling the app. Depending on where you live, you
+        may have rights to access, correct, delete, or restrict processing of your personal information, or to opt out of
+        certain processing. For the limited product-analytics events we receive through PostHog, you can opt out in the
+        app, and you can contact us to ask about data associated with your random installation ID. We do not sell or
+        share your personal information for cross-context behavioral advertising.
+      </p>
+
+      <h2>Data retention</h2>
+      <p>
+        Local data persists on your Mac until you delete it or uninstall the app. Product-analytics events received
+        through PostHog are retained according to our analytics configuration and are limited to allowlisted, coarse
+        metadata as described above.
+      </p>
+
+      <h2>Children</h2>
+      <p>
+        The app is not directed to children under 13, and you should not use it to process the personal information of a
+        child under 13. See the eligibility section of the <a href="terms.html">Terms of Service</a>.
+      </p>
+
+      <h2>Who we are and how to contact us</h2>
+      <p>
+        Messages for AI is provided by Heath Foundry LLC, doing business as Sunrise Labs. For privacy questions, contact us at hello@sunriselabs.ai or open an issue
+        on <a href="https://github.com/Sunrise-Labs-Dot-AI/messages-for-ai">GitHub</a>. If you are in a region with a
+        data-protection authority, you may also have the right to lodge a complaint with it.
+      </p>
+
+      <h2>Questions or issues</h2>
+      <p>
+        Messages for AI is open source. You can review the code, report issues, or ask privacy questions on
+        <a href="https://github.com/Sunrise-Labs-Dot-AI/messages-for-ai">GitHub</a>.
+      </p>
+    </main>
+
+    <footer>
+      <span>&copy; 2026 Sunrise Labs</span>
+      <span>
+        <a href="terms.html">Terms</a> &middot; <a href="security.html">Security</a>
+      </span>
+    </footer>
+  </div>
+</body>
+</html>

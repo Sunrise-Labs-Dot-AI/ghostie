@@ -1,0 +1,22 @@
+{
+  "name": "wrapped-generator",
+  "version": "0.11.2",
+  "description": "Deterministic Texting Wrapped generator. Reads chat.db (read-only), computes the analysis, and prints a self-contained Wrapped HTML to stdout. No LLM. Spawned by the Messages for AI menu-bar app (which holds Full Disk Access via launcher attribution); also callable as a CLI by the texting-analytics Claude skill. Shares the iMessage daemon's chat.db decode/contacts layer at build time.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "bun build src/index.ts --compile --outfile bin/wrapped-generator",
+    "build:analytics": "bun build src/texting-analytics-generator.ts --compile --outfile bin/texting-analytics-generator",
+    "dev": "bun run src/index.ts",
+    "dev:analytics": "bun run src/texting-analytics-generator.ts",
+    "test": "bun test",
+    "typecheck": "bun --bun tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.13",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "html2canvas": "1.4.1"
+  }
+}

@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ghostie Brand System</title>
+  <meta name="description" content="A complete brand system for Ghostie, the warm macOS texting companion.">
+  <link rel="stylesheet" href="tokens.css">
+  <link rel="stylesheet" href="brand-board.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <a href="#top" aria-label="Ghostie brand system home">
+        <img src="assets/ghostie-lockup.svg" alt="Ghostie">
+      </a>
+      <nav class="nav" aria-label="Brand sections">
+        <a href="#logo">Logo</a>
+        <a href="#mascot">Mascot</a>
+        <a href="#color">Color</a>
+        <a href="#type">Type</a>
+        <a href="#components">Components</a>
+        <a href="#doors">Two doors</a>
+        <button class="theme-toggle" type="button" data-theme-toggle>Dark mode</button>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="shell page-hero">
+      <div>
+        <p class="eyebrow">Brand system, v1</p>
+        <h1>A friendly ghost for people who mean to <br class="phone-only">text back.</h1>
+        <p class="lead">Ghostie helps you show up for the people you care about. It catches quiet threads, remembers birthdays, reads emotional tone, drafts in your voice, and waits for your approval before anything sends.</p>
+        <div class="hero-actions" aria-label="Primary brand actions">
+          <a class="button button-primary" href="#components">View components</a>
+          <a class="button button-secondary" href="README.md">Read guidelines</a>
+          <a class="button button-ghost" href="tokens.css">Open tokens</a>
+        </div>
+      </div>
+      <div class="hero-device" aria-label="Ghostie companion preview">
+        <div class="friend-card">
+          <div class="friend-card-head">
+            <div class="mini-lockup">
+              <img src="assets/ghostie-mark.svg" alt="">
+              <span>Ghostie</span>
+            </div>
+            <span class="status-pill">3 nudges</span>
+          </div>
+          <div class="friend-list">
+            <div class="friend-row">
+              <div class="avatar">M</div>
+              <div>
+                <p class="row-title">Maya</p>
+                <p class="row-note">You left the ball in your court.</p>
+              </div>
+              <span class="time-chip">5d</span>
+            </div>
+            <div class="friend-row">
+              <div class="avatar">J</div>
+              <div>
+                <p class="row-title">Jon</p>
+                <p class="row-note">Birthday tomorrow. Be smooth.</p>
+              </div>
+              <span class="status-pill">soon</span>
+            </div>
+            <div class="friend-row">
+              <div class="avatar">A</div>
+              <div>
+                <p class="row-title">Ari</p>
+                <p class="row-note">Draft ready, needs your thumbs up.</p>
+              </div>
+              <span class="status-pill">draft</span>
+            </div>
+          </div>
+          <img class="hero-mascot" src="assets/ghostie-mascot-waving.svg" alt="Ghostie waving">
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="logo">
+      <div class="shell">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">01 Logo and wordmark</p>
+            <h2>Soft, legible, never spooky.</h2>
+          </div>
+          <p>The mark combines a ghost, a speech bubble, and a tiny spark of care. The wordmark is round and warm, with enough polish for a macOS app and enough charm for Wrapped cards.</p>
+        </div>
+        <div class="asset-grid">
+          <div class="asset-tile">
+            <img src="assets/ghostie-lockup.svg" alt="Ghostie logo lockup">
+            <p class="asset-note">Primary lockup for marketing headers, press, onboarding, and brand introductions.</p>
+          </div>
+          <div class="asset-tile">
+            <img src="assets/ghostie-mark.svg" alt="Ghostie logo mark">
+            <p class="asset-note">Standalone mark for menu bar, small UI, social avatars, and favicon contexts.</p>
+          </div>
+          <div class="asset-tile">
+            <img src="assets/ghostie-wordmark.svg" alt="Ghostie wordmark">
+            <p class="asset-note">Wordmark for wide layouts where the mascot appears elsewhere in the composition.</p>
+          </div>
+          <div class="asset-tile app-icon-wrap">
+            <img src="assets/ghostie-app-icon.svg" alt="Ghostie macOS app icon">
+            <p class="asset-note">macOS app icon: mint and honey field, ink outline, clear face at dock size.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="mascot">
+      <div class="shell">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">02 Mascot</p>
+            <h2>One character, six useful moods.</h2>
+          </div>
+          <p>The silhouette stays fixed, which keeps the ghost recognizable in tiny UI, empty states, hero art, and Texting Wrapped share cards.</p>
+        </div>
+        <div class="mascot-grid">
+          <div class="mascot-tile"><img src="assets/ghostie-mascot-happy.svg" alt="Happy Ghostie"><span>Happy</span></div>
+          <div class="mascot-tile"><img src="assets/ghostie-mascot-winking.svg" alt="Winking Ghostie"><span>Winking</span></div>
+          <div class="mascot-tile"><img src="assets/ghostie-mascot-sleepy.svg" alt="Sleepy Ghostie"><span>Sleepy</span></div>
+          <div class="mascot-tile"><img src="assets/ghostie-mascot-waving.svg" alt="Waving Ghostie"><span>Waving</span></div>
+          <div class="mascot-tile"><img src="assets/ghostie-mascot-boo.svg" alt="Boo Ghostie"><span>Boo</span></div>
+          <div class="mascot-tile"><img src="assets/ghostie-mascot-thinking.svg" alt="Thinking Ghostie"><span>Thinking</span></div>
+        </div>
+        <div class="construction">
+          <div class="construction-ghost">
+            <img src="assets/ghostie-mascot-happy.svg" alt="Ghostie construction grid">
+          </div>
+          <div class="guideline-panel">
+            <h3>Construction note</h3>
+            <ul>
+              <li>Use a 96 by 96 grid. The body sits from x 9 to 78 and y 13 to 79.</li>
+              <li>Keep the outline at 3 px, rounded caps, rounded joins, and the same bottom scallop rhythm.</li>
+              <li>Eyes are round, dark, and spaced on a calm centerline. Cheeks are coral at low opacity.</li>
+              <li>Only expressions, arms, and small props change. The body, cheeks, and outline stay consistent.</li>
+              <li>The ghost is a helper, not a prank. Avoid sharp teeth, horror cues, smoke trails, or cluttered props.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="color">
+      <div class="shell">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">03 Color</p>
+            <h2>Warm by default, crisp when serious.</h2>
+          </div>
+          <p>Use cream and mint for friendship, plum for trust and control, coral for emotion, honey for approval, and lilac for playful data moments.</p>
+        </div>
+        <div class="color-grid" aria-label="Light mode color tokens">
+          <div class="swatch" style="--swatch:#FFF8F1;--swatchText:#211A2A"><strong>Warm Cream</strong><span>#FFF8F1</span></div>
+          <div class="swatch" style="--swatch:#211A2A;--swatchText:#FFFFFF"><strong>Ink Plum</strong><span>#211A2A</span></div>
+          <div class="swatch" style="--swatch:#007D73;--swatchText:#FFFFFF"><strong>Spirit Teal</strong><span>#007D73</span></div>
+          <div class="swatch" style="--swatch:#E85D4F;--swatchText:#211A2A"><strong>Friend Coral</strong><span>#E85D4F</span></div>
+          <div class="swatch" style="--swatch:#FFD66D;--swatchText:#3F2B00"><strong>Approval Honey</strong><span>#FFD66D</span></div>
+          <div class="swatch" style="--swatch:#C9B9FF;--swatchText:#211A2A"><strong>Soft Lilac</strong><span>#C9B9FF</span></div>
+          <div class="swatch" style="--swatch:#DDF7F0;--swatchText:#173E38"><strong>Message Mint</strong><span>#DDF7F0</span></div>
+          <div class="swatch" style="--swatch:#FFF1D6;--swatchText:#3F2B00"><strong>Draft Honey</strong><span>#FFF1D6</span></div>
+        </div>
+        <p class="contrast-note">Dark mode tokens live in `tokens.css` and `GhostieColors.swift`. Primary text pairs, message pairs, and approval pairs are selected for WCAG AA contrast.</p>
+      </div>
+    </section>
+
+    <section class="section" id="type">
+      <div class="shell">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">04 Type</p>
+            <h2>Expressive headlines, calm UI.</h2>
+          </div>
+          <p>Fraunces gives the ghost warmth and personality. Inter keeps the app readable. JetBrains Mono marks the power door without turning the whole product into a terminal.</p>
+        </div>
+        <div class="type-spec">
+          <div class="type-row">
+            <span class="type-name">Display</span>
+            <span class="display-sample">Do not ghost.</span>
+            <span class="type-meta">Fraunces 850</span>
+          </div>
+          <div class="type-row">
+            <span class="type-name">Title</span>
+            <span class="title-sample">Draft awaiting approval</span>
+            <span class="type-meta">Inter 800</span>
+          </div>
+          <div class="type-row">
+            <span class="type-name">Body</span>
+            <span class="body-sample">Ghostie drafted this in your voice. Read it, tweak it, then approve when it feels right.</span>
+            <span class="type-meta">Inter 400</span>
+          </div>
+          <div class="type-row">
+            <span class="type-name">Power label</span>
+            <span class="mono-sample">BYOK_ACTIVE: claude, local, approval_gate</span>
+            <span class="type-meta">JetBrains Mono 700</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="components">
+      <div class="shell">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">05 Core UI</p>
+            <h2>Friendly controls with a visible gate.</h2>
+          </div>
+          <p>Components are restrained enough for daily macOS use, with playful edges reserved for moments that need warmth, confirmation, or sharing.</p>
+        </div>
+        <div class="component-grid">
+          <div class="component-tile">
+            <h3>Buttons</h3>
+            <div class="button-stack">
+              <button class="button button-primary" type="button">Approve draft</button>
+              <button class="button button-secondary" type="button">Edit first</button>
+              <button class="button button-ghost" type="button">Not now</button>
+            </div>
+          </div>
+          <div class="component-tile">
+            <h3>Message bubble</h3>
+            <div class="message-demo">
+              <div class="bubble bubble-in">Are you still down for Saturday?</div>
+              <div class="bubble bubble-out">Yes. I forgot to reply, not to care.</div>
+            </div>
+          </div>
+          <div class="component-tile">
+            <h3>Approval card</h3>
+            <div class="approval-card">
+              <strong>Draft awaiting approval</strong>
+              <p>Ghostie wrote a warm reply. Nothing sends until you approve it.</p>
+              <div class="approval-actions">
+                <button class="mini-button" type="button">Approve</button>
+                <button class="mini-button" type="button">Edit</button>
+              </div>
+            </div>
+          </div>
+          <div class="component-tile">
+            <h3>macOS app icon</h3>
+            <div class="app-icon-wrap">
+              <img src="assets/ghostie-app-icon.svg" alt="Ghostie app icon">
+            </div>
+          </div>
+          <div class="component-tile">
+            <h3>Hero marketing card</h3>
+            <div class="hero-card">
+              <div>
+                <h3>Your friend radar is on.</h3>
+                <p>Quiet thread, birthday tomorrow, draft ready. Tiny saves, big friendship energy.</p>
+              </div>
+              <img src="assets/ghostie-mascot-happy.svg" alt="Happy Ghostie">
+            </div>
+          </div>
+          <div class="component-tile">
+            <h3>Empty state</h3>
+            <div class="hero-card">
+              <div>
+                <h3>No one is being ghosted.</h3>
+                <p>Enjoy the rare thrill of having your texting life together.</p>
+              </div>
+              <img src="assets/ghostie-mascot-sleepy.svg" alt="Sleepy Ghostie">
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="doors">
+      <div class="shell">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">06 Two front doors</p>
+            <h2>Same product, different dials.</h2>
+          </div>
+          <p>The consumer door leads with friendship and relief. The power door leads with control, local context, BYOK, and the same approval promise.</p>
+        </div>
+        <div class="door-grid">
+          <article class="door door-consumer">
+            <div class="door-content">
+              <div>
+                <p class="eyebrow">Free to start</p>
+                <h3>Ghostie</h3>
+                <p>The Mac app that helps you text back, remember the important days, and sound like yourself when words are hard.</p>
+                <a class="button button-primary" href="#components">Start free</a>
+              </div>
+              <div class="door-art">
+                <div class="message-demo">
+                  <div class="bubble bubble-in">You disappeared for a week.</div>
+                  <div class="bubble bubble-out">I know. Ghostie caught me.</div>
+                </div>
+                <img src="assets/ghostie-mascot-waving.svg" alt="Ghostie waving">
+              </div>
+            </div>
+          </article>
+          <article class="door door-power">
+            <div class="door-content">
+              <div>
+                <p class="eyebrow">Advanced mode</p>
+                <h3>Ghostie Power</h3>
+                <p>Plug in your own Claude or ChatGPT key. Read, draft, and automate with local message context. Every send still waits for you.</p>
+                <div class="hero-actions">
+                  <a class="button button-primary" href="#tokens">Bring your key</a>
+                  <a class="button button-secondary" href="#tokens">View controls</a>
+                </div>
+              </div>
+              <div class="door-art">
+                <div class="signal-stack" aria-label="Power mode signals">
+                  <div class="signal-line"><span>LOCAL</span><span>ON</span></div>
+                  <div class="signal-line"><span>BYOK</span><span>READY</span></div>
+                  <div class="signal-line"><span>SEND</span><span>GATED</span></div>
+                </div>
+                <img src="assets/ghostie-mascot-thinking.svg" alt="Thinking Ghostie">
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="tokens">
+      <div class="shell">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">07 Code-ready tokens</p>
+            <h2>Web and SwiftUI, same names.</h2>
+          </div>
+          <p>The token files are included beside this board, so design and implementation can start from the same vocabulary.</p>
+        </div>
+        <div class="token-grid">
+          <div class="token-panel">
+            <h3>CSS sample</h3>
+            <pre><code>:root {
+  --gh-bg: #FFF8F1;
+  --gh-text: #211A2A;
+  --gh-primary: #2B2148;
+  --gh-primary-text: #FFFFFF;
+  --gh-teal: #007D73;
+  --gh-coral: #E85D4F;
+}
+
+[data-theme="dark"] {
+  --gh-bg: #121018;
+  --gh-text: #FFF8F1;
+  --gh-primary: #89E5D3;
+  --gh-primary-text: #121018;
+}</code></pre>
+          </div>
+          <div class="token-panel">
+            <h3>SwiftUI sample</h3>
+            <pre><code>Text("Draft awaiting approval")
+  .foregroundStyle(GhostieColors.text)
+  .padding(16)
+  .background(GhostieColors.approvalBackground)
+  .overlay {
+    RoundedRectangle(cornerRadius: 12)
+      .stroke(GhostieColors.approvalBorder)
+  }</code></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="voice">
+      <div class="shell">
+        <div class="section-header">
+          <div>
+            <p class="section-kicker">08 Voice</p>
+            <h2>Helpful first, cheeky second.</h2>
+          </div>
+          <p>Ghostie talks like a candid friend who wants you to feel capable, not guilty.</p>
+        </div>
+        <div class="voice-grid">
+          <div class="voice-card">
+            <strong>Say</strong>
+            <p>"You forgot to reply, not to care."</p>
+          </div>
+          <div class="voice-card">
+            <strong>Say</strong>
+            <p>"Draft ready. Make it yours, then send."</p>
+          </div>
+          <div class="voice-card">
+            <strong>Avoid</strong>
+            <p>"Engagement automation workflow initiated."</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="shell">Ghostie brand artifacts live in `brand/ghostie/`. SVG assets, tokens, SwiftUI colors, and guidelines are included.</div>
+  </footer>
+
+  <script>
+    const root = document.documentElement;
+    const toggle = document.querySelector("[data-theme-toggle]");
+
+    toggle.addEventListener("click", () => {
+      const next = root.dataset.theme === "dark" ? "light" : "dark";
+      root.dataset.theme = next;
+      toggle.textContent = next === "dark" ? "Light mode" : "Dark mode";
+    });
+  </script>
+</body>
+</html>

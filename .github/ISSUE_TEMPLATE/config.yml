@@ -1,0 +1,11 @@
+# GitHub uses this config alongside the *.yml templates above. It controls
+# the New Issue chooser: disables blank issues (forces categorization),
+# and adds contact links for paths that aren't tracked as GitHub issues.
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/Sunrise-Labs-Dot-AI/messages-for-ai/security/advisories/new
+    about: For anything that should not be discussed in public, please open a private security advisory.
+  - name: Email feedback
+    url: mailto:support@sunriselabs.ai
+    about: General feedback or questions you'd rather not file as a public issue.

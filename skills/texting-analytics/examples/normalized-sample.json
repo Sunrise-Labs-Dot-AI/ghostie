@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "source_platform": "mixed",
+  "window": { "since_ms": 1715000000000, "until_ms": 1747699200000 },
+  "generated_at_ms": 1747699200000,
+  "truncated": false,
+  "threads": [
+    { "platform": "imessage", "thread_id": "imessage:chat123", "is_group": false, "participant_count": 2, "display_name": "Avery", "last_event_ts_ms": 1747697240000 },
+    { "platform": "imessage", "thread_id": "imessage:chat777", "is_group": true, "participant_count": 5, "display_name": "Immature Dumpy Dads", "last_event_ts_ms": 1747600300000 },
+    { "platform": "whatsapp", "thread_id": "whatsapp:14155550123@s.whatsapp.net", "is_group": false, "participant_count": 2, "display_name": "Ari", "last_event_ts_ms": 1747500000000 }
+  ],
+  "events": [
+    { "platform": "imessage", "thread_id": "imessage:chat123", "event_id": "imessage:m1", "sender_key": "+14155550100", "from_me": false, "ts_ms": 1747697000000, "kind": "text", "text_len": 42 },
+    { "platform": "imessage", "thread_id": "imessage:chat123", "event_id": "imessage:m2", "sender_key": null, "from_me": true, "ts_ms": 1747697240000, "kind": "text", "text_len": 8 },
+    { "platform": "imessage", "thread_id": "imessage:chat777", "event_id": "imessage:m3", "sender_key": "+14155550111", "from_me": false, "ts_ms": 1747600000000, "kind": "text", "text_len": 120 },
+    { "platform": "imessage", "thread_id": "imessage:chat777", "event_id": "imessage:m4", "sender_key": null, "from_me": true, "ts_ms": 1747600300000, "kind": "reaction", "text_len": null },
+    { "platform": "whatsapp", "thread_id": "whatsapp:14155550123@s.whatsapp.net", "event_id": "whatsapp:wm1", "sender_key": "+14155550123", "from_me": false, "ts_ms": 1747500000000, "kind": "text", "text_len": 15 }
+  ]
+}

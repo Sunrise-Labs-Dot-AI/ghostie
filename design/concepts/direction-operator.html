@@ -1,0 +1,1994 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Operator — Messages for AI</title>
+<!-- Native type system: SF Pro (via system stack) + SF Mono (via ui-monospace). No webfonts bundled. -->
+<style>
+  /* ============================================================
+     OPERATOR — Linear-grade instrument discipline
+     Flat matte graphite. Hairline borders, not glows. ONE accent
+     (iMessage blue) rationed to the single most important action.
+     Mono for every metadata value; sans for labels/body.
+     4px grid. Radii: 12 cards / 6 controls / 2 badges / 9999 pills.
+     No gradients on surfaces, no spotlight blooms, no neon.
+     ============================================================ */
+
+  :root {
+    /* ---- type & geometry (theme-independent) ---- */
+    --radius-card: 12px;
+    --radius-ctrl: 6px;
+    --radius-badge: 2px;
+
+    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, "Helvetica Neue", sans-serif;
+    --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, monospace;
+
+    /* ---- native bubble palettes (Apple / WhatsApp — same in both themes
+            EXCEPT the surface-matched incoming, which switches per theme) ---- */
+    --imsg-blue-1: #1fa2ff;   /* outgoing iMessage gradient top */
+    --imsg-blue-2: #0a7cff;   /* outgoing iMessage gradient bottom */
+    --imsg-blue-solid: #0a7cff;
+    --wa-out-text: #e9edef;   /* default; overridden per theme */
+  }
+
+  /* ============================================================
+     DARK THEME (the original Operator look, refactored onto vars)
+     ============================================================ */
+  [data-theme="dark"] {
+    /* ---- accent (rationed hard) ---- */
+    --blue:        #0a7cff;
+    --blue-edge:   #3a96ff;   /* leading edge of the hold sweep */
+    --blue-dim:    rgba(10,124,255,.16);
+    --blue-rail:   rgba(10,124,255,.40);
+
+    /* ---- platform identity markers (used sparingly) ---- */
+    --green:       #11b981;
+    --green-dim:   rgba(17,185,129,.16);
+    --amber:       #e0a23a;
+    --amber-dim:   rgba(224,162,58,.16);
+    --red:         #ff5f57;
+
+    /* ---- graphite scale (own ladder, matte, flat) ---- */
+    --g-000:       #0c0d0f;   /* desktop backdrop */
+    --g-050:       #111316;   /* window base */
+    --g-080:       #14161a;   /* sidebar */
+    --g-100:       #16191d;   /* content pane */
+    --g-130:       #1a1d22;   /* raised row / card */
+    --g-160:       #1e2127;   /* hover / selected fill */
+    --g-200:       #23272e;   /* control fill */
+    --g-260:       #2b2f37;   /* control hover */
+
+    /* ---- hairlines (low-opacity white, the ONLY elevation) ---- */
+    --line:        rgba(255,255,255,.07);
+    --line-2:      rgba(255,255,255,.10);
+    --line-strong: rgba(255,255,255,.14);
+    --line-faint:  rgba(255,255,255,.045);
+
+    /* ---- ink ---- */
+    --ink:         #eceef1;   /* primary text */
+    --ink-2:       #b6bcc6;   /* secondary */
+    --ink-3:       #7e858f;   /* muted / meta */
+    --ink-4:       #5a606a;   /* faint */
+
+    /* ---- faint desktop grid lines ---- */
+    --grid-line:   rgba(255,255,255,.012);
+
+    /* ---- native bubbles (incoming surfaces match the OS) ---- */
+    --imsg-in-bg:  #3b3b3d;   /* iMessage gray, dark */
+    --imsg-in-text:#ffffff;
+    --wa-in-bg:    #202c33;   /* WhatsApp incoming, dark */
+    --wa-in-text:  #e9edef;
+    --wa-out-bg:   #005c4b;   /* WhatsApp outgoing, dark */
+    --wa-out-text: #e9edef;
+    --wa-tick:     #53bdeb;
+
+    /* matte elevation: a whisper of depth, no bloom */
+    --shadow-win: 0 1px 0 rgba(255,255,255,.04) inset,
+                  0 18px 50px rgba(0,0,0,.55),
+                  0 2px 8px rgba(0,0,0,.40);
+  }
+
+  /* ============================================================
+     LIGHT THEME (default) — same instrument, lit. Near-white cool
+     surfaces, crisp 1px hairlines, ink text, mono values in slate.
+     The SAME rationed blue accent. Precise & flat, not soft cards.
+     ============================================================ */
+  [data-theme="light"] {
+    /* ---- accent (identical, rationed) ---- */
+    --blue:        #0a7cff;
+    --blue-edge:   #0a6ae0;   /* leading edge reads darker on light */
+    --blue-dim:    rgba(10,124,255,.16);
+    --blue-rail:   rgba(10,124,255,.45);
+
+    /* ---- platform markers, tuned for legibility on light ---- */
+    --green:       #0f9d6b;
+    --green-dim:   rgba(15,157,107,.18);
+    --amber:       #b9791b;
+    --amber-dim:   rgba(185,121,27,.22);
+    --red:         #ff5f57;
+
+    /* ---- light cool-gray ladder (very tight, near-white) ---- */
+    --g-000:       #eef1f5;   /* desktop backdrop */
+    --g-050:       #ffffff;   /* window base */
+    --g-080:       #f6f8fa;   /* sidebar */
+    --g-100:       #ffffff;   /* content pane */
+    --g-130:       #fafbfc;   /* raised row / card */
+    --g-160:       #f1f4f8;   /* hover / selected fill */
+    --g-200:       #f3f5f8;   /* control fill */
+    --g-260:       #e9edf2;   /* control hover */
+
+    /* ---- hairlines (crisp ink lines, the ONLY elevation) ---- */
+    --line:        #e4e8ee;
+    --line-2:      #dfe4eb;
+    --line-strong: #cdd4dd;
+    --line-faint:  #eef1f5;
+
+    /* ---- ink ---- */
+    --ink:         #111317;   /* primary text */
+    --ink-2:       #3f4751;   /* secondary */
+    --ink-3:       #6a727d;   /* muted / meta (slate for mono values) */
+    --ink-4:       #99a1ac;   /* faint */
+
+    /* ---- faint desktop grid lines ---- */
+    --grid-line:   rgba(16,20,28,.022);
+
+    /* ---- native bubbles (incoming surfaces match the OS) ---- */
+    --imsg-in-bg:  #e9e9eb;   /* iMessage gray, light */
+    --imsg-in-text:#000000;
+    --wa-in-bg:    #ffffff;   /* WhatsApp incoming, light */
+    --wa-in-text:  #111b21;
+    --wa-out-bg:   #d9fdd3;   /* WhatsApp outgoing, light */
+    --wa-out-text: #111b21;
+    --wa-tick:     #34b7f1;
+
+    /* matte elevation on light: soft neutral drop, no glow */
+    --shadow-win: 0 0 0 1px rgba(16,20,28,.02),
+                  0 14px 40px rgba(16,20,28,.10),
+                  0 2px 6px rgba(16,20,28,.06);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0; padding: 0;
+    font-family: var(--sans);
+    color: var(--ink);
+    background: var(--g-000);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    font-feature-settings: "cv11" 1, "ss01" 1;
+  }
+
+  /* Desktop backdrop: a plain deep neutral, no gradient.
+     A single ultra-faint hairline grid hints "instrument", not decoration. */
+  body {
+    min-height: 100vh;
+    background-color: var(--g-000);
+    background-image:
+      linear-gradient(0deg, var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+    background-size: 64px 64px, 64px 64px;
+  }
+
+  .page {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 36px 40px 88px;
+  }
+
+  /* ===================== HEADER BAND ===================== */
+  .band {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: var(--g-050);
+    padding: 20px 24px;
+    margin-bottom: 36px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 20px 32px;
+    align-items: center;
+  }
+  .band-id { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .band-kicker {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-badge);
+    padding: 3px 7px;
+  }
+  .band-name {
+    font-size: 26px;
+    font-weight: 600;
+    letter-spacing: -.02em;
+    color: var(--ink);
+  }
+  .band-thesis {
+    grid-column: 1 / 2;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink-2);
+    max-width: 64ch;
+  }
+  .band-thesis b { color: var(--ink); font-weight: 600; }
+
+  .typeset {
+    display: flex;
+    gap: 18px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-3);
+    letter-spacing: .04em;
+  }
+  .typeset span b { color: var(--ink-2); font-weight: 600; }
+
+  /* smooth theme cross-fade on surfaces (kept subtle, instrument-grade) */
+  .band, .window, .titlebar, .sidebar, .content, .nav, .convo,
+  .set-card, .status-card, .home-foot, .band-themebox, .demo-card {
+    transition: background-color .18s ease, border-color .18s ease, color .18s ease;
+  }
+
+  /* ---- header controls cluster (theme toggle + service demo) ---- */
+  .band-controls {
+    grid-row: 1 / 3;
+    grid-column: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-end;
+  }
+  .band-toprow {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  /* segmented Light / Dark toggle (mono, hairline, rationed) */
+  .theme-seg {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px;
+    border: 1px solid var(--line-2);
+    border-radius: 9999px;
+    background: var(--g-080);
+  }
+  .theme-seg button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    padding: 5px 11px;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    line-height: 1;
+    transition: color .15s ease, background-color .15s ease;
+  }
+  .theme-seg button svg { width: 12px; height: 12px; }
+  [data-theme="light"] .theme-seg button[data-set="light"],
+  [data-theme="dark"]  .theme-seg button[data-set="dark"] {
+    background: var(--g-200);
+    color: var(--ink);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  /* the active segment gets the rationed accent on its glyph only */
+  [data-theme="light"] .theme-seg button[data-set="light"] svg,
+  [data-theme="dark"]  .theme-seg button[data-set="dark"]  svg { color: var(--blue); }
+
+  /* ---- service-accurate bubble demo (header band) ---- */
+  .demo-card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: var(--g-130);
+    padding: 11px 13px 12px;
+  }
+  .demo-head {
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    margin-bottom: 10px;
+    white-space: nowrap;
+  }
+  .demo-head b { color: var(--ink-2); font-weight: 600; }
+  .demo-pairs { display: flex; gap: 18px; }
+  .demo-svc { display: flex; flex-direction: column; gap: 6px; }
+  .demo-svc-name {
+    font-family: var(--mono);
+    font-size: 8.5px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+  }
+  .demo-stack { display: flex; flex-direction: column; gap: 5px; }
+  .demo-stack .row-in  { display: flex; justify-content: flex-start; }
+  .demo-stack .row-out { display: flex; justify-content: flex-end; }
+
+  /* tiny native sample bubbles — real tails, real radii, real colors */
+  .mini {
+    position: relative;
+    max-width: 132px;
+    padding: 5px 9px;
+    border-radius: 13px;
+    font-size: 10.5px;
+    line-height: 1.25;
+    font-family: var(--sans);
+  }
+  .mini::after { content: ""; position: absolute; bottom: 0; width: 12px; height: 14px; }
+  /* incoming tail (bottom-left) */
+  .mini.in::after {
+    left: -5px;
+    background: inherit;
+    border-bottom-right-radius: 14px;
+    clip-path: path("M12 14 C5 14 0 9 0 0 L0 14 Z");
+  }
+  /* outgoing tail (bottom-right) */
+  .mini.out::after {
+    right: -5px;
+    background: inherit;
+    border-bottom-left-radius: 14px;
+    clip-path: path("M0 14 C7 14 12 9 12 0 L12 14 Z");
+  }
+  /* iMessage */
+  .mini.imsg-in  { background: var(--imsg-in-bg);  color: var(--imsg-in-text); border-bottom-left-radius: 4px; }
+  .mini.imsg-out {
+    background: linear-gradient(180deg, var(--imsg-blue-1), var(--imsg-blue-2));
+    color: #fff; border-bottom-right-radius: 4px;
+  }
+  /* WhatsApp */
+  .mini.wa-in  { background: var(--wa-in-bg);  color: var(--wa-in-text);  border-bottom-left-radius: 4px; border: 1px solid var(--line); }
+  .mini.wa-in::after { border: 0; }
+  .mini.wa-out { background: var(--wa-out-bg); color: var(--wa-out-text); border-bottom-right-radius: 4px; }
+  .mini .meta {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: 6px;
+    font-family: var(--mono);
+    font-size: 7.5px;
+    letter-spacing: .02em;
+    opacity: .85;
+    vertical-align: baseline;
+  }
+  .mini .meta svg { width: 11px; height: 8px; }
+  .mini.wa-out .meta svg { color: var(--wa-tick); }
+
+  /* ===================== CAPTION ===================== */
+  .caption {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin: 0 0 12px 4px;
+  }
+  .caption .tick {
+    width: 14px; height: 1px; background: var(--line-strong);
+  }
+  .caption b { color: var(--ink-2); font-weight: 600; }
+
+  /* ===================== WINDOW CHROME ===================== */
+  .window {
+    width: 1180px;
+    max-width: 100%;
+    margin: 0 auto 56px;
+    border-radius: var(--radius-card);
+    background: var(--g-050);
+    border: 1px solid var(--line-2);
+    box-shadow: var(--shadow-win);
+    overflow: hidden;
+  }
+  .titlebar {
+    height: 38px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    background: var(--g-080);
+    border-bottom: 1px solid var(--line);
+    position: relative;
+  }
+  .lights { display: flex; gap: 8px; }
+  .light { width: 12px; height: 12px; border-radius: 50%; }
+  .light.r { background: #ff5f57; }
+  .light.y { background: #febc2e; }
+  .light.g { background: #28c840; }
+  .titlebar .tb-name {
+    position: absolute;
+    left: 50%; transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .03em;
+    color: var(--ink-4);
+  }
+
+  .shell { display: flex; min-height: 560px; }
+
+  /* ===================== SIDEBAR ===================== */
+  .sidebar {
+    width: 220px;
+    flex: 0 0 220px;
+    background: var(--g-080);
+    border-right: 1px solid var(--line);
+    padding: 14px 12px;
+    display: flex;
+    flex-direction: column;
+  }
+  .wordmark {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 4px 8px 14px;
+  }
+  .wordmark .glyph {
+    width: 20px; height: 20px;
+    border: 1px solid var(--line-strong);
+    border-radius: 5px;
+    display: grid; place-items: center;
+    flex: 0 0 20px;
+  }
+  .wordmark .glyph svg { width: 12px; height: 12px; }
+  .wordmark .wm-text {
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: -.01em;
+    color: var(--ink);
+  }
+
+  .navgroup { display: flex; flex-direction: column; gap: 1px; }
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 7px 8px;
+    border-radius: var(--radius-ctrl);
+    color: var(--ink-2);
+    cursor: default;
+    position: relative;
+    font-size: 12.5px;
+    font-weight: 450;
+    line-height: 1;
+  }
+  .nav svg { width: 15px; height: 15px; flex: 0 0 15px; color: var(--ink-3); }
+  .nav .nav-label { flex: 1; }
+  .nav:hover { background: var(--g-130); }
+
+  /* active: ONE accent. A 2px blue rail + faint fill + blue glyph. No glow. */
+  .nav.active {
+    background: var(--g-160);
+    color: var(--ink);
+  }
+  .nav.active svg { color: var(--blue); }
+  .nav.active::before {
+    content: "";
+    position: absolute;
+    left: -12px; top: 4px; bottom: 4px;
+    width: 2px;
+    background: var(--blue);
+    border-radius: 0 2px 2px 0;
+  }
+
+  .nav-badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    min-width: 18px;
+    height: 16px;
+    padding: 0 5px;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--g-200);
+    color: var(--ink-2);
+    border: 1px solid var(--line);
+  }
+  .attn-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--red);
+    margin-left: auto;
+    flex: 0 0 6px;
+  }
+
+  .side-divider {
+    height: 1px;
+    background: var(--line);
+    margin: 14px 4px 12px;
+  }
+  .group-label {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    padding: 0 8px 8px;
+  }
+  .side-spacer { flex: 1; }
+  .side-foot {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .04em;
+    color: var(--ink-4);
+    padding: 10px 8px 2px;
+    border-top: 1px solid var(--line-faint);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .side-foot .live {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--green);
+  }
+
+  /* ===================== CONTENT PANE ===================== */
+  .content { flex: 1; background: var(--g-100); min-width: 0; display: flex; }
+
+  /* mono utility */
+  .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  /* ============================================================
+     WINDOW 1 — MESSAGES (three columns)
+     ============================================================ */
+  .threadlist {
+    width: 348px;
+    flex: 0 0 348px;
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .tl-head { padding: 20px 20px 14px; border-bottom: 1px solid var(--line); }
+  .tl-titlerow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .tl-title { font-size: 21px; font-weight: 600; letter-spacing: -.02em; }
+  .tl-sub {
+    margin-top: 6px;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: var(--ink-3);
+    max-width: 40ch;
+  }
+  .tl-sub b { color: var(--ink-2); font-weight: 500; }
+  .compose-btn {
+    flex: 0 0 auto;
+    width: 30px; height: 30px;
+    display: grid; place-items: center;
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius-ctrl);
+    background: var(--g-130);
+    color: var(--ink-2);
+    cursor: default;
+  }
+  .compose-btn:hover { background: var(--g-160); color: var(--ink); }
+  .compose-btn svg { width: 15px; height: 15px; }
+
+  .tl-section {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    padding: 16px 20px 8px;
+  }
+  .convos { padding: 0 10px; display: flex; flex-direction: column; gap: 1px; }
+  .convo {
+    display: flex;
+    gap: 11px;
+    padding: 10px;
+    border-radius: 8px;
+    cursor: default;
+    position: relative;
+    border: 1px solid transparent;
+  }
+  .convo:hover { background: var(--g-130); }
+  .convo.active {
+    background: var(--g-160);
+    border-color: var(--line);
+  }
+  .convo.active::before {
+    content: "";
+    position: absolute;
+    left: 0; top: 9px; bottom: 9px;
+    width: 2px; border-radius: 0 2px 2px 0;
+    background: var(--blue);
+  }
+  .mono-avatar {
+    width: 34px; height: 34px;
+    flex: 0 0 34px;
+    border-radius: 8px;
+    border: 1px solid var(--line-2);
+    background: var(--g-200);
+    display: grid; place-items: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--ink-2);
+    letter-spacing: .02em;
+  }
+  .mono-avatar.wa { border-color: var(--green-dim); color: var(--green); }
+  .convo-main { flex: 1; min-width: 0; }
+  .convo-toprow { display: flex; align-items: center; gap: 8px; }
+  .convo-name { font-size: 13px; font-weight: 550; color: var(--ink); }
+  .wa-badge {
+    font-family: var(--mono);
+    font-size: 8.5px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--green);
+    border: 1px solid var(--green-dim);
+    border-radius: var(--radius-badge);
+    padding: 1px 4px;
+  }
+  .convo-sub {
+    margin-top: 3px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--ink-3);
+    letter-spacing: .01em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .chips { display: flex; gap: 5px; align-items: center; margin-top: 8px; }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 18px;
+    padding: 0 6px;
+    border-radius: var(--radius-badge);
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1;
+    border: 1px solid var(--line);
+    color: var(--ink-2);
+    background: var(--g-130);
+  }
+  .chip svg { width: 10px; height: 10px; }
+  .chip.blue { color: var(--blue); border-color: var(--blue-dim); }
+  .chip.amber { color: var(--amber); border-color: var(--amber-dim); }
+  .chip.green { color: var(--green); border-color: var(--green-dim); }
+
+  /* ---- thread detail ---- */
+  .detail { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .detail-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 22px;
+    border-bottom: 1px solid var(--line);
+  }
+  .detail-head .mono-avatar { width: 38px; height: 38px; flex: 0 0 38px; font-size: 12px; }
+  .dh-text { flex: 1; min-width: 0; }
+  .dh-name { font-size: 14px; font-weight: 600; }
+  .dh-sub { font-family: var(--mono); font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+  .dh-meta {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-badge);
+    padding: 4px 8px;
+    white-space: nowrap;
+  }
+
+  .transcript {
+    flex: 1;
+    padding: 22px 22px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    overflow: hidden;
+  }
+
+  /* ============================================================
+     NATIVE iMESSAGE BUBBLES (inside the Operator chrome)
+     Real radii (~18px), real tails, real Apple colors. The bubbles
+     mirror Messages.app; the instrument chrome stays around them.
+     ============================================================ */
+  .bubble-row { display: flex; flex-direction: column; }
+  .bubble-row.out { align-items: flex-end; }
+  .bubble-row.in  { align-items: flex-start; }
+
+  /* base native bubble (shared geometry + the tail) */
+  .imsg {
+    position: relative;
+    max-width: 70%;
+    padding: 7px 13px 8px;
+    border-radius: 18px;
+    font-size: 13.5px;
+    line-height: 1.32;
+    font-family: var(--sans);
+    word-wrap: break-word;
+  }
+  .imsg::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    width: 16px;
+    height: 18px;
+  }
+  /* incoming: gray, tail bottom-left */
+  .imsg.in {
+    background: var(--imsg-in-bg);
+    color: var(--imsg-in-text);
+    border-bottom-left-radius: 6px;
+    align-self: flex-start;
+  }
+  .imsg.in::after {
+    left: -6px;
+    background: var(--imsg-in-bg);
+    clip-path: path("M16 18 C7 18 0 12 0 0 L0 18 Z");
+  }
+  /* outgoing: iMessage blue gradient, white text, tail bottom-right */
+  .imsg.out {
+    background: linear-gradient(180deg, var(--imsg-blue-1), var(--imsg-blue-2));
+    color: #fff;
+    border-bottom-right-radius: 6px;
+    align-self: flex-end;
+  }
+  .imsg.out::after {
+    right: -6px;
+    background: var(--imsg-blue-2);
+    clip-path: path("M0 18 C9 18 16 12 16 0 L16 18 Z");
+  }
+
+  /* timestamp sits OUTSIDE the bubble (Operator mono), like Messages' labels */
+  .ts {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: var(--ink-4);
+    letter-spacing: .04em;
+  }
+  .ts-out { margin: 4px 8px 0 0; }
+  .ts-in  { margin: 4px 0 0 8px; }
+
+  /* pending divider */
+  .pending-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 4px 0 2px;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+  }
+  .pending-divider::before,
+  .pending-divider::after {
+    content: ""; flex: 1; height: 1px; background: var(--line);
+  }
+
+  /* ============================================================
+     HERO — the approval object. A GENUINE iMessage blue outgoing
+     bubble (right tail, 18px radius) in a STAGED state: the bubble
+     starts as a translucent outlined blue and solid iMessage-blue
+     fills left→right to 55% with a 2px brighter leading edge. The
+     Operator instrument signaling (mono tag + readout + hint) lives
+     as overlay/satellite, never changing the bubble's iMessage shape.
+     ============================================================ */
+  .approval {
+    align-self: flex-end;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    max-width: 74%;
+    position: relative;
+  }
+
+  /* the mono "AI DRAFT · HOLD TO SEND" tag — graphite/hairline, above the bubble */
+  .approval-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    background: var(--g-130);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-badge);
+    padding: 3px 8px;
+    margin-bottom: 7px;
+  }
+  .approval-tag .pulse {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: var(--blue);
+  }
+  .approval-tag .src { color: var(--ink-4); letter-spacing: .1em; }
+
+  /* the real iMessage blue bubble, rendered in its STAGED (pre-send) state:
+     SOLID iMessage blue (authentic + white text legible everywhere, in both
+     themes). "Staged" is signaled by the mono tag above + the hold rail below
+     + a soft top sheen — NOT by transparency. The hold progress shows as a
+     brighter "charge" sweep over the left 55%, which only lightens (never
+     thins) the blue, so the back half of the message never disappears. */
+  .approval-bubble {
+    position: relative;
+    align-self: flex-end;
+    max-width: 100%;
+    background: linear-gradient(180deg, var(--imsg-blue-1), var(--imsg-blue-2));
+    color: #fff;
+    border-radius: 18px;
+    border-bottom-right-radius: 6px;
+    padding: 7px 13px 8px;
+    font-size: 13.5px;
+    line-height: 1.32;
+    overflow: hidden;
+    isolation: isolate;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.22);
+  }
+  /* the "charge" sweep: a brighter sheen over the left 55% (a lighten on top
+     of the solid blue, not a cutout), echoing the hold rail's progress */
+  .approval-bubble::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 55%;
+    background: linear-gradient(90deg, rgba(255,255,255,.20), rgba(255,255,255,.07));
+    z-index: 0;
+    pointer-events: none;
+  }
+  /* crisp 2px brighter leading edge of the charge — no blur, no glow */
+  .approval-bubble::after {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0;
+    left: 55%;
+    width: 2px;
+    margin-left: -1px;
+    background: rgba(255,255,255,.78);
+    z-index: 1;
+    pointer-events: none;
+  }
+  /* outgoing tail (bottom-right) — solid blue */
+  .approval-tail {
+    position: absolute;
+    right: -6px; bottom: 0;
+    width: 16px; height: 18px;
+    background: var(--imsg-blue-2);
+    clip-path: path("M0 18 C9 18 16 12 16 0 L16 18 Z");
+    z-index: 0;
+  }
+  /* text rides above the sheen on solid blue — fully legible in both themes */
+  .approval-body {
+    position: relative;
+    z-index: 2;
+    color: #fff;
+  }
+
+  /* bubble + its left-side affordances on one row, right-aligned */
+  .approval-bubblewrap {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  /* hover row actions (Operator hairline/mono icon buttons), LEFT of the
+     right-aligned outgoing bubble so they never overflow the pane */
+  .approval-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 0 0 auto;
+  }
+  .icon-act {
+    width: 22px; height: 22px;
+    display: grid; place-items: center;
+    border: 1px solid var(--line-2);
+    border-radius: 5px;
+    background: var(--g-130);
+    color: var(--ink-3);
+    cursor: default;
+  }
+  .icon-act:hover { color: var(--ink); background: var(--g-200); }
+  .icon-act svg { width: 12px; height: 12px; }
+
+  /* the hold mechanism: a satellite readout BENEATH the bubble (Operator) */
+  .hold {
+    margin-top: 9px;
+    width: 248px;
+    max-width: 78vw;
+    align-self: flex-end;
+  }
+  .hold-readout {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 7px;
+  }
+  .hold-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: .04em;
+    color: var(--blue);
+    display: flex;
+    align-items: center;
+    gap: 7px;
+  }
+  .hold-label svg { width: 12px; height: 12px; }
+  .hold-pct {
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .08em;
+    color: var(--ink-2);
+  }
+  .hold-pct b { color: var(--blue); }
+  /* the track: matte, flat, 1px-feeling */
+  .hold-track {
+    height: 6px;
+    border-radius: 9999px;
+    background: var(--g-080);
+    border: 1px solid var(--line);
+    overflow: hidden;
+    position: relative;
+  }
+  .hold-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 55%;
+    background: var(--blue);
+    border-radius: 9999px;
+  }
+  /* crisp 2px leading edge — no blur, no glow */
+  .hold-fill::after {
+    content: "";
+    position: absolute;
+    top: -1px; bottom: -1px; right: -1px;
+    width: 2px;
+    background: var(--blue-edge);
+  }
+  .hold-hint {
+    margin-top: 8px;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .03em;
+    color: var(--ink-3);
+  }
+
+  /* ============================================================
+     SCHEDULED — same real iMessage blue bubble, AT REST (solid,
+     lightly dimmed), tagged with a mono amber SCHEDULED satellite.
+     Clearly NOT mid-gesture.
+     ============================================================ */
+  .scheduled {
+    align-self: flex-end;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    max-width: 74%;
+  }
+  .scheduled-bubble {
+    position: relative;
+    align-self: flex-end;
+    background: linear-gradient(180deg, var(--imsg-blue-1), var(--imsg-blue-2));
+    color: #fff;
+    border-radius: 18px;
+    border-bottom-right-radius: 6px;
+    padding: 7px 13px 8px;
+    font-size: 13.5px;
+    line-height: 1.32;
+    opacity: .72;   /* lightly dimmed = staged, at rest */
+  }
+  .scheduled-bubble::after {
+    content: "";
+    position: absolute;
+    right: -6px; bottom: 0;
+    width: 16px; height: 18px;
+    background: var(--imsg-blue-2);
+    clip-path: path("M0 18 C9 18 16 12 16 0 L16 18 Z");
+  }
+  .sched-meta {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+  .sched-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 18px;
+    padding: 0 7px;
+    border-radius: var(--radius-badge);
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    color: var(--amber);
+    border: 1px solid var(--amber-dim);
+    background: var(--amber-dim);
+  }
+  .sched-chip svg { width: 10px; height: 10px; }
+  .sched-when {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .04em;
+    color: var(--ink-3);
+  }
+  .sched-hint {
+    margin-top: 7px;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: .03em;
+    color: var(--ink-4);
+  }
+
+  /* ============================================================
+     WINDOW 2 — SETTINGS (nested, legible)
+     ============================================================ */
+  .settings {
+    flex: 1;
+    padding: 26px 0 32px;
+    overflow: hidden;
+  }
+  .settings-inner { max-width: 740px; padding: 0 36px; }
+  .set-title { font-size: 20px; font-weight: 600; letter-spacing: -.02em; margin-bottom: 4px; }
+  .set-lede { font-size: 12px; color: var(--ink-3); margin-bottom: 26px; }
+
+  .set-group { margin-bottom: 28px; }
+  .set-group-label {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .set-group-label::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+  .set-card {
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: var(--g-130);
+    overflow: hidden;
+  }
+  .set-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 13px 16px;
+  }
+  .set-row + .set-row { border-top: 1px solid var(--line-faint); }
+  .set-row .label-block { flex: 1; min-width: 0; }
+  .set-label { font-size: 13px; font-weight: 500; color: var(--ink); }
+  .set-help {
+    margin-top: 3px;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--ink-3);
+    max-width: 52ch;
+  }
+  .set-controls { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+
+  /* status pill */
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    padding: 0 9px;
+    border-radius: 9999px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    border: 1px solid var(--line);
+    color: var(--ink-2);
+    background: var(--g-080);
+  }
+  .status-pill .sd { width: 6px; height: 6px; border-radius: 50%; }
+  .status-pill.ok { color: var(--green); border-color: var(--green-dim); }
+  .status-pill.ok .sd { background: var(--green); }
+
+  /* button */
+  .btn {
+    height: 26px;
+    padding: 0 11px;
+    border-radius: var(--radius-ctrl);
+    border: 1px solid var(--line-2);
+    background: var(--g-200);
+    color: var(--ink-2);
+    font-family: var(--sans);
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: default;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn:hover { background: var(--g-260); color: var(--ink); }
+  .btn svg { width: 12px; height: 12px; }
+
+  /* toggle (flat; ON = blue ONLY where it's the gate; else neutral graphite) */
+  .toggle {
+    width: 38px; height: 22px;
+    border-radius: 9999px;
+    border: 1px solid var(--line-2);
+    background: var(--g-200);
+    position: relative;
+    flex: 0 0 38px;
+  }
+  .toggle .knob {
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--ink-2);
+  }
+  .toggle.on {
+    background: var(--blue);
+    border-color: var(--blue);
+  }
+  .toggle.on .knob { left: 18px; background: #fff; }
+  /* neutral ON for non-gate toggles: graphite, knob right, NO accent */
+  .toggle.on.neutral {
+    background: var(--g-260);
+    border-color: var(--line-strong);
+  }
+  .toggle.on.neutral .knob { background: var(--ink); }
+
+  /* nested subsection: indented w/ 1px left rail */
+  .nested {
+    margin: 0 16px 14px 16px;
+    padding-left: 16px;
+    border-left: 1px solid var(--line-2);
+  }
+  .nested-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+  }
+  .nested-row + .nested-row { border-top: 1px solid var(--line-faint); }
+  .nested-label { font-size: 12px; color: var(--ink-2); flex: 1; }
+  .time-ctrl {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-2);
+  }
+  .time-box {
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius-ctrl);
+    background: var(--g-080);
+    padding: 4px 8px;
+    color: var(--ink);
+  }
+  .time-sep { color: var(--ink-4); letter-spacing: .1em; }
+
+  /* masked field */
+  .field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 30px;
+    padding: 0 10px;
+    min-width: 280px;
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius-ctrl);
+    background: var(--g-080);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink);
+    letter-spacing: .02em;
+  }
+  .field svg { width: 13px; height: 13px; color: var(--ink-4); }
+
+  .select-mono {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 26px;
+    padding: 0 9px;
+    border: 1px solid var(--line-2);
+    border-radius: var(--radius-ctrl);
+    background: var(--g-080);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink);
+  }
+  .select-mono svg { width: 11px; height: 11px; color: var(--ink-4); }
+  .nested-cap {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: var(--ink-4);
+    padding: 4px 0 2px;
+    letter-spacing: .03em;
+  }
+
+  /* diagnostics checklist */
+  .diag {
+    display: flex;
+    flex-direction: column;
+  }
+  .diag-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 11px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-2);
+  }
+  .diag-row + .diag-row { border-top: 1px solid var(--line-faint); }
+  .diag-row .check {
+    width: 16px; height: 16px;
+    flex: 0 0 16px;
+    border-radius: 50%;
+    border: 1px solid var(--green-dim);
+    display: grid; place-items: center;
+    color: var(--green);
+  }
+  .diag-row .check svg { width: 9px; height: 9px; }
+  .diag-row .dn { flex: 1; color: var(--ink); }
+  .diag-row .dv {
+    color: var(--green);
+    font-weight: 600;
+    letter-spacing: .04em;
+  }
+  .diag-foot {
+    display: flex;
+    gap: 8px;
+    padding: 14px 16px 2px;
+  }
+
+  /* ============================================================
+     WINDOW 3 — HOME (status at a glance)
+     ============================================================ */
+  .home { flex: 1; padding: 30px 0; }
+  .home-inner { max-width: 720px; padding: 0 36px; }
+  .home-title { font-size: 23px; font-weight: 600; letter-spacing: -.02em; }
+  .home-sub { margin-top: 7px; font-size: 13px; line-height: 1.5; color: var(--ink-3); max-width: 56ch; }
+
+  .status-card {
+    margin-top: 26px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: var(--g-130);
+    overflow: hidden;
+  }
+  .status-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--line);
+  }
+  .scc-label {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--ink-4);
+  }
+  .scc-count {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-3);
+    letter-spacing: .06em;
+  }
+  .status-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 15px 18px;
+  }
+  .status-row + .status-row { border-top: 1px solid var(--line-faint); }
+  .status-row .sr-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    flex: 0 0 8px;
+  }
+  .sr-dot.green { background: var(--green); }
+  .sr-dot.amber { background: var(--amber); }
+  .status-row .sr-name { flex: 1; font-size: 13.5px; font-weight: 500; color: var(--ink); }
+  .status-row .sr-val {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .03em;
+    color: var(--ink-2);
+  }
+  .sr-val.green { color: var(--green); }
+  .sr-val.amber { color: var(--amber); }
+
+  .home-foot {
+    margin-top: 22px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 16px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: var(--g-100);
+    font-size: 12.5px;
+    color: var(--ink-2);
+  }
+  .home-foot svg { width: 15px; height: 15px; color: var(--blue); flex: 0 0 15px; }
+  .home-foot b { color: var(--ink); font-weight: 600; }
+
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ===================== HEADER BAND ===================== -->
+  <div class="band">
+    <div class="band-id">
+      <span class="band-kicker">Direction</span>
+      <span class="band-name">Operator</span>
+    </div>
+    <div class="band-thesis">
+      A pro instrument, not a dashboard. Flat matte graphite separated by <b>hairlines</b>, color
+      <b>rationed</b> to a single accent on the one action that matters, and <b>monospace</b> for every
+      value you read. The approval gate is the protagonist; the chrome disappears.
+    </div>
+    <div class="band-controls">
+      <div class="band-toprow">
+        <div class="theme-seg" role="group" aria-label="Theme">
+          <button type="button" data-set="light" onclick="setTheme('light')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/></svg>
+            Light
+          </button>
+          <button type="button" data-set="dark" onclick="setTheme('dark')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+            Dark
+          </button>
+        </div>
+        <div class="typeset">
+          <span><b>SF Pro</b> · labels</span>
+          <span><b>SF Mono</b> · values</span>
+        </div>
+      </div>
+
+      <!-- SERVICE-ACCURATE BUBBLES: the app renders each thread in its
+           native service's bubbles — real radii, tails, and colors. -->
+      <div class="demo-card">
+        <div class="demo-head">Service-accurate bubbles · <b>native to each thread</b></div>
+        <div class="demo-pairs">
+          <div class="demo-svc">
+            <span class="demo-svc-name">iMessage</span>
+            <div class="demo-stack">
+              <div class="row-in"><span class="mini in imsg-in">Sounds good</span></div>
+              <div class="row-out"><span class="mini out imsg-out">See you at 6:30
+                <span class="meta">10:54
+                  <svg viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6.5 4 9.5 10 2"/><path d="M7.5 8 9 9.5 17 2"/></svg>
+                </span></span></div>
+            </div>
+          </div>
+          <div class="demo-svc">
+            <span class="demo-svc-name">WhatsApp</span>
+            <div class="demo-stack">
+              <div class="row-in"><span class="mini in wa-in">On my way</span></div>
+              <div class="row-out"><span class="mini out wa-out">Great, see you soon
+                <span class="meta">10:54
+                  <svg viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6.5 4 9.5 10 2"/><path d="M7.5 8 9 9.5 17 2"/></svg>
+                </span></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       WINDOW 1 — MESSAGES (hero)
+       ============================================================ -->
+  <div class="caption"><span class="tick"></span>Messages · <b>the approval gate (hero)</b></div>
+  <div class="window">
+    <div class="titlebar">
+      <div class="lights"><span class="light r"></span><span class="light y"></span><span class="light g"></span></div>
+      <div class="tb-name">messages-for-ai</div>
+    </div>
+    <div class="shell">
+
+      <!-- SIDEBAR -->
+      <aside class="sidebar">
+        <div class="wordmark">
+          <span class="glyph">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#eceef1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          </span>
+          <span class="wm-text">Messages for AI</span>
+        </div>
+
+        <nav class="navgroup">
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>
+            <span class="nav-label">Home</span>
+          </div>
+          <div class="nav active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/></svg>
+            <span class="nav-label">Messages</span>
+            <span class="nav-badge">2</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span class="nav-label">Automations</span>
+            <span class="nav-badge">1</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <span class="nav-label">Scheduled</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            <span class="nav-label">Health</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51z"/></svg>
+            <span class="nav-label">Settings</span>
+            <span class="attn-dot" title="needs attention"></span>
+          </div>
+        </nav>
+
+        <div class="side-divider"></div>
+        <div class="group-label">Labs</div>
+        <nav class="navgroup">
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+            <span class="nav-label">Texting Style</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+            <span class="nav-label">Don't Ghost</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg>
+            <span class="nav-label">EQ</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 4-6"/></svg>
+            <span class="nav-label">Texting Analytics</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 9 22 9 16.5 13.5 18.5 21 12 16.5 5.5 21 7.5 13.5 2 9 9 9"/></svg>
+            <span class="nav-label">Texting Wrapped</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7S9 1 6 4s4 3 6 3M12 7s3-6 6-3-4 3-6 3"/></svg>
+            <span class="nav-label">Birthday Texts</span>
+          </div>
+        </nav>
+
+        <div class="side-spacer"></div>
+        <div class="side-foot"><span class="live"></span>v0.5.1 · 2 engines live</div>
+      </aside>
+
+      <!-- CONTENT: three-column messages -->
+      <div class="content">
+
+        <!-- THREAD LIST -->
+        <div class="threadlist">
+          <div class="tl-head">
+            <div class="tl-titlerow">
+              <div>
+                <div class="tl-title">Messages</div>
+              </div>
+              <div class="compose-btn" title="Compose">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+              </div>
+            </div>
+            <div class="tl-sub">Review staged and scheduled messages by conversation. <b>Nothing sends without your hold.</b></div>
+          </div>
+
+          <div class="tl-section">Conversations</div>
+          <div class="convos">
+
+            <!-- Mara Lin (active) -->
+            <div class="convo active">
+              <div class="mono-avatar">ML</div>
+              <div class="convo-main">
+                <div class="convo-toprow"><span class="convo-name">Mara Lin</span></div>
+                <div class="convo-sub">+1 (415) 555-0142</div>
+                <div class="chips">
+                  <span class="chip blue">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>2</span>
+                  <span class="chip amber">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>1</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Dad -->
+            <div class="convo">
+              <div class="mono-avatar">DA</div>
+              <div class="convo-main">
+                <div class="convo-toprow"><span class="convo-name">Dad</span></div>
+                <div class="convo-sub">iMessage</div>
+                <div class="chips">
+                  <span class="chip blue">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>1</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Weekend Crew -->
+            <div class="convo">
+              <div class="mono-avatar">WC</div>
+              <div class="convo-main">
+                <div class="convo-toprow"><span class="convo-name">Weekend Crew</span></div>
+                <div class="convo-sub">Group · 4 people</div>
+                <div class="chips">
+                  <span class="chip blue">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>1</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Priya (WhatsApp) -->
+            <div class="convo">
+              <div class="mono-avatar wa">PR</div>
+              <div class="convo-main">
+                <div class="convo-toprow"><span class="convo-name">Priya</span><span class="wa-badge">WhatsApp</span></div>
+                <div class="convo-sub">+44 7700 900812</div>
+                <div class="chips">
+                  <span class="chip green">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>1</span>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- THREAD DETAIL -->
+        <div class="detail">
+          <div class="detail-head">
+            <div class="mono-avatar">ML</div>
+            <div class="dh-text">
+              <div class="dh-name">Mara Lin</div>
+              <div class="dh-sub">+1 (415) 555-0142</div>
+            </div>
+            <div class="dh-meta">2 drafts · 1 scheduled</div>
+          </div>
+
+          <div class="transcript">
+
+            <!-- prior SENT outgoing iMessage bubble (anchors the "real iMessage" read) -->
+            <div class="bubble-row out">
+              <div class="imsg out">Perfect, let's lock it in</div>
+              <span class="ts ts-out">10:51 AM</span>
+            </div>
+
+            <!-- incoming iMessage gray bubble (real tail bottom-left) -->
+            <div class="bubble-row in">
+              <div class="imsg in">Also happy to meet at 6:30 if that works</div>
+              <span class="ts ts-in">10:53 AM</span>
+            </div>
+
+            <div class="pending-divider">Pending messages</div>
+
+            <!-- HERO: a GENUINE iMessage blue bubble, STAGED, hold frozen @ 55% -->
+            <div class="approval">
+              <div class="approval-tag">
+                <span class="pulse"></span>AI DRAFT · HOLD TO SEND
+                <span class="src">· iMessage</span>
+              </div>
+
+              <div class="approval-bubblewrap">
+                <div class="approval-actions">
+                  <span class="icon-act" title="Edit">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+                  </span>
+                  <span class="icon-act" title="Delete">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg>
+                  </span>
+                </div>
+                <div class="approval-bubble">
+                  <span class="approval-tail"></span>
+                  <span class="approval-body">1025 Mission St. I can meet at 6:30</span>
+                </div>
+              </div>
+
+              <!-- hold mechanism (Operator satellite readout, beneath the bubble) -->
+              <div class="hold">
+                <div class="hold-readout">
+                  <span class="hold-label">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    HOLD · 0.55s
+                  </span>
+                  <span class="hold-pct"><b>55</b>%</span>
+                </div>
+                <div class="hold-track">
+                  <div class="hold-fill"></div>
+                </div>
+                <div class="hold-hint">Keep holding to send…</div>
+              </div>
+            </div>
+
+            <!-- SCHEDULED: same real iMessage blue bubble, at rest -->
+            <div class="scheduled">
+              <div class="scheduled-bubble">I'll follow up tomorrow morning with the final plan</div>
+              <div class="sched-meta">
+                <span class="sched-chip">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                  Scheduled · Jun 6, 12:02 PM
+                </span>
+              </div>
+              <div class="sched-hint">Press &amp; hold to send now</div>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       WINDOW 2 — SETTINGS
+       ============================================================ -->
+  <div class="caption"><span class="tick"></span>Settings · <b>nested &amp; legible</b></div>
+  <div class="window">
+    <div class="titlebar">
+      <div class="lights"><span class="light r"></span><span class="light y"></span><span class="light g"></span></div>
+      <div class="tb-name">messages-for-ai · settings</div>
+    </div>
+    <div class="shell">
+
+      <!-- SIDEBAR (Settings active) -->
+      <aside class="sidebar">
+        <div class="wordmark">
+          <span class="glyph">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#eceef1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          </span>
+          <span class="wm-text">Messages for AI</span>
+        </div>
+
+        <nav class="navgroup">
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>
+            <span class="nav-label">Home</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/></svg>
+            <span class="nav-label">Messages</span>
+            <span class="nav-badge">2</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span class="nav-label">Automations</span>
+            <span class="nav-badge">1</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <span class="nav-label">Scheduled</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            <span class="nav-label">Health</span>
+          </div>
+          <div class="nav active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51z"/></svg>
+            <span class="nav-label">Settings</span>
+            <span class="attn-dot" title="needs attention"></span>
+          </div>
+        </nav>
+
+        <div class="side-divider"></div>
+        <div class="group-label">Labs</div>
+        <nav class="navgroup">
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg><span class="nav-label">Texting Style</span></div>
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span class="nav-label">Don't Ghost</span></div>
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg><span class="nav-label">EQ</span></div>
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 4-6"/></svg><span class="nav-label">Texting Analytics</span></div>
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 9 22 9 16.5 13.5 18.5 21 12 16.5 5.5 21 7.5 13.5 2 9 9 9"/></svg><span class="nav-label">Texting Wrapped</span></div>
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7S9 1 6 4s4 3 6 3M12 7s3-6 6-3-4 3-6 3"/></svg><span class="nav-label">Birthday Texts</span></div>
+        </nav>
+
+        <div class="side-spacer"></div>
+        <div class="side-foot"><span class="live"></span>v0.5.1 · 2 engines live</div>
+      </aside>
+
+      <!-- CONTENT: settings -->
+      <div class="content">
+        <div class="settings">
+          <div class="settings-inner">
+            <div class="set-title">Settings</div>
+            <div class="set-lede">Section → subsection → row → caption. Values in mono, controls right-aligned, nesting on a hairline rail.</div>
+
+            <!-- MESSAGING -->
+            <div class="set-group">
+              <div class="set-group-label">Messaging</div>
+              <div class="set-card">
+                <div class="set-row">
+                  <div class="label-block"><div class="set-label">iMessage</div></div>
+                  <div class="set-controls">
+                    <span class="status-pill ok"><span class="sd"></span>Running</span>
+                    <button class="btn">Restart</button>
+                    <span class="toggle on neutral"><span class="knob"></span></span>
+                  </div>
+                </div>
+                <div class="set-row">
+                  <div class="label-block"><div class="set-label">WhatsApp</div></div>
+                  <div class="set-controls">
+                    <span class="status-pill ok"><span class="sd"></span>Connected</span>
+                    <button class="btn">Reconnect</button>
+                    <span class="toggle on neutral"><span class="knob"></span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- SCHEDULING -->
+            <div class="set-group">
+              <div class="set-group-label">Scheduling</div>
+              <div class="set-card">
+                <div class="set-row">
+                  <div class="label-block"><div class="set-label">Quiet hours</div></div>
+                  <div class="set-controls">
+                    <span class="toggle on neutral"><span class="knob"></span></span>
+                  </div>
+                </div>
+              </div>
+              <!-- nested time control on a 1px rail -->
+              <div class="nested">
+                <div class="nested-row">
+                  <span class="nested-label">Active window</span>
+                  <span class="time-ctrl">
+                    <span class="time-box">From 10:00 PM</span>
+                    <span class="time-sep">→</span>
+                    <span class="time-box">To 8:00 AM</span>
+                  </span>
+                </div>
+              </div>
+              <div class="set-card">
+                <div class="set-row">
+                  <div class="label-block">
+                    <div class="set-label">Require approval before sending scheduled drafts</div>
+                    <div class="set-help">If off, approved scheduled drafts send automatically at their time.</div>
+                  </div>
+                  <div class="set-controls">
+                    <span class="toggle on neutral"><span class="knob"></span></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- AI -->
+            <div class="set-group">
+              <div class="set-group-label">AI</div>
+              <div class="set-card">
+                <div class="set-row">
+                  <div class="label-block">
+                    <div class="set-label">Anthropic API key</div>
+                    <div class="set-help">Used to generate your texting style and draft replies. Stored locally.</div>
+                  </div>
+                  <div class="set-controls">
+                    <span class="field">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                      sk-ant-•••••••••••••••3a9f
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- APP -->
+            <div class="set-group">
+              <div class="set-group-label">App</div>
+              <div class="set-card">
+                <div class="set-row">
+                  <div class="label-block"><div class="set-label">Launch on login</div></div>
+                  <div class="set-controls">
+                    <span class="toggle on neutral"><span class="knob"></span></span>
+                  </div>
+                </div>
+              </div>
+              <!-- nested Updates subsection -->
+              <div class="nested">
+                <div class="nested-cap">UPDATES</div>
+                <div class="nested-row">
+                  <span class="nested-label">Check automatically</span>
+                  <span class="select-mono">Daily
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+                  </span>
+                </div>
+                <div class="nested-row">
+                  <span class="nested-label">Manual</span>
+                  <button class="btn">Check for updates</button>
+                </div>
+                <div class="nested-cap">You're on v0.5.1 (build 61)</div>
+              </div>
+            </div>
+
+            <!-- DIAGNOSTICS -->
+            <div class="set-group">
+              <div class="set-group-label">Diagnostics</div>
+              <div class="set-card">
+                <div class="diag">
+                  <div class="diag-row">
+                    <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                    <span class="dn">Full Disk Access</span>
+                    <span class="dv">Granted ✓</span>
+                  </div>
+                  <div class="diag-row">
+                    <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                    <span class="dn">iMessage engine</span>
+                    <span class="dv">Running ✓</span>
+                  </div>
+                  <div class="diag-row">
+                    <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                    <span class="dn">WhatsApp engine</span>
+                    <span class="dv">Connected ✓</span>
+                  </div>
+                  <div class="diag-row">
+                    <span class="check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+                    <span class="dn">Claude Desktop wiring</span>
+                    <span class="dv">Configured ✓</span>
+                  </div>
+                </div>
+                <div class="diag-foot">
+                  <button class="btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                    Export diagnostic log
+                  </button>
+                  <button class="btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                    Reveal logs folder
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ============================================================
+       WINDOW 3 — HOME
+       ============================================================ -->
+  <div class="caption"><span class="tick"></span>Home · <b>status at a glance</b></div>
+  <div class="window">
+    <div class="titlebar">
+      <div class="lights"><span class="light r"></span><span class="light y"></span><span class="light g"></span></div>
+      <div class="tb-name">messages-for-ai</div>
+    </div>
+    <div class="shell">
+
+      <!-- SIDEBAR (Home active) -->
+      <aside class="sidebar">
+        <div class="wordmark">
+          <span class="glyph">
+            <svg viewBox="0 0 24 24" fill="none" stroke="#eceef1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          </span>
+          <span class="wm-text">Messages for AI</span>
+        </div>
+
+        <nav class="navgroup">
+          <div class="nav active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9.5 12 3l9 6.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg>
+            <span class="nav-label">Home</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8z"/></svg>
+            <span class="nav-label">Messages</span>
+            <span class="nav-badge">2</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span class="nav-label">Automations</span>
+            <span class="nav-badge">1</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            <span class="nav-label">Scheduled</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+            <span class="nav-label">Health</span>
+          </div>
+          <div class="nav">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51z"/></svg>
+            <span class="nav-label">Settings</span>
+            <span class="attn-dot" title="needs attention"></span>
+          </div>
+        </nav>
+
+        <div class="side-divider"></div>
+        <div class="group-label">Labs</div>
+        <nav class="navgroup">
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg><span class="nav-label">Texting Style</span></div>
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><span class="nav-label">Don't Ghost</span></div>
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg><span class="nav-label">EQ</span></div>
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 2 4-6"/></svg><span class="nav-label">Texting Analytics</span></div>
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 9 22 9 16.5 13.5 18.5 21 12 16.5 5.5 21 7.5 13.5 2 9 9 9"/></svg><span class="nav-label">Texting Wrapped</span></div>
+          <div class="nav"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 22V7M12 7S9 1 6 4s4 3 6 3M12 7s3-6 6-3-4 3-6 3"/></svg><span class="nav-label">Birthday Texts</span></div>
+        </nav>
+
+        <div class="side-spacer"></div>
+        <div class="side-foot"><span class="live"></span>v0.5.1 · 2 engines live</div>
+      </aside>
+
+      <!-- CONTENT: home -->
+      <div class="content">
+        <div class="home">
+          <div class="home-inner">
+            <div class="home-title">Messages for AI</div>
+            <div class="home-sub">AI proposes, you approve — plus tools built on your message history.</div>
+
+            <div class="status-card">
+              <div class="status-card-head">
+                <span class="scc-label">System status</span>
+                <span class="scc-count">4 checks · updated 12s ago</span>
+              </div>
+              <div class="status-row">
+                <span class="sr-dot green"></span>
+                <span class="sr-name">iMessage engine</span>
+                <span class="sr-val green">Running</span>
+              </div>
+              <div class="status-row">
+                <span class="sr-dot green"></span>
+                <span class="sr-name">Full Disk Access</span>
+                <span class="sr-val green">Granted</span>
+              </div>
+              <div class="status-row">
+                <span class="sr-dot amber"></span>
+                <span class="sr-name">Pending drafts</span>
+                <span class="sr-val amber">2 awaiting approval</span>
+              </div>
+              <div class="status-row">
+                <span class="sr-dot green"></span>
+                <span class="sr-name">WhatsApp</span>
+                <span class="sr-val green">Connected</span>
+              </div>
+            </div>
+
+            <div class="home-foot">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.9 5.8L20 10.7l-5.1 2 1.1 6-4-3.4-4 3.4 1.1-6L4 10.7l6.1-1.9z"/></svg>
+              <span>Open <b>Labs</b> in the sidebar to generate your Texting Wrapped.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Theme toggle. DEFAULT = LIGHT (set explicitly on <html>, NOT from
+  // prefers-color-scheme). Flips data-theme; every color resolves via vars.
+  function setTheme(mode) {
+    document.documentElement.setAttribute('data-theme', mode === 'dark' ? 'dark' : 'light');
+  }
+
+  // Optional: subtle live "breathing" on the hold pulse only.
+  // The hold itself is FROZEN at 55% by design (static-screenshot legible).
+  (function () {
+    var pulse = document.querySelector('.approval-tag .pulse');
+    if (!pulse) return;
+    var t = 0;
+    setInterval(function () {
+      t += 0.08;
+      pulse.style.opacity = (0.55 + 0.45 * Math.abs(Math.sin(t))).toFixed(2);
+    }, 60);
+  })();
+</script>
+</body>
+</html>

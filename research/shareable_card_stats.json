@@ -1,0 +1,67 @@
+{
+  "_meta": {
+    "title": "Texting Wrapped — Shareable Card Stats",
+    "description": "The 7 highest-signal comparative stats for share cards. Each gives a copy template (with placeholders for the user's own value), the population baseline, source_key, and confidence.",
+    "generated": "2026-05-28"
+  },
+  "cards": [
+    {
+      "id": "reply_speed",
+      "title": "Reply Speed",
+      "copy_template": "You replied within {user_avg_min} on average — the typical person your age takes {peer_avg_min}.",
+      "baseline": {"18-29": 0.30, "30-44": 0.32, "45-62": 0.55, "62+": 0.83, "unit": "median open minutes"},
+      "source_key": "stach_2024",
+      "confidence": "medium",
+      "note": "Compute the user's value directly from their own message metadata; baseline is open-time not reply-time."
+    },
+    {
+      "id": "daily_volume",
+      "title": "Daily Message Volume",
+      "copy_template": "You sent {user_count} messages — that's {more_or_less} than {pct}% of people.",
+      "baseline": {"all_us_median": 10, "all_us_mean": 41.5, "age_18_24_mean": 109.5},
+      "source_key": "pew_2011",
+      "confidence": "medium"
+    },
+    {
+      "id": "laughter_style",
+      "title": "Laughter Style",
+      "copy_template": "Your signature laugh is {top_token}. {flavor_text}",
+      "baseline": {"haha": 51.4, "emoji": 33.7, "hehe": 12.7, "lol": 1.9, "age_note": "lol & hehe skew oldest; emoji youngest"},
+      "source_key": "meta_2015",
+      "confidence": "high"
+    },
+    {
+      "id": "period_tell",
+      "title": "The Period Tell",
+      "copy_template": "You end {pct}% of your messages with a period. Younger texters read that as passive-aggressive.",
+      "baseline": {"finding": "period-ending texts rated less sincere (digital only)", "sample": "n=126 undergrads"},
+      "source_key": "gunraj_2016",
+      "confidence": "medium"
+    },
+    {
+      "id": "group_share",
+      "title": "Group Chat Contribution",
+      "copy_template": "In your group chats you sent {pct}% of all messages. In ~8% of group chats, one person sends over half of everything.",
+      "baseline": {"pct_groups_one_over_50": 8.1, "avg_group_size": 9},
+      "source_key": "seufert_2016",
+      "confidence": "medium"
+    },
+    {
+      "id": "emoji_intensity",
+      "title": "Emoji Intensity",
+      "copy_template": "You used {user_count} emoji this year — top {pct}% of your age group.",
+      "baseline": {"pct_18_29_multiple_daily": 34, "pct_65plus_never": 15, "pct_millennials_daily": 92},
+      "source_key": "statista_2023",
+      "confidence": "medium"
+    },
+    {
+      "id": "texting_age",
+      "title": "Your Texting Age",
+      "copy_template": "You text like a {estimated_band}. Strongest tells: {top_features}.",
+      "baseline": {"method": "age_rubric.json"},
+      "source_key": "meta_2015",
+      "confidence": "low-medium",
+      "note": "Highest-engagement card; frame as playful, not an identity claim."
+    }
+  ]
+}

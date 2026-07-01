@@ -1,0 +1,78 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "headers": [
+    {
+      "source": "/control.json(.sig)?",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=30, s-maxage=60, must-revalidate" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    },
+    {
+      "source": "/appcast.xml",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=300, s-maxage=300" }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/releases/latest/download/Ghostie.dmg",
+      "destination": "/api/download"
+    },
+    {
+      "source": "/releases/latest/download/Messages-for-AI.dmg",
+      "destination": "/api/download"
+    },
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "ghostie.app" }],
+      "destination": "/ghostie/index.html"
+    },
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "www.ghostie.app" }],
+      "destination": "/ghostie/index.html"
+    },
+    {
+      "source": "/pro",
+      "has": [{ "type": "host", "value": "ghostie.app" }],
+      "destination": "/ghostie/pro.html"
+    },
+    {
+      "source": "/pro",
+      "has": [{ "type": "host", "value": "www.ghostie.app" }],
+      "destination": "/ghostie/pro.html"
+    },
+    {
+      "source": "/assets/:path*",
+      "has": [{ "type": "host", "value": "ghostie.app" }],
+      "destination": "/ghostie/assets/:path*"
+    },
+    {
+      "source": "/assets/:path*",
+      "has": [{ "type": "host", "value": "www.ghostie.app" }],
+      "destination": "/ghostie/assets/:path*"
+    },
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "textingwrapped.com" }],
+      "destination": "/texting-wrapped/index.html"
+    },
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "www.textingwrapped.com" }],
+      "destination": "/texting-wrapped/index.html"
+    },
+    {
+      "source": "/assets/:path*",
+      "has": [{ "type": "host", "value": "textingwrapped.com" }],
+      "destination": "/texting-wrapped/assets/:path*"
+    },
+    {
+      "source": "/assets/:path*",
+      "has": [{ "type": "host", "value": "www.textingwrapped.com" }],
+      "destination": "/texting-wrapped/assets/:path*"
+    }
+  ]
+}

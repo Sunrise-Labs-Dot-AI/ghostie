@@ -1,0 +1,23 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "wrapped-preview",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8137", "--directory", "dist/wrapped-preview"],
+      "port": 8137
+    },
+    {
+      "name": "ghostie-landing",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "4519", "--directory", "site/ghostie"],
+      "port": 4519
+    },
+    {
+      "name": "site-root",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "4520", "--directory", "site"],
+      "port": 4520
+    }
+  ]
+}

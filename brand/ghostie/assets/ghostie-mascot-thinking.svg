@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" role="img" aria-labelledby="title desc">
+  <title id="title">Ghostie mascot, thinking</title>
+  <desc id="desc">A friendly ghost mascot thinking.</desc>
+  <path d="M48 13c-16.2 0-27 12.2-27 29.9v8.4c-7.2 1.2-11.7 6.6-11.4 12.9.2 3.2 3.3 4.9 6.1 3.2l5.3-3.2v7.2c0 5 5.7 7.8 9.5 4.6l4.8-4.1 5.3 5.9a4.1 4.1 0 0 0 6.1 0l5.3-5.9 5.2 4.1c3.8 3.1 9.5.4 9.5-4.6v-7.2l5.3 3.2c2.8 1.7 5.9 0 6.1-3.2.3-6.3-4.2-11.7-11.4-12.9v-8.4C75 25.2 64.2 13 48 13Z" fill="#FFF9F2" stroke="#211A2A" stroke-width="3" stroke-linejoin="round"/>
+  <circle cx="38.5" cy="45.2" r="4.3" fill="#211A2A"/>
+  <circle cx="57.7" cy="45.2" r="4.3" fill="#211A2A"/>
+  <path d="M44 59.2c2.6-1.3 5.8-1.3 8.4 0" fill="none" stroke="#211A2A" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="31.8" cy="54.4" r="3.5" fill="#FF8E7E" opacity=".7"/>
+  <circle cx="64.3" cy="54.4" r="3.5" fill="#FF8E7E" opacity=".7"/>
+  <circle cx="71.5" cy="28" r="5.2" fill="#E6F8F4" stroke="#211A2A" stroke-width="2.1"/>
+  <circle cx="82.5" cy="18.5" r="8" fill="#E6F8F4" stroke="#211A2A" stroke-width="2.1"/>
+  <path d="M82.5 14.7c2.9 0 5.1 1.7 5.1 4 0 2.1-1.4 3.2-3.4 4.1-.8.4-1.1.8-1.1 1.7" fill="none" stroke="#211A2A" stroke-width="1.8" stroke-linecap="round"/>
+  <circle cx="83.2" cy="27.5" r="1.2" fill="#211A2A"/>
+</svg>

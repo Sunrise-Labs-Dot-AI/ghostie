@@ -1,0 +1,20 @@
+{
+  "name": "ghostie-mcp",
+  "version": "0.11.2",
+  "description": "Ghostie: generalized MCP facade over the bundled iMessage and WhatsApp MCP transports. Read/search/stage drafts through one tool surface while preserving transport-specific approval gates.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "test": "bun test",
+    "typecheck": "bun --bun tsc --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.1.13",
+    "typescript": "^5.6.0"
+  }
+}

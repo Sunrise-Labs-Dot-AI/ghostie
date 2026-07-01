@@ -1,0 +1,90 @@
+{
+  "filters": {
+    "window_days": 365,
+    "since_ts_ms": 1717200000000,
+    "until_ts_ms": 1748736000000
+  },
+  "latency": {
+    "total_reply_pairs": 1588,
+    "pct_within_5min": 72,
+    "pct_within_30min": 88,
+    "pct_within_1hr": 93,
+    "pct_within_4hr": 98,
+    "mean_minutes": 8,
+    "median_minutes": 3,
+    "thread_count": 88,
+    "window_label": "past 12 months"
+  },
+  "ball_in_court": {
+    "total_threads_sampled": 100,
+    "threads_with_ball_in_court": 45,
+    "pct_ball_in_court": 45,
+    "live_conversations_estimate": 38,
+    "snapshot_label": "June 2025"
+  },
+  "group_contribution": {
+    "total_groups_analyzed": 10,
+    "total_messages_in_groups": 2400,
+    "user_messages_in_groups": 432,
+    "user_contribution_pct": 18,
+    "user_reaction_rate_pct": 18,
+    "peer_reaction_rate_pct": 26,
+    "groups_where_user_silent": 1,
+    "groups_mostly_reactions": 2,
+    "worst_offender": {
+      "thread_label": "Movie Night",
+      "total": 80,
+      "user_count": 3,
+      "user_pct": 3.8,
+      "user_reaction_pct": 33
+    },
+    "per_thread": [
+      { "thread_label": "Movie Night", "total": 80, "user_count": 3, "user_pct": 3.8, "user_reaction_pct": 33 },
+      { "thread_label": "Family Logistics", "total": 420, "user_count": 96, "user_pct": 22.9, "user_reaction_pct": 15 },
+      { "thread_label": "Best Friends", "total": 880, "user_count": 210, "user_pct": 23.9, "user_reaction_pct": 12 }
+    ]
+  },
+  "top_people": [
+    { "name": "Ari Patel", "count": 3210 },
+    { "name": "Jamie Brooks", "count": 2204 },
+    { "name": "Morgan Lee", "count": 1844 },
+    { "name": "Tessa Kim", "count": 1122 },
+    { "name": "Leo Grant", "count": 930 },
+    { "name": "Nora Vale", "count": 855 },
+    { "name": "Camila Ortiz", "count": 774 },
+    { "name": "Ben Hayes", "count": 612 },
+    { "name": "Iris Chen", "count": 544 },
+    { "name": "Theo King", "count": 498 }
+  ],
+  "emoji": {
+    "pct_messages_with_emoji": 31,
+    "emoji_per_message": 0.52,
+    "top": [
+      { "emoji": "😭", "count": 810 },
+      { "emoji": "💀", "count": 655 },
+      { "emoji": "✨", "count": 310 },
+      { "emoji": "🫡", "count": 205 },
+      { "emoji": "❤️", "count": 188 }
+    ]
+  },
+  "style": {
+    "pct_end_period": 4,
+    "pct_all_lowercase": 72,
+    "laugh_tokens": { "lol": 92, "haha": 210, "skull": 655 },
+    "dominant_laugh": "skull",
+    "sample_size": 5200
+  },
+  "age": {
+    "estimated_age": 27,
+    "band": "zillennial",
+    "label": "Zillennial",
+    "approx_age": "24-31",
+    "confidence": "medium",
+    "drivers": [
+      "Uses skull as laughter",
+      "High lowercase rate",
+      "Fast replies across active threads"
+    ],
+    "sample_size": 5200
+  }
+}
