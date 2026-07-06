@@ -40,10 +40,6 @@ enum ToolCatalog {
     workPersonal, babysitter,
   ]
 
-  /// The "Recommended" preset: the core approve-and-send loop plus the two
-  /// most broadly useful extras.
-  static let recommendedToolIDs: Set<String> = [messages, wrapped, birthdays]
-
   /// The "Just Texting Wrapped" quick path.
   static let wrappedOnlyToolIDs: Set<String> = [wrapped]
 

@@ -100,25 +100,28 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(OnboardingView.initialProductAnalyticsValue(storedValue: true, preferenceRecorded: true))
     }
 
-    func test_onboardingInitialChosenTools_freshUsersGetRecommendedPreset() {
+    func test_onboardingInitialChosenTools_freshUsersGetEverythingSelected() {
+        // No "recommended" subset any more: a fresh install starts with every
+        // choosable tool selected, and the user unchecks what they don't want.
         XCTAssertEqual(
             OnboardingView.initialChosenTools(
                 firstRunComplete: false,
                 storedMode: .full,
                 storedTools: []
             ),
-            ToolCatalog.recommendedToolIDs
+            Set(ToolCatalog.choosableToolIDs)
         )
     }
 
-    func test_onboardingInitialChosenTools_wrappedOnlyContinuationKeepsWrappedPlusRecommended() {
+    func test_onboardingInitialChosenTools_wrappedOnlyContinuationSelectsEverything() {
+        // A Wrapped-only user reopening onboarding ("Continue setup") now sees
+        // the full set selected, consistent with the default-all model.
         let tools = OnboardingView.initialChosenTools(
             firstRunComplete: true,
             storedMode: .textingWrappedOnly,
             storedTools: [ToolCatalog.wrapped]
         )
-        XCTAssertTrue(tools.contains(ToolCatalog.wrapped))
-        XCTAssertTrue(tools.isSuperset(of: ToolCatalog.recommendedToolIDs))
+        XCTAssertEqual(tools, Set(ToolCatalog.choosableToolIDs))
     }
 
     func test_onboardingInitialChosenTools_fullUserReacceptingTermsKeepsCurrentChoices() {
@@ -137,7 +140,7 @@ final class SettingsStoreTests: XCTestCase {
     func test_onboardingCanCommit_requiresTermsAndAtLeastOneTool() {
         XCTAssertFalse(OnboardingView.canCommit(
             termsAccepted: false,
-            chosenTools: ToolCatalog.recommendedToolIDs
+            chosenTools: [ToolCatalog.messages]
         ))
         XCTAssertFalse(OnboardingView.canCommit(
             termsAccepted: true,

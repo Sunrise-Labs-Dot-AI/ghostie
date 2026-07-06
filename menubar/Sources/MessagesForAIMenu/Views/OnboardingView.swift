@@ -4,8 +4,8 @@ import SwiftUI
 /// is true (true first run, or a Terms version bump).
 ///
 /// Choose-your-own-adventure: instead of a binary Wrapped-vs-Full pick, the
-/// user multi-selects the tools they actually want. "Recommended" (Messages +
-/// Texting Wrapped + Birthday Texts) is preselected; "Just Texting Wrapped"
+/// user multi-selects the tools they actually want. Every tool starts
+/// selected — the user unchecks what they don't want; "Just Texting Wrapped"
 /// is one click. Clicking the primary button writes the choices into
 /// `~/.messages-mcp/settings.json` and routes:
 ///
@@ -33,7 +33,7 @@ struct OnboardingView: View {
   // Local state while the user is making their picks. We don't write to
   // SettingsStore until the primary button — premature writes would surface
   // partial state to the MCP server before the user has confirmed.
-  @State private var chosenTools: Set<String> = ToolCatalog.recommendedToolIDs
+  @State private var chosenTools: Set<String> = Set(ToolCatalog.choosableToolIDs)
   @State private var whatsapp: Bool = false
   @State private var productAnalytics: Bool = false
   @State private var loadedInitialState = false
@@ -145,27 +145,26 @@ struct OnboardingView: View {
     preferenceRecorded ? storedValue : false
   }
 
-  /// Fresh installs start on the Recommended preset. A Wrapped-only user who
-  /// reopens onboarding ("Continue setup") sees Recommended plus what they
-  /// already have; a full user re-accepting bumped Terms sees their current
-  /// tool set, so re-acceptance never silently rewrites their choices.
+  /// Fresh installs start with every tool selected — the user unchecks what
+  /// they don't want. A Wrapped-only user who reopens onboarding ("Continue
+  /// setup") likewise sees the full set; a full user re-accepting bumped Terms
+  /// sees their current tool set, so re-acceptance never silently rewrites
+  /// their choices.
   static func initialChosenTools(
     firstRunComplete: Bool,
     storedMode: AppExperienceMode,
     storedTools: Set<String>,
     choosableToolIDs: [String] = ToolCatalog.choosableToolIDs
   ) -> Set<String> {
+    let choosable = Set(choosableToolIDs)
     guard firstRunComplete else {
-      return ToolCatalog.recommendedToolIDs.intersection(Set(choosableToolIDs))
+      return choosable
     }
     if storedMode == .textingWrappedOnly {
-      return ToolCatalog.recommendedToolIDs
-        .union(ToolCatalog.wrappedOnlyToolIDs)
-        .intersection(Set(choosableToolIDs))
+      return choosable
     }
-    let choosable = Set(choosableToolIDs)
     let stored = storedTools.intersection(choosable)
-    return stored.isEmpty ? ToolCatalog.recommendedToolIDs.intersection(choosable) : stored
+    return stored.isEmpty ? choosable : stored
   }
 
   static func canCommit(termsAccepted: Bool, chosenTools: Set<String>) -> Bool {
@@ -179,7 +178,7 @@ struct OnboardingView: View {
     let choosable = Set(choosableToolIDs)
     let visible = chosen.intersection(choosable)
     if !visible.isEmpty { return visible }
-    return ToolCatalog.recommendedToolIDs.intersection(choosable)
+    return choosable
   }
 
   /// Where the console lands after commit: Messages when chosen, otherwise
@@ -239,16 +238,12 @@ struct OnboardingView: View {
 
   // MARK: - Tool picker
 
-  /// One-click presets above the grid. Buttons, not a segmented control —
-  /// the grid below stays freely editable after applying either preset.
+  /// A one-click shortcut above the grid for the lightweight Wrapped-only
+  /// path. Every tool is selected by default, so there's no "recommended"
+  /// preset — just this escape hatch for people who only want Texting Wrapped.
+  /// The grid below stays freely editable after tapping it.
   private var presetRow: some View {
     HStack(spacing: 8) {
-      presetButton(
-        "Recommended",
-        active: chosenTools == ToolCatalog.recommendedToolIDs
-      ) {
-        chosenTools = ToolCatalog.recommendedToolIDs
-      }
       presetButton(
         "Just Texting Wrapped",
         active: chosenTools == ToolCatalog.wrappedOnlyToolIDs
@@ -294,7 +289,6 @@ struct OnboardingView: View {
 
   private func toolCard(_ tool: ConsoleTool) -> some View {
     let selected = chosenTools.contains(tool.id)
-    let recommended = ToolCatalog.recommendedToolIDs.contains(tool.id)
     return Button {
       if selected {
         chosenTools.remove(tool.id)
@@ -309,20 +303,10 @@ struct OnboardingView: View {
           .frame(width: 22)
           .padding(.top, 1)
         VStack(alignment: .leading, spacing: 2) {
-          HStack(spacing: 5) {
-            Text(tool.title)
-              .font(.callout.weight(.semibold))
-              .foregroundStyle(.primary)
-              .lineLimit(1)
-            if recommended {
-              Text("Recommended")
-                .font(DS.Font.chip)
-                .padding(.horizontal, 5)
-                .padding(.vertical, 1)
-                .background(Capsule().fill(DS.Color.accentTeal(colorScheme).opacity(0.12)))
-                .foregroundStyle(DS.Color.accentTeal(colorScheme))
-            }
-          }
+          Text(tool.title)
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(.primary)
+            .lineLimit(1)
           Text(Self.toolCaptions[tool.id] ?? tool.introSummary)
             .font(.caption)
             .foregroundStyle(.secondary)

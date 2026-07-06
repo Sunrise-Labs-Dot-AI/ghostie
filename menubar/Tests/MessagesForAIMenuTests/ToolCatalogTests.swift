@@ -28,7 +28,7 @@ final class ToolCatalogTests: XCTestCase {
             .full
         )
         XCTAssertEqual(
-            ToolCatalog.experienceMode(forChosen: ToolCatalog.recommendedToolIDs),
+            ToolCatalog.experienceMode(forChosen: [ToolCatalog.messages, ToolCatalog.birthdays]),
             .full
         )
     }
@@ -41,13 +41,6 @@ final class ToolCatalogTests: XCTestCase {
         XCTAssertFalse(
             ToolCatalog.persistedTools(forChosen: [ToolCatalog.wrapped, ToolCatalog.eq])
                 .contains(ToolCatalog.textingVoice)
-        )
-    }
-
-    func test_recommendedPreset_isMessagesWrappedBirthdays() {
-        XCTAssertEqual(
-            ToolCatalog.recommendedToolIDs,
-            [ToolCatalog.messages, ToolCatalog.wrapped, ToolCatalog.birthdays]
         )
     }
 
@@ -87,7 +80,7 @@ final class ToolCatalogTests: XCTestCase {
 
     func test_permissionsFootnote_statesLazyAskAndOptionalContacts() {
         let needs = ToolCatalog.permissionNeeds(
-            forChosen: ToolCatalog.recommendedToolIDs, whatsappToggled: true
+            forChosen: [ToolCatalog.messages, ToolCatalog.birthdays], whatsappToggled: true
         )
         let text = OnboardingView.permissionsFootnoteText(for: needs)
         XCTAssertTrue(text.contains("first time"))
