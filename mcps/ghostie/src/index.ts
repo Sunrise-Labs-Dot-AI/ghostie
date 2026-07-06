@@ -821,7 +821,7 @@ async function main() {
   setInterval(() => void refreshChatDbStatus(), 30_000).unref?.();
 
   const server = new McpServer(
-    { name: "ghostie-mcp", version: "0.11.2" },
+    { name: "ghostie-mcp", version: "0.11.3" },
     {
       instructions:
         "Ghostie: a generalized facade over local iMessage and WhatsApp transports. " +

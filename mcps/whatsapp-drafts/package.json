@@ -1,6 +1,6 @@
 {
   "name": "whatsapp-mcp",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "description": "Local MCP server for WhatsApp on macOS: persistent Baileys daemon, draft-staging with thread-context snapshots, hold-to-fire approval. Sibling to imessage-mcp. Designed for Claude Desktop / Claude Code / Codex CLI.",
   "keywords": [
     "mcp",

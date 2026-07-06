@@ -1,7 +1,7 @@
 {
   "name": "ghostie",
   "description": "AI proposes, you approve. Ghostie is a local menubar app + MCPs for iMessage and WhatsApp: Claude drafts, you hold-to-fire in the menubar. A post-onboarding walkthrough verifies Claude can reach each MCP, and a persistent Status pane lets you re-run the checks on demand. Full audit log under ~/.messages-mcp/send-audit.log. Requires Ghostie.app installed from GitHub Releases.",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "author": {
     "name": "Sunrise Labs",
     "url": "https://messagesfor.ai"

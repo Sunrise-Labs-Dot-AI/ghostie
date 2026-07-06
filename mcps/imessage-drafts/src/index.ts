@@ -41,7 +41,7 @@ async function main() {
   setInterval(() => void refreshChatDbStatus(), 30_000).unref?.();
 
   const server = new McpServer(
-    { name: "imessage-drafts-mcp", version: "0.11.2" },
+    { name: "imessage-drafts-mcp", version: "0.11.3" },
     {
       instructions:
         "Read-only iMessage access (chat.db) plus a local draft-staging API for the macOS Messages app. " +

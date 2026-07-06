@@ -1,6 +1,6 @@
 {
   "name": "birthday-generator",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "description": "Deterministic upcoming-birthday surfacing + suggestion engine. Reads the Contacts birthdays sidecar (and the hand-maintained birthdays.json) and chat.db (read-only) to rank who to text, stage a happy-birthday draft, and persist pin/mute curation. No LLM. Spawned by the Messages for AI menu-bar app (which holds Full Disk Access via launcher attribution). Shares the iMessage daemon's chat.db decode + draft-storage layer at build time.",
   "type": "module",
   "private": true,

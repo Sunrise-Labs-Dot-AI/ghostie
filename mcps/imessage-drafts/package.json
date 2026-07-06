@@ -1,6 +1,6 @@
 {
   "name": "imessage-drafts-mcp",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "description": "Local MCP server for macOS iMessages: read-only chat.db queries, draft staging with thread-context snapshots, AppleScript send. Designed for Claude Desktop / Claude Code / Codex CLI.",
   "keywords": [
     "mcp",

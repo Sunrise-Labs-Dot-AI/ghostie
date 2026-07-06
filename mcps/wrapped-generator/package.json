@@ -1,6 +1,6 @@
 {
   "name": "wrapped-generator",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "description": "Deterministic Texting Wrapped generator. Reads chat.db (read-only), computes the analysis, and prints a self-contained Wrapped HTML to stdout. No LLM. Spawned by the Messages for AI menu-bar app (which holds Full Disk Access via launcher attribution); also callable as a CLI by the texting-analytics Claude skill. Shares the iMessage daemon's chat.db decode/contacts layer at build time.",
   "type": "module",
   "private": true,
