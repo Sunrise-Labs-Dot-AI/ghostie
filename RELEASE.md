@@ -58,8 +58,8 @@ You only do this once per machine. If `release.sh --dry-run` passes, you're set.
 1. **Developer ID Application certificate** in your login keychain. (You already
    have this — it's how every build so far got signed.)
 2. **Notary credentials** stored as a keychain profile named
-   `imessage-mcp-notary` (legacy name, kept for continuity). Override with the
-   `NOTARY_PROFILE` env var if yours differs.
+   `ghostie` (older machines may still carry the legacy `imessage-mcp-notary`
+   profile). Override with the `NOTARY_PROFILE` env var if yours differs.
 3. **GitHub CLI** authenticated: `gh auth login`.
 4. **create-dmg**: `brew install create-dmg` (the dmg script auto-installs it if
    missing).
@@ -110,8 +110,9 @@ with a plain-English message if something's off — before it changes anything.
 - **Deliberately unchanged across the rebrand** (see CLAUDE.md "Rebrand
   invariants"): bundle id / codesign identifier
   `com.sunriselabs.messages-for-ai`, `~/.messages-mcp` paths, the stable
-  `Messages-for-AI.dmg` download name, `SUFeedURL`, and the
-  `imessage-mcp-notary` profile.
+  `Messages-for-AI.dmg` download name, and `SUFeedURL`. (The notary keychain
+  profile is a local, overridable name — now defaulting to `ghostie` — not a
+  cross-machine invariant.)
 
 ---
 

@@ -34,7 +34,7 @@
 # requires tag vX.Y.Z to already exist and HEAD == origin/<branch>.
 #
 # Env overrides:
-#   NOTARY_PROFILE   keychain profile name (default: imessage-mcp-notary)
+#   NOTARY_PROFILE   keychain profile name (default: ghostie)
 #   RELEASE_BRANCH   branch releases must run from (default: main)
 #   POSTHOG_PROJECT_TOKEN  required for shippable product analytics
 #   POSTHOG_HOST     PostHog capture host (default: https://us.i.posthog.com)

@@ -40,12 +40,12 @@
 #   - POSTHOG_PROJECT_TOKEN, supplied from your shell/keychain. This is embedded
 #     into Info.plist so opt-in product analytics can reach PostHog.
 #   - POSTHOG_HOST, optional (default: https://us.i.posthog.com).
-#   - Notarytool credentials stored in keychain as profile
-#     "imessage-mcp-notary" (legacy name from the imessage-mcp era; kept
-#     to avoid re-storing credentials on every maintainer's machine).
+#   - Notarytool credentials stored in keychain as profile "ghostie" (the
+#     current default; older machines may still carry the legacy
+#     "imessage-mcp-notary" profile from the imessage-mcp era).
 #     Override via NOTARY_PROFILE env var if your keychain uses a
 #     different name. One-time setup:
-#       xcrun notarytool store-credentials imessage-mcp-notary \
+#       xcrun notarytool store-credentials ghostie \
 #         --apple-id <your-apple-id-email> \
 #         --team-id <your-team-id> \
 #         --password <app-specific-password-from-appleid.apple.com>
@@ -55,7 +55,7 @@
 #   BEFORE we poll Apple. If `xcrun notarytool wait` times out, you can
 #   re-poll without re-uploading (which would burn another ~5-15 min) via:
 #     xcrun notarytool wait $(cat dist/notarize-app.uuid) \
-#       --keychain-profile imessage-drafts-mcp-notary
+#       --keychain-profile ghostie
 #   The trap on INT/TERM/EXIT wipes dist/ on abort, so you must save
 #   the UUID elsewhere FIRST if you Ctrl-C during the wait. A future
 #   refactor (deferred WARNING #14) will add a proper --resume flag.
@@ -63,7 +63,7 @@
 set -euo pipefail
 
 VERSION="${1:?usage: build-release.sh <version>, e.g. v0.1.1}"
-NOTARY_PROFILE="${NOTARY_PROFILE:-imessage-mcp-notary}"
+NOTARY_PROFILE="${NOTARY_PROFILE:-ghostie}"
 
 # The only Apple Developer Team ID this build accepts. Auto-detected
 # certs from a different Team ID will be REJECTED rather than silently
