@@ -9,6 +9,14 @@
     <language>en</language>
     <!-- release.sh inserts <item> entries here, newest first. -->
     <item>
+      <title>v0.11.3</title>
+      <sparkle:version>4</sparkle:version>
+      <sparkle:shortVersionString>0.11.3</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Mon, 06 Jul 2026 13:14:25 -0700</pubDate>
+      <enclosure url="https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.11.3/messages-for-ai-v0.11.3.zip" sparkle:edSignature="d6VNNAyU/JKSoBdX3AZNUTlGjIhdkuJj5dlBTYJQzJH9+IiKVOGUbMUZ7KRuqvPFBV9eEp1xrLVMO/Lb3t+hBA==" length="34788753" type="application/octet-stream" />
+    </item>
+    <item>
       <title>v0.11.2</title>
       <sparkle:version>296</sparkle:version>
       <sparkle:shortVersionString>0.11.2</sparkle:shortVersionString>
