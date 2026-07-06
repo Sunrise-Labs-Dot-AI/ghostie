@@ -158,8 +158,9 @@ old names:
   Releases; docs and the marketing site link to it.
 - **`SUFeedURL` (Sparkle appcast URL)** — shipped apps poll the existing URL;
   changing it orphans every installed copy from updates.
-- **Notary keychain profile `imessage-mcp-notary`** — local keychain name,
-  legacy from the imessage-mcp era (override with `NOTARY_PROFILE`).
+- **Notary keychain profile** — NOT a true invariant: a local keychain name
+  only, overridable via `NOTARY_PROFILE`. The scripts now default to `ghostie`;
+  older machines may still carry the legacy `imessage-mcp-notary` profile.
 - **Binary names** (`MessagesForAIMenu`, `messages-for-ai-backend`,
   `imessage-drafts-mcp`, `whatsapp-drafts-mcp`, daemons) — MCP client configs
   and the launcher dispatch table point at them; `ghostie-mcp` is additive.
@@ -180,8 +181,9 @@ the UUID from `notarytool history` when the JSON output is blanked, and poll wit
 `notarytool info --output-format json` (short response) rather than
 `notarytool wait` (long response re-triggers the formatter crash).
 
-Notary keychain profile is `imessage-mcp-notary` (legacy name from the
-imessage-mcp era). Override with `NOTARY_PROFILE` if your keychain differs.
+Notary keychain profile defaults to `ghostie` (older machines may still carry
+the legacy `imessage-mcp-notary` profile). Override with `NOTARY_PROFILE` if your
+keychain differs.
 
 ## Session memory
 
