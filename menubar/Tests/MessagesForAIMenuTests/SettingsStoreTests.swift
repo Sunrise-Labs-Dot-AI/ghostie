@@ -126,7 +126,8 @@ final class SettingsStoreTests: XCTestCase {
 
     func test_onboardingInitialChosenTools_fullUserReacceptingTermsKeepsCurrentChoices() {
         // A full user re-accepting bumped Terms must NOT have their tool set
-        // silently rewritten to the Recommended preset.
+        // silently rewritten to the default-all set: a non-empty stored
+        // selection is preserved as-is.
         let stored: Set<String> = [ToolCatalog.messages, ToolCatalog.eq, ToolCatalog.textingVoice]
         let tools = OnboardingView.initialChosenTools(
             firstRunComplete: true,
@@ -135,6 +136,38 @@ final class SettingsStoreTests: XCTestCase {
         )
         // textingVoice isn't a picker card; only choosable IDs come back.
         XCTAssertEqual(tools, [ToolCatalog.messages, ToolCatalog.eq])
+    }
+
+    func test_onboardingInitialChosenTools_fullUserWithStoredToolsAllFlagHidden_selectsVisibleSet() {
+        // Edge case (adversarial-review finding): a full user whose entire
+        // stored selection is currently feature-flag-hidden. There is no prior
+        // choice left to preserve, so the default-all model applies to the
+        // VISIBLE set — the user still reviews and unchecks before committing.
+        // Intentional; pinned so it isn't "fixed" back into an empty/dead-end
+        // picker or a reintroduced curated subset.
+        let visible = [ToolCatalog.messages, ToolCatalog.wrapped]  // babysitter flag-hidden
+        let tools = OnboardingView.initialChosenTools(
+            firstRunComplete: true,
+            storedMode: .full,
+            storedTools: [ToolCatalog.babysitter],
+            choosableToolIDs: visible
+        )
+        XCTAssertEqual(tools, Set(visible))
+    }
+
+    func test_onboardingNormalizedChosenTools_emptyAfterFilterFallsBackToVisibleSet() {
+        // When a live feature-flag change hides every currently-checked tool,
+        // fall back to the full visible set rather than an empty selection.
+        let visible = [ToolCatalog.messages, ToolCatalog.wrapped]
+        XCTAssertEqual(
+            OnboardingView.normalizedChosenTools([ToolCatalog.babysitter], choosableToolIDs: visible),
+            Set(visible)
+        )
+        // A still-visible subset is preserved untouched.
+        XCTAssertEqual(
+            OnboardingView.normalizedChosenTools([ToolCatalog.messages], choosableToolIDs: visible),
+            [ToolCatalog.messages]
+        )
     }
 
     func test_onboardingCanCommit_requiresTermsAndAtLeastOneTool() {
