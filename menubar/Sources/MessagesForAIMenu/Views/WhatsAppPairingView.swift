@@ -37,7 +37,6 @@ import AppKit
 /// `unlinkAndReset` then drops back to `.subscribing` for a fresh pair.
 struct WhatsAppPairingView: View {
   @EnvironmentObject var whatsappDaemon: WhatsAppDaemonController
-  @EnvironmentObject var settings: SettingsStore
   @Environment(\.colorScheme) private var colorScheme
   @Environment(\.dismissWindow) private var dismissWindow
   @Environment(\.openWindow) private var openWindow
@@ -61,10 +60,6 @@ struct WhatsAppPairingView: View {
   enum Phase: Equatable {
     case checkingSentinel
     case loggedOutRecovery
-    /// One-time risk acknowledgement before linking via the unofficial
-    /// WhatsApp client. Kept separate from the ready gate so no daemon or QR
-    /// work starts until the user explicitly accepts the risk.
-    case riskAcknowledgment
     /// Pre-pairing gate. We show the user how to reach Link a Device on
     /// their phone and wait for an explicit "Ready to scan" tap before
     /// touching the daemon — so the ~20s QR-rotation clock (enforced by
@@ -95,14 +90,8 @@ struct WhatsAppPairingView: View {
     .onAppear {
       if WhatsAppQRSession.loggedOutSentinelExists {
         // Remote logout recovery is its own flow (wipe + re-pair) and
-        // keeps its existing UX — no Ready gate. Re-pairing implies the user
-        // already accepted the linking risk on the first pair.
+        // keeps its existing UX — no Ready gate.
         phase = .loggedOutRecovery
-      } else if !settings.whatsappRiskAcknowledged {
-        // Require the one-time linking-risk acknowledgment before anything
-        // touches the daemon or starts a QR. Gates every pairing entry path
-        // (onboarding, Settings) since they all land here.
-        phase = .riskAcknowledgment
       } else {
         // Don't start the daemon or request a QR yet. Show the Ready gate
         // first so the user has time to open Link a Device on their phone
@@ -167,8 +156,6 @@ struct WhatsAppPairingView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     case .loggedOutRecovery:
       loggedOutView
-    case .riskAcknowledgment:
-      riskAcknowledgmentView
     case .awaitingUserReady:
       awaitingUserReadyView
     case .startingDaemon:
@@ -184,40 +171,6 @@ struct WhatsAppPairingView: View {
     case .error(let message):
       errorView(message)
     }
-  }
-
-  /// One-time linking-risk acknowledgment. Gates the entire pairing flow:
-  /// until the user accepts, nothing here touches the daemon or starts a QR.
-  /// Confirming records `settings.whatsappRiskAcknowledged` so it's never
-  /// shown again, then advances to the Ready gate.
-  private var riskAcknowledgmentView: some View {
-    VStack(alignment: .leading, spacing: 16) {
-      HStack(alignment: .top, spacing: 12) {
-        Image(systemName: "exclamationmark.triangle.fill")
-          .font(.system(size: 28, weight: .semibold))
-          .foregroundStyle(DS.Color.amber(colorScheme))
-        VStack(alignment: .leading, spacing: 6) {
-          Text("Before you link WhatsApp")
-            .font(DS.Font.settingsTitle)
-            .foregroundStyle(DS.Color.ink(colorScheme))
-          Text("Linking WhatsApp uses Baileys, an unofficial WhatsApp client. WhatsApp's Terms don't sanction third-party clients, so your number could be flagged or banned. You can use iMessage without WhatsApp.")
-            .font(DS.Font.settingsLabel)
-            .foregroundStyle(DS.Color.ink2(colorScheme))
-            .fixedSize(horizontal: false, vertical: true)
-        }
-      }
-      .padding(12)
-      .dsCard(colorScheme, fill: DS.Color.amberDim(colorScheme), radius: DS.Radius.card)
-
-      Button("I understand and accept this risk") {
-        settings.acknowledgeWhatsAppRisk()
-        // Advance to the existing Ready gate; the daemon still isn't
-        // touched until the user taps "Ready to scan".
-        phase = .awaitingUserReady
-      }
-      .dsButton(.primary, fullWidth: true)
-    }
-    .frame(maxWidth: .infinity, alignment: .leading)
   }
 
   /// Pre-pairing instructions + the "Ready to scan" gate. Nothing here
