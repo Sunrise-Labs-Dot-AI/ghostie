@@ -114,6 +114,11 @@ struct MessagesForAIMenuApp: App {
         .environmentObject(appDelegate.whatsappDaemon)
         .environmentObject(appDelegate.imessageDaemon)
         .environmentObject(appDelegate.nav)
+        // featureFlags gates the choosable-tool grid (babysitter etc.). Missing
+        // here → OnboardingView.availableChoosableToolIDs hits EnvironmentObject
+        // .error() and SIGTRAPs on first-run / Terms-bump onboarding (the only
+        // times this window presents — which is why it hid until a fresh machine).
+        .environmentObject(appDelegate.featureFlags)
         .frame(width: 560)
         .fixedSize()
         .trackWindowLifecycle(appDelegate: appDelegate)
