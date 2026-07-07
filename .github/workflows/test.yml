@@ -15,12 +15,15 @@ on:
       - 'LICENSE'
   pull_request:
     branches: [main]
-    paths-ignore:
-      - '**/*.md'
-      - 'memory/**'
-      - 'docs/**'
-      - '.gitignore'
-      - 'LICENSE'
+    # DELIBERATELY NO paths-ignore here (unlike push above). bun-test and
+    # swift-build are REQUIRED status checks: if a PR skips this whole workflow
+    # via a path filter, those contexts never post and branch protection parks
+    # the PR at "Expected — waiting for status" forever (the exact trap
+    # site-metadata.yml calls out). So the workflow ALWAYS runs on PRs, and the
+    # expensive jobs skip *themselves* via detect-changes — a job skipped by an
+    # `if` reports "skipped", which satisfies a required check, whereas a
+    # workflow that never ran leaves the context absent and blocks. See
+    # swift-build below. (push keeps paths-ignore: it has no merge gate.)
 
 # Cancel an in-flight run when a new commit lands on the same ref:
 # keeps PR latency low when someone pushes multiple times.
@@ -69,7 +72,11 @@ jobs:
     # REQUIRED status checks on main: "bun-test (mcps/imessage-drafts)" and
     # "bun-test (mcps/whatsapp-drafts)". Keep the job name + matrix EXACTLY so
     # both contexts keep reporting (a renamed/skipped required check blocks
-    # merge forever).
+    # merge forever). Intentionally NO `if` gate: this runs on every PR (docs
+    # included) so both required contexts always post. Do NOT add a
+    # detect-changes gate here the way swift-build has one — a skipped *matrix*
+    # job does not reliably post its per-cell contexts, which would reintroduce
+    # the trap. The tests are cheap portable Linux (~12s), so always-run is fine.
     #
     # Runner moved macos-latest -> ubuntu-latest (10x cheaper minute multiplier).
     # Every test here is portable (node:fs / node:os / node:path / node:crypto /
@@ -160,6 +167,22 @@ jobs:
     # compile?", and the SIGNED release-mode compile already happens at ship
     # time in scripts/build-release.sh (`swift build -c release`, line ~260).
     # Measured on a clean checkout: debug ~31s vs release ~74s wall.
+    #
+    # Gated on detect-changes so non-app PRs (docs / markdown / site-only) SKIP
+    # this macOS job instead of burning minutes. Because it's a REQUIRED check,
+    # skipping-via-`if` is exactly right: a skipped job posts "skipped" (which
+    # satisfies branch protection), whereas the old workflow-level paths-ignore
+    # left the context absent and blocked the PR. No `github.event_name` guard —
+    # swift-build must also run on main code pushes.
+    #
+    # Fail-safe: also run when detect-changes did NOT succeed. Without that, a
+    # detect-changes FAILURE would skip swift-build, and a skipped required
+    # check counts as passed — so a broken compile could merge because the gate
+    # never ran. `!cancelled()` lets swift-build evaluate despite a failed
+    # dependency (but not on a cancelled workflow); `result != 'success'` then
+    # forces a real build unless detect-changes cleanly reported app=false.
+    needs: detect-changes
+    if: ${{ !cancelled() && (needs.detect-changes.outputs.app == 'true' || needs.detect-changes.result != 'success') }}
     runs-on: macos-latest
     timeout-minutes: 8
     steps:
