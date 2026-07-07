@@ -1,0 +1,39 @@
+name: site-metadata
+
+# Update-feed / site metadata gate: validates site/appcast.xml (Sparkle version
+# ordering + enclosure/signature shape), site/control.json (+ .sig), and the
+# privacy/security/terms pages via tests/experience/site-update-checks.mjs.
+#
+# Like pii-guard, this is a REQUIRED check with DELIBERATELY NO paths-ignore.
+# A required status check must post a result on every PR or branch protection
+# leaves the PR "Expected — waiting for status" forever; test.yml skips
+# docs/markdown (to save macOS minutes), so its jobs can't safely be required.
+# This check is node-only and ~6s, so running it unconditionally is cheap.
+#
+# The same validation also runs inside test.yml's experience-evals for app PRs
+# and locally via scripts/test-experience.sh; this workflow is the always-on
+# gate. Keep the job name "site-metadata" stable — branch protection matches the
+# required context by name.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: site-metadata-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  site-metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Check appcast + control + site metadata
+        run: node tests/experience/site-update-checks.mjs

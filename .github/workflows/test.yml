@@ -275,26 +275,3 @@ jobs:
       - name: Check referral program handler
         working-directory: site
         run: npm run test:referral
-
-  site-metadata:
-    # tests/experience/site-update-checks.mjs validates site/appcast.xml (Sparkle
-    # version ordering + enclosure/signature shape), site/control.json (+ .sig),
-    # and the privacy/security/terms pages. It ALSO runs inside experience-evals,
-    # but that job is gated on `app` changes only — so a PR touching just site/
-    # files would skip the very check that validates them. That gap let a
-    # non-descending appcast reach main and only surfaced on unrelated app PRs.
-    # Gate a lightweight copy on `site` so site-only changes self-validate.
-    # Node-only: the check reads files with node:fs and needs no deps.
-    runs-on: ubuntu-latest
-    needs: detect-changes
-    if: github.event_name == 'pull_request' && needs.detect-changes.outputs.site == 'true'
-    timeout-minutes: 3
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-
-      - name: Check appcast + control + site metadata
-        run: node tests/experience/site-update-checks.mjs
