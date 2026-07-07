@@ -100,30 +100,34 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertTrue(OnboardingView.initialProductAnalyticsValue(storedValue: true, preferenceRecorded: true))
     }
 
-    func test_onboardingInitialChosenTools_freshUsersGetRecommendedPreset() {
+    func test_onboardingInitialChosenTools_freshUsersGetEverythingSelected() {
+        // No "recommended" subset any more: a fresh install starts with every
+        // choosable tool selected, and the user unchecks what they don't want.
         XCTAssertEqual(
             OnboardingView.initialChosenTools(
                 firstRunComplete: false,
                 storedMode: .full,
                 storedTools: []
             ),
-            ToolCatalog.recommendedToolIDs
+            Set(ToolCatalog.choosableToolIDs)
         )
     }
 
-    func test_onboardingInitialChosenTools_wrappedOnlyContinuationKeepsWrappedPlusRecommended() {
+    func test_onboardingInitialChosenTools_wrappedOnlyContinuationSelectsEverything() {
+        // A Wrapped-only user reopening onboarding ("Continue setup") now sees
+        // the full set selected, consistent with the default-all model.
         let tools = OnboardingView.initialChosenTools(
             firstRunComplete: true,
             storedMode: .textingWrappedOnly,
             storedTools: [ToolCatalog.wrapped]
         )
-        XCTAssertTrue(tools.contains(ToolCatalog.wrapped))
-        XCTAssertTrue(tools.isSuperset(of: ToolCatalog.recommendedToolIDs))
+        XCTAssertEqual(tools, Set(ToolCatalog.choosableToolIDs))
     }
 
     func test_onboardingInitialChosenTools_fullUserReacceptingTermsKeepsCurrentChoices() {
         // A full user re-accepting bumped Terms must NOT have their tool set
-        // silently rewritten to the Recommended preset.
+        // silently rewritten to the default-all set: a non-empty stored
+        // selection is preserved as-is.
         let stored: Set<String> = [ToolCatalog.messages, ToolCatalog.eq, ToolCatalog.textingVoice]
         let tools = OnboardingView.initialChosenTools(
             firstRunComplete: true,
@@ -134,10 +138,42 @@ final class SettingsStoreTests: XCTestCase {
         XCTAssertEqual(tools, [ToolCatalog.messages, ToolCatalog.eq])
     }
 
+    func test_onboardingInitialChosenTools_fullUserWithStoredToolsAllFlagHidden_selectsVisibleSet() {
+        // Edge case (adversarial-review finding): a full user whose entire
+        // stored selection is currently feature-flag-hidden. There is no prior
+        // choice left to preserve, so the default-all model applies to the
+        // VISIBLE set — the user still reviews and unchecks before committing.
+        // Intentional; pinned so it isn't "fixed" back into an empty/dead-end
+        // picker or a reintroduced curated subset.
+        let visible = [ToolCatalog.messages, ToolCatalog.wrapped]  // babysitter flag-hidden
+        let tools = OnboardingView.initialChosenTools(
+            firstRunComplete: true,
+            storedMode: .full,
+            storedTools: [ToolCatalog.babysitter],
+            choosableToolIDs: visible
+        )
+        XCTAssertEqual(tools, Set(visible))
+    }
+
+    func test_onboardingNormalizedChosenTools_emptyAfterFilterFallsBackToVisibleSet() {
+        // When a live feature-flag change hides every currently-checked tool,
+        // fall back to the full visible set rather than an empty selection.
+        let visible = [ToolCatalog.messages, ToolCatalog.wrapped]
+        XCTAssertEqual(
+            OnboardingView.normalizedChosenTools([ToolCatalog.babysitter], choosableToolIDs: visible),
+            Set(visible)
+        )
+        // A still-visible subset is preserved untouched.
+        XCTAssertEqual(
+            OnboardingView.normalizedChosenTools([ToolCatalog.messages], choosableToolIDs: visible),
+            [ToolCatalog.messages]
+        )
+    }
+
     func test_onboardingCanCommit_requiresTermsAndAtLeastOneTool() {
         XCTAssertFalse(OnboardingView.canCommit(
             termsAccepted: false,
-            chosenTools: ToolCatalog.recommendedToolIDs
+            chosenTools: [ToolCatalog.messages]
         ))
         XCTAssertFalse(OnboardingView.canCommit(
             termsAccepted: true,
