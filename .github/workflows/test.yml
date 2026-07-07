@@ -174,8 +174,15 @@ jobs:
     # satisfies branch protection), whereas the old workflow-level paths-ignore
     # left the context absent and blocked the PR. No `github.event_name` guard —
     # swift-build must also run on main code pushes.
+    #
+    # Fail-safe: also run when detect-changes did NOT succeed. Without that, a
+    # detect-changes FAILURE would skip swift-build, and a skipped required
+    # check counts as passed — so a broken compile could merge because the gate
+    # never ran. `!cancelled()` lets swift-build evaluate despite a failed
+    # dependency (but not on a cancelled workflow); `result != 'success'` then
+    # forces a real build unless detect-changes cleanly reported app=false.
     needs: detect-changes
-    if: needs.detect-changes.outputs.app == 'true'
+    if: ${{ !cancelled() && (needs.detect-changes.outputs.app == 'true' || needs.detect-changes.result != 'success') }}
     runs-on: macos-latest
     timeout-minutes: 8
     steps:
