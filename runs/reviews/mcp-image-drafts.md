@@ -37,6 +37,7 @@ Load-bearing invariants:
 | 3 | Shared TypeScript snapshot cleanup used an `lstat` followed by recursive pathname deletion, allowing an FDA-enabled daemon cleanup race. | ACCEPT | Cleanup now accepts only canonical UUID draft IDs, pins every directory with `O_NOFOLLOW`, enumerates by stable file-ID path, deletes only canonical managed regular files, and removes the parent only if its current device/inode still matches the pinned directory. Symlink-root and unrecognized-file tests pass. |
 | 3 | A protected spool younger than one hour at app startup could survive indefinitely if no later media send occurred. | ACCEPT | Ghostie now sweeps at startup and every 30 minutes, and clears the timer at termination. Immutable stale files are cleared and removed by descriptor. |
 | CI | `oven-sh/setup-bun` could not resolve `latest` because GitHub's tag API returned HTTP 503 before repository commands ran. | ACCEPT | All Bun jobs use the locally verified `1.3.14` toolchain, removing runtime tag discovery and making CI reproducible. |
+| CI | Descriptor-pinned managed snapshot access used macOS `/.vol` paths on Ubuntu CI. | ACCEPT | Stable directory addressing now uses `/.vol/<dev>/<ino>` on macOS and the already-open `/proc/self/fd/<fd>` directory descriptor on Linux. Unsupported platforms fail closed. |
 
 ## Reviewer verdicts
 

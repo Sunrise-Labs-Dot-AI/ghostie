@@ -151,8 +151,10 @@ function ensurePrivateDirectory(path: string): void {
   }
 }
 
-function fileIdPath(stat: { dev: bigint; ino: bigint }): string {
-  return `/.vol/${stat.dev.toString()}/${stat.ino.toString()}`;
+function stableDirectoryPath(fd: number, stat: { dev: bigint; ino: bigint }): string {
+  if (process.platform === "linux") return `/proc/self/fd/${fd}`;
+  if (process.platform === "darwin") return `/.vol/${stat.dev.toString()}/${stat.ino.toString()}`;
+  throw new Error(`unsupported platform for descriptor-pinned attachment access: ${process.platform}`);
 }
 
 /** Open a directory without following its final component and bind it by inode. */
@@ -162,7 +164,7 @@ function openStableDirectory(path: string): StableDirectory {
   try {
     const stat = fstatSync(fd, { bigint: true });
     if (!stat.isDirectory()) throw new Error(`not a directory: ${path}`);
-    return { fd, path: fileIdPath(stat), dev: stat.dev, ino: stat.ino };
+    return { fd, path: stableDirectoryPath(fd, stat), dev: stat.dev, ino: stat.ino };
   } catch (error) {
     closeSync(fd);
     throw error;
