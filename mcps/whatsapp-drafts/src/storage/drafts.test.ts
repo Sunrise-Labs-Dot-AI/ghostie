@@ -1,7 +1,8 @@
 import { afterAll, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { snapshotDraftAttachments } from "../../../shared/src/attachments.ts";
 
 const tmp = mkdtempSync(join(tmpdir(), "whatsapp-mcp-drafts-"));
 process.env.WHATSAPP_MCP_HOME = tmp;
@@ -22,6 +23,7 @@ afterAll(() => {
 });
 
 beforeEach(() => {
+  rmSync(join(tmp, "draft-attachments"), { recursive: true, force: true });
   const dir = join(tmp, "drafts");
   if (!existsSync(dir)) {
     mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -83,10 +85,27 @@ describe("drafts", () => {
     expect(discardDraft(d.id)).toBe(false);
   });
 
+  test("stage adopts the caller-owned snapshot and discard cleans it", () => {
+    const source = join(tmp, "wa-photo.jpg");
+    writeFileSync(source, Buffer.from([0xff, 0xd8, 0xff, 0x11]));
+    const draftId = "00000000-0000-4000-8000-000000000201";
+    const attachments = snapshotDraftAttachments(tmp, draftId, [{ path: source }]);
+    const d = stageDraft({ draft_id: draftId, to_handle: "to", body: "photo", attachments });
+    const attachment = d.attachments[0]!;
+    rmSync(source);
+    expect(readFileSync(attachment.path)).toEqual(Buffer.from([0xff, 0xd8, 0xff, 0x11]));
+    expect(attachment.filename).toBe("wa-photo.jpg");
+    expect(attachment.mime_type).toBe("image/jpeg");
+    expect(attachment.sha256).toMatch(/^[0-9a-f]{64}$/);
+    discardDraft(d.id);
+    expect(existsSync(attachment.path)).toBe(false);
+  });
+
   test("invalid draft id is rejected", () => {
     expect(() => getDraft("../etc/passwd")).toThrow(DraftSchemaError);
     expect(() => getDraft("a/b")).toThrow(DraftSchemaError);
     expect(() => getDraft("")).toThrow(DraftSchemaError);
+    expect(() => getDraft("not-a-uuid")).toThrow(DraftSchemaError);
   });
 
   test("sweep deletes drafts older than TTL", () => {
@@ -99,6 +118,37 @@ describe("drafts", () => {
     const r = sweepDrafts(7, now);
     expect(r.deleted).toBe(1);
     expect(getDraft(d.id)).toBeNull();
+  });
+
+  test("sweep removes a deleted draft's private attachment snapshot", () => {
+    const now = Date.now();
+    const source = join(tmp, "sweep-photo.png");
+    writeFileSync(source, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    const draftId = "00000000-0000-4000-8000-000000000202";
+    const attachments = snapshotDraftAttachments(tmp, draftId, [{ path: source }]);
+    const d = stageDraft({ draft_id: draftId, to_handle: "to", body: "x", attachments });
+    const managedPath = d.attachments[0]!.path;
+    writeFileSync(join(tmp, "drafts", `${d.id}.json`), JSON.stringify({
+      ...d,
+      staged_at: new Date(now - 10 * 86_400_000).toISOString(),
+    }), { mode: 0o600 });
+    expect(sweepDrafts(7, now).deleted).toBe(1);
+    expect(existsSync(managedPath)).toBe(false);
+  });
+
+  test("sweep removes an hour-old caller snapshot that no draft adopted", () => {
+    const now = Date.now();
+    const source = join(tmp, "orphan-photo.jpg");
+    writeFileSync(source, Buffer.from([0xff, 0xd8, 0xff, 0x66]));
+    const draftId = "00000000-0000-4000-8000-000000000203";
+    const [attachment] = snapshotDraftAttachments(tmp, draftId, [{ path: source }]);
+    const old = new Date(now - 2 * 60 * 60 * 1000);
+    utimesSync(join(tmp, "draft-attachments", draftId), old, old);
+
+    const result = sweepDrafts(7, now);
+
+    expect(result.orphaned_attachments).toBe(1);
+    expect(existsSync(attachment!.path)).toBe(false);
   });
 
   test("sweep deletes sent drafts older than 24h", () => {
@@ -122,6 +172,15 @@ describe("drafts", () => {
     const d = stageDraft({ to_handle: "to", body: "hi" });
     expect(d.quoted_message_id).toBeNull();
     expect(d.quoted_preview).toBeNull();
+  });
+
+  test("delivery progress defaults, persists, and clears an ambiguity marker", () => {
+    const d = stageDraft({ to_handle: "to", body: "hi" });
+    expect(d.delivery_progress).toEqual({ completed_attachment_count: 0, body_sent: false, ambiguous_part: null });
+    updateDraft(d.id, { delivery_progress: { completed_attachment_count: 0, body_sent: false, ambiguous_part: "body" } });
+    expect(getDraft(d.id)!.delivery_progress.ambiguous_part).toBe("body");
+    updateDraft(d.id, { delivery_progress: { completed_attachment_count: 0, body_sent: true, ambiguous_part: null } });
+    expect(getDraft(d.id)!.delivery_progress).toEqual({ completed_attachment_count: 0, body_sent: true, ambiguous_part: null });
   });
 
   test("stage persists quoted_message_id + quoted_preview and round-trips through getDraft", () => {

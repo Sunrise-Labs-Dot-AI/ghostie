@@ -44,17 +44,24 @@ import {
 } from "../storage/messages.ts";
 import { deleteSession } from "../storage/session.ts";
 import {
+  type Draft,
   type StageInput,
   discardDraft,
   getDraft,
   listDrafts,
   stageDraft,
+  sweepDrafts,
   updateDraft,
   DraftSchemaError,
 } from "../storage/drafts.ts";
 import { reserveSend, SEND_ERR, type ReserveErr } from "../storage/audit.ts";
 import { readSettings, SettingsError, type Settings } from "../settings.ts";
 import { assertSendAllowed, ControlBlockedError } from "../control-gate.ts";
+import {
+  loadVerifiedDraftAttachmentBytes,
+  validateManagedDraftAttachmentSet,
+} from "../../../shared/src/attachments.ts";
+import { draftPayloadDigest } from "../../../shared/src/draft-payload.ts";
 
 // Per-connection inbound frame cap (#84). A single JSON-RPC frame is
 // newline-delimited and tiny in practice; anything past this without a
@@ -130,6 +137,11 @@ const RPC_ERR = {
 const DIRECT_SEND_SOURCE = "first_party_inline_composer";
 const DIRECT_REACTION_SOURCE = "first_party_message_tab";
 
+// Approval is intentionally process-memory-only. A daemon restart requires a
+// fresh human approval, and an on-disk `approval_state: approved` bit alone is
+// never authority to send a changed payload.
+const approvedPayloadDigests = new Map<string, string>();
+
 interface RpcNotification {
   jsonrpc: "2.0";
   method: string;
@@ -145,6 +157,13 @@ export function runMessageRetentionSweep(
   return sweep(settings.message_retention_days * DAY_MS);
 }
 
+export function runDraftRetentionSweep(
+  settings: Pick<Settings, "draft_ttl_days">,
+  sweep: typeof sweepDrafts = sweepDrafts,
+): ReturnType<typeof sweepDrafts> {
+  return sweep(settings.draft_ttl_days);
+}
+
 function startMessageRetentionSweep(): Timer {
   const run = () => {
     try {
@@ -155,6 +174,18 @@ function startMessageRetentionSweep(): Timer {
       }
     } catch (e) {
       process.stderr.write(`message retention sweep skipped: ${(e as Error).message}\n`);
+    }
+    try {
+      const settings = readSettings();
+      const result = runDraftRetentionSweep(settings);
+      if (result.deleted > 0 || result.orphaned_attachments > 0) {
+        process.stderr.write(
+          `draft retention sweep deleted ${result.deleted} draft(s) and ` +
+          `${result.orphaned_attachments} orphan attachment snapshot(s)\n`,
+        );
+      }
+    } catch (e) {
+      process.stderr.write(`draft retention sweep skipped: ${(e as Error).message}\n`);
     }
   };
   run();
@@ -383,15 +414,14 @@ async function handle(
         if (typeof p?.to_handle !== "string" || typeof p?.body !== "string") {
           return err(id, RPC_ERR.INVALID_PARAMS, "to_handle and body required");
         }
-        // Sanity-check attachments shape (the MCP already resolved + size-checked
-        // them; this is the daemon-side trust boundary). Empty body is allowed
-        // ONLY when at least one attachment is present (media-only message).
+        // Adopt only a complete snapshot manifest prepared by the MCP caller.
+        // This app-launched daemon must never open arbitrary source paths.
         const stageAttachments = Array.isArray(p.attachments) ? p.attachments : [];
-        for (const a of stageAttachments) {
-          if (!a || typeof a.path !== "string" || a.path.length === 0) {
-            return err(id, RPC_ERR.INVALID_PARAMS, "each attachment needs a string path");
-          }
+        if (stageAttachments.length > 0 && (typeof p.draft_id !== "string" || p.draft_id.length === 0)) {
+          return err(id, RPC_ERR.INVALID_PARAMS, "managed attachments require a caller-owned draft_id");
         }
+        const stageAttachmentSet = validateManagedDraftAttachmentSet(stageAttachments);
+        if (!stageAttachmentSet.ok) return err(id, RPC_ERR.INVALID_PARAMS, stageAttachmentSet.error);
         if (p.body.length === 0 && stageAttachments.length === 0) {
           return err(id, RPC_ERR.INVALID_PARAMS, "body must not be empty without attachments");
         }
@@ -437,6 +467,7 @@ async function handle(
           }
         }
         const draft = stageDraft({
+          draft_id: p.draft_id,
           to_handle: p.to_handle,
           to_handle_name: resolvedName,
           body: p.body,
@@ -488,6 +519,7 @@ async function handle(
         if (typeof p?.draft_id !== "string") return err(id, RPC_ERR.INVALID_PARAMS, "draft_id required");
         try {
           const existed = discardDraft(p.draft_id);
+          approvedPayloadDigests.delete(p.draft_id);
           return ok(id, { ok: true, existed });
         } catch (e) {
           if (e instanceof DraftSchemaError) return err(id, RPC_ERR.INVALID_PARAMS, e.message);
@@ -498,10 +530,21 @@ async function handle(
         // Called by the menu bar app's hold-to-fire BEFORE sendDraft.
         // Also callable from MCP when settings.require_approval = false
         // (the MCP tool side handles that gate).
-        const p = req.params as { draft_id: string };
-        if (typeof p?.draft_id !== "string") return err(id, RPC_ERR.INVALID_PARAMS, "draft_id required");
+        const p = req.params as { draft_id: string; expected_payload_digest: string };
+        if (typeof p?.draft_id !== "string" || typeof p?.expected_payload_digest !== "string") {
+          return err(id, RPC_ERR.INVALID_PARAMS, "draft_id and expected_payload_digest required");
+        }
         try {
+          const current = getDraft(p.draft_id);
+          if (current == null) return err(id, RPC_ERR.DRAFT_NOT_FOUND, `no draft ${p.draft_id}`);
+          const digest = payloadDigestForDraft(current);
+          if (!digest.ok) return err(id, RPC_ERR.SEND_FAILED, digest.error);
+          if (digest.digest !== p.expected_payload_digest) {
+            approvedPayloadDigests.delete(p.draft_id);
+            return err(id, RPC_ERR.PENDING_APPROVAL, "draft payload changed before approval; review the current draft and approve again");
+          }
           const d = updateDraft(p.draft_id, { approval_state: "approved" });
+          approvedPayloadDigests.set(p.draft_id, digest.digest);
           return ok(id, { draft: d });
         } catch (e) {
           if (e instanceof DraftSchemaError) return err(id, RPC_ERR.INVALID_PARAMS, e.message);
@@ -738,9 +781,24 @@ async function handleSendDraft(
   if (draft == null) return err(id, RPC_ERR.DRAFT_NOT_FOUND, `no draft ${draftId}`);
   if (draft.sent_at != null) return err(id, RPC_ERR.INVALID_PARAMS, "draft already sent");
 
+  const currentDigest = payloadDigestForDraft(draft);
+  if (!currentDigest.ok) return err(id, RPC_ERR.SEND_FAILED, currentDigest.error);
+
   // 3. Approval gate.
   if (draft.approval_state !== "approved") {
     return err(id, RPC_ERR.PENDING_APPROVAL, "draft has not been approved");
+  }
+  const approvedDigest = approvedPayloadDigests.get(draft.id);
+  if (approvedDigest == null || approvedDigest !== currentDigest.digest) {
+    approvedPayloadDigests.delete(draft.id);
+    return err(id, RPC_ERR.PENDING_APPROVAL, "draft payload is not bound to the current daemon approval; review and approve it again");
+  }
+  if (draft.delivery_progress.ambiguous_part != null) {
+    return err(
+      id,
+      RPC_ERR.SEND_FAILED,
+      `draft has an ambiguous prior wire attempt (${draft.delivery_progress.ambiguous_part}); refusing ordinary retry to prevent duplicates`,
+    );
   }
 
   // 4. Min staged age.
@@ -765,7 +823,7 @@ async function handleSendDraft(
   // is already counted but Meta's anti-bot heuristics see staggered timing.
   await waitSendJitter();
 
-  // 7. Baileys send.
+  // 7. Baileys send with durable per-part progress.
   try {
     // Reply-draft: reconstruct the quoted message from the cache so Baileys
     // threads the reply. Null (quoted message no longer cached) degrades
@@ -774,38 +832,11 @@ async function handleSendDraft(
       draft.quoted_message_id != null
         ? getQuotedReconstruction(draft.to_handle, draft.quoted_message_id)
         : null;
-    // Attachments + body are one logical send (one reserved slot). Common case
-    // — a single captionable file with body text — goes as one captioned media
-    // message. Otherwise: each file (quoting only the first), then the body as
-    // its own text message. `message_id` is the last message sent.
-    const atts = draft.attachments ?? [];
-    let messageId: string;
-    if (atts.length === 0) {
-      const result = await connection.sendText(draft.to_handle, draft.body, quoted);
-      messageId = result.message_id;
-    } else {
-      const body = draft.body ?? "";
-      const firstMime = (atts[0]!.mime_type ?? "").toLowerCase();
-      const canCaption = !firstMime.startsWith("audio/");
-      if (atts.length === 1 && body.length > 0 && canCaption) {
-        const result = await connection.sendMedia(draft.to_handle, atts[0]!, body, quoted);
-        messageId = result.message_id;
-      } else {
-        let last = "";
-        for (let i = 0; i < atts.length; i++) {
-          const r = await connection.sendMedia(draft.to_handle, atts[i]!, null, i === 0 ? quoted : null);
-          last = r.message_id;
-        }
-        if (body.length > 0) {
-          const r = await connection.sendText(draft.to_handle, body, null);
-          last = r.message_id;
-        }
-        messageId = last;
-      }
-    }
+    const messageId = await deliverDraftParts(draft, connection, quoted);
     reservation.commit("ok");
     const sent_at = new Date().toISOString();
     try { updateDraft(draft.id, { sent_at }); } catch { /* draft sweep handles cleanup */ }
+    approvedPayloadDigests.delete(draft.id);
     return ok(id, {
       ok: true,
       draft_id: draft.id,
@@ -816,4 +847,120 @@ async function handleSendDraft(
     reservation.commit("send_failed");
     return err(id, RPC_ERR.SEND_FAILED, (e as Error).message);
   }
+}
+
+/**
+ * Deliver one logical WhatsApp draft with a durable journal around every wire
+ * call. Exported as a deterministic seam so multipart retry behavior is tested
+ * without contacting WhatsApp.
+ */
+export async function deliverDraftParts(
+  draft: Draft,
+  connection: Pick<WhatsAppConnection, "sendText" | "sendMedia">,
+  quoted: ReturnType<typeof getQuotedReconstruction>,
+  options: {
+    transportRoot?: string;
+    update?: typeof updateDraft;
+    loadAttachment?: typeof loadVerifiedDraftAttachmentBytes;
+  } = {},
+): Promise<string> {
+  const transportRoot = options.transportRoot ?? PATHS.root;
+  const persist = options.update ?? updateDraft;
+  const loadAttachment = options.loadAttachment ?? loadVerifiedDraftAttachmentBytes;
+  const atts = draft.attachments ?? [];
+  const attachmentSet = validateManagedDraftAttachmentSet(atts);
+  if (!attachmentSet.ok) throw new Error(attachmentSet.error);
+  let progress = draft.delivery_progress;
+
+  if (atts.length === 0) {
+    if (progress.body_sent) return "resumed-complete";
+    progress = persist(draft.id, {
+      delivery_progress: { ...progress, ambiguous_part: "body" },
+    }).delivery_progress;
+    const result = await connection.sendText(draft.to_handle, draft.body, quoted);
+    persist(draft.id, {
+      delivery_progress: { ...progress, body_sent: true, ambiguous_part: null },
+    });
+    return result.message_id;
+  }
+
+  const body = draft.body ?? "";
+  const firstMime = (atts[0]!.mime_type ?? "").toLowerCase();
+  const canCaption = !firstMime.startsWith("audio/");
+  if (atts.length === 1 && body.length > 0 && canCaption) {
+    if (progress.completed_attachment_count === 1 && progress.body_sent) return "resumed-complete";
+    if (progress.completed_attachment_count !== 0 || progress.body_sent) {
+      throw new Error("combined media-caption delivery progress is inconsistent; discard and restage");
+    }
+    const verified = await loadAttachment(transportRoot, draft.id, atts[0]);
+    if (!verified.ok) throw new Error(verified.error);
+    progress = persist(draft.id, {
+      delivery_progress: { ...progress, ambiguous_part: "attachment:0+body" },
+    }).delivery_progress;
+    const result = await connection.sendMedia(
+      draft.to_handle,
+      verified.value.attachment,
+      verified.value.bytes,
+      body,
+      quoted,
+    );
+    persist(draft.id, {
+      delivery_progress: { completed_attachment_count: 1, body_sent: true, ambiguous_part: null },
+    });
+    return result.message_id;
+  }
+
+  let last = "";
+  for (let i = progress.completed_attachment_count; i < atts.length; i++) {
+    const verified = await loadAttachment(transportRoot, draft.id, atts[i]);
+    if (!verified.ok) throw new Error(verified.error);
+    progress = persist(draft.id, {
+      delivery_progress: { ...progress, ambiguous_part: `attachment:${i}` },
+    }).delivery_progress;
+    const result = await connection.sendMedia(
+      draft.to_handle,
+      verified.value.attachment,
+      verified.value.bytes,
+      null,
+      i === 0 ? quoted : null,
+    );
+    last = result.message_id;
+    progress = persist(draft.id, {
+      delivery_progress: {
+        completed_attachment_count: i + 1,
+        body_sent: progress.body_sent,
+        ambiguous_part: null,
+      },
+    }).delivery_progress;
+  }
+  if (body.length > 0 && !progress.body_sent) {
+    progress = persist(draft.id, {
+      delivery_progress: { ...progress, ambiguous_part: "body" },
+    }).delivery_progress;
+    const result = await connection.sendText(draft.to_handle, body, null);
+    last = result.message_id;
+    persist(draft.id, {
+      delivery_progress: { ...progress, body_sent: true, ambiguous_part: null },
+    });
+  }
+  return last || "resumed-complete";
+}
+
+export function payloadDigestForDraft(
+  draft: Draft,
+): { ok: true; digest: string } | { ok: false; error: string } {
+  const attachmentSet = validateManagedDraftAttachmentSet(draft.attachments);
+  if (!attachmentSet.ok) return attachmentSet;
+  return {
+    ok: true,
+    digest: draftPayloadDigest({
+      id: draft.id,
+      platform: "whatsapp",
+      to_handle: draft.to_handle,
+      body: draft.body,
+      quoted_message_id: draft.quoted_message_id,
+      scheduled_send_at: draft.scheduled_send_at,
+      attachments: attachmentSet.attachments,
+    }),
+  };
 }

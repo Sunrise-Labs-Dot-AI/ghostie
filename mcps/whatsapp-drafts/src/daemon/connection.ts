@@ -14,7 +14,7 @@
 //                flow.
 // restartRequired → reconnect immediately, no backoff.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { EventEmitter } from "node:events";
 
@@ -326,22 +326,23 @@ export class WhatsAppConnection extends EventEmitter {
     return { message_id: result?.key.id ?? "" };
   }
 
-  /** Send a single local file as a WhatsApp media message. The bytes are read
-   *  from disk here (the daemon is the FDA/launcher-attributed process) and the
-   *  Baileys content type is chosen from the MIME: image / video / audio /
+  /** Send one already-verified byte buffer as a WhatsApp media message. The
+   *  caller loads and hashes these bytes through one no-follow descriptor, so
+   *  this layer must never reopen an attachment path. The Baileys content type
+   *  is chosen from the MIME: image / video / audio /
    *  document. An optional `caption` rides on image/video/document (audio has
    *  no caption — the caller sends the text separately). `quoted` threads it as
    *  a reply, same as sendText. */
   async sendMedia(
     jid: string,
-    attachment: { path: string; filename: string; mime_type: string | null },
+    attachment: { filename: string; mime_type: string | null },
+    bytes: Buffer,
     caption: string | null,
     quoted?: QuotedReconstruction | null,
   ): Promise<{ message_id: string }> {
     if (this.socket == null || this.state !== "connected") {
       throw new Error("Not connected to WhatsApp");
     }
-    const bytes = readFileSync(attachment.path);
     const mime = (attachment.mime_type ?? "").toLowerCase();
     const captionText = caption != null && caption.length > 0 ? caption : undefined;
     let content: AnyMessageContent;

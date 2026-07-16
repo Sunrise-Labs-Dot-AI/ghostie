@@ -6688,11 +6688,27 @@ struct PendingMessageBubble: View {
   }
 
   private var actionsVisible: Bool {
-    isHovering || isEditing
+    isHovering || isEditing || draft.attachmentReviewIssue != nil
+  }
+
+  private var hasReviewText: Bool {
+    !draft.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
   private var shouldConstrainBubbleWidth: Bool {
     draft.body.count > 48 || draft.body.contains(where: \.isNewline)
+  }
+
+  private var stagedAttachments: [DraftAttachment] {
+    draft.attachments ?? []
+  }
+
+  private var reviewBubbleText: String {
+    guard draft.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      return draft.body
+    }
+    let count = stagedAttachments.count
+    return count == 1 ? "1 staged attachment" : "\(count) staged attachments"
   }
 
   var body: some View {
@@ -6716,6 +6732,9 @@ struct PendingMessageBubble: View {
       editedHasSchedule = draft.isScheduled
       scheduleDate = draft.scheduledDate ?? defaultScheduleDate
     }
+    .onChange(of: lastError) { _, error in
+      if let error { announceAccessibility(error) }
+    }
   }
 
   private var bubbleStack: some View {
@@ -6726,6 +6745,8 @@ struct PendingMessageBubble: View {
       }
 
       replyingToCallout
+
+      attachmentPreviews
 
       HStack(alignment: .center, spacing: 8) {
         Spacer(minLength: 0)
@@ -6745,6 +6766,42 @@ struct PendingMessageBubble: View {
           .foregroundStyle(.red)
           .frame(maxWidth: 420, alignment: .trailing)
       }
+
+      if let issue = draft.attachmentReviewIssue {
+        Label(issue, systemImage: "exclamationmark.triangle.fill")
+          .font(.caption)
+          .foregroundStyle(DS.Color.red)
+          .frame(maxWidth: 420, alignment: .trailing)
+          .accessibilityLabel("Attachment cannot be approved: \(issue)")
+          .onAppear { announceAccessibility("Attachment cannot be approved. \(issue)") }
+      }
+    }
+  }
+
+  @ViewBuilder
+  private var attachmentPreviews: some View {
+    if !stagedAttachments.isEmpty {
+      VStack(alignment: .trailing, spacing: 6) {
+        Text(hasReviewText ? "Sends first" : "Attachment only")
+          .font(DS.Font.monoMicro)
+          .foregroundStyle(DS.Color.ink3(colorScheme))
+        ForEach(Array(stagedAttachments.enumerated()), id: \.offset) { index, attachment in
+          Button {
+            NSWorkspace.shared.open(URL(fileURLWithPath: attachment.path))
+          } label: {
+            AttachmentBubbleView(attachment: attachment.asRef, fromMe: true)
+              .allowsHitTesting(false)
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel(
+            "Open attachment \(index + 1) of \(stagedAttachments.count) for review: "
+              + (attachment.filename?.isEmpty == false ? attachment.filename! : "attachment")
+          )
+        }
+      }
+      .frame(maxWidth: 420, alignment: .trailing)
+      .accessibilityElement(children: .contain)
+      .accessibilityLabel(attachmentAccessibilityLabel)
     }
   }
 
@@ -6864,7 +6921,7 @@ struct PendingMessageBubble: View {
   private var holdableBubble: some View {
     TimelineView(.animation(minimumInterval: reduceMotion ? holdDuration : 1.0 / 30.0)) { context in
       let bubbleProgress = displayedProgress(at: context.date)
-      Text(draft.body)
+      let bubble = Text(reviewBubbleText)
         .font(DS.Font.bubbleBody)
         .foregroundStyle(approvalTextColor)
         .multilineTextAlignment(.leading)
@@ -6879,7 +6936,8 @@ struct PendingMessageBubble: View {
         .gesture(
           DragGesture(minimumDistance: 0)
             .onChanged { _ in
-              guard !sending, !holding, !isEditing, !discardPending else { return }
+              guard !sending, !holding, !isEditing, !discardPending,
+                    draft.attachmentReviewIssue == nil else { return }
               beginHold()
             }
             .onEnded { _ in cancelHold() }
@@ -6895,7 +6953,12 @@ struct PendingMessageBubble: View {
         // (two-step confirm, never a single-press send), Esc disarms. Focus-scoped
         // so only the focused bubble responds. The VoiceOver action routes through
         // the same gate, so it can't fire on a single activation either.
-        .focusable(featureFlags.resolved(.draftSafetyStates) && !sending && !discardPending)
+        .focusable(
+          featureFlags.resolved(.draftSafetyStates)
+            && !sending
+            && !discardPending
+            && draft.attachmentReviewIssue == nil
+        )
         .onKeyPress(.return) { handleConfirmKey() ? .handled : .ignored }
         .onKeyPress(.space) { handleConfirmKey() ? .handled : .ignored }
         .onKeyPress(.escape) {
@@ -6905,6 +6968,20 @@ struct PendingMessageBubble: View {
         .onChange(of: sending) { _, isSending in
           if isSending { disarm() }
         }
+
+      accessibilityReviewSurface(bubble)
+    }
+  }
+
+  @ViewBuilder
+  private func accessibilityReviewSurface<Content: View>(_ content: Content) -> some View {
+    if let issue = draft.attachmentReviewIssue {
+      content
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Draft cannot be sent. \(issue)")
+        .accessibilityHint("Delete this draft, then stage it again with the attachment.")
+    } else {
+      content
         .accessibilityLabel(accessibilitySendLabel)
         .accessibilityValue(armed ? "Armed, ready to send" : "")
         .accessibilityHint(
@@ -7009,7 +7086,10 @@ struct PendingMessageBubble: View {
 
         Button("Save") { saveEdit() }
           .dsButton(.primary, size: .small)
-          .disabled(editedBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+          .disabled(
+            editedBody.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+              && stagedAttachments.isEmpty
+          )
       }
     }
     .frame(maxWidth: bubbleMaxWidth, alignment: .trailing)
@@ -7091,14 +7171,27 @@ struct PendingMessageBubble: View {
   }
 
   private var accessibilitySendLabel: String {
+    let payload = stagedAttachments.isEmpty ? "" : " \(attachmentAccessibilityLabel)."
     switch reviewState {
     case .stagedDraft:
-      return "Staged draft. Press and hold to send."
+      return "Staged draft.\(payload) Press and hold to send."
     case .scheduledDraft:
-      return "Scheduled draft. Press and hold to approve and queue."
+      return "Scheduled draft.\(payload) Press and hold to approve and queue."
     case .queuedScheduled:
-      return "Queued scheduled message. Press and hold to send now."
+      return "Queued scheduled message.\(payload) Press and hold to send now."
     }
+  }
+
+  private var attachmentAccessibilityLabel: String {
+    let count = stagedAttachments.count
+    let names = stagedAttachments.map { attachment in
+      attachment.filename?.isEmpty == false ? attachment.filename! : "attachment"
+    }.joined(separator: ", ")
+    let noun = count == 1 ? "attachment" : "attachments"
+    if hasReviewText {
+      return "\(count) \(noun), sent before the text: \(names)"
+    }
+    return "Attachment-only draft with \(count) \(noun); no text follows: \(names)"
   }
 
   private var accessibilityActionName: String {
@@ -7154,6 +7247,10 @@ struct PendingMessageBubble: View {
   }
 
   private func beginHold() {
+    guard draft.attachmentReviewIssue == nil else {
+      lastError = draft.attachmentReviewIssue
+      return
+    }
     disarm()  // a pointer hold supersedes any keyboard-armed state
     holding = true
     holdStartedAt = Date()
@@ -7200,7 +7297,8 @@ struct PendingMessageBubble: View {
   /// press is swallowed (stays armed). Returns true when the key was consumed.
   @discardableResult
   private func handleConfirmKey() -> Bool {
-    guard !sending, !isEditing, !discardPending else { return false }
+    guard !sending, !isEditing, !discardPending,
+          draft.attachmentReviewIssue == nil else { return false }
     if armed {
       guard let armedAt, Date().timeIntervalSince(armedAt) >= holdDuration else {
         return true  // swallow: keep armed until the hold elapses
@@ -7259,6 +7357,17 @@ struct PendingMessageBubble: View {
     }
   }
 
+  private func announceAccessibility(_ message: String) {
+    NSAccessibility.post(
+      element: NSApp.mainWindow ?? NSApp as Any,
+      notification: .announcementRequested,
+      userInfo: [
+        .announcement: message,
+        .priority: NSAccessibilityPriorityLevel.high.rawValue
+      ]
+    )
+  }
+
   private func undoDiscard() {
     discardTask?.cancel()
     discardTask = nil
@@ -7268,6 +7377,10 @@ struct PendingMessageBubble: View {
   private func performReviewAction(allowWhileHolding: Bool = false) async {
     guard !sending, !isEditing, !discardPending else { return }
     guard allowWhileHolding || !holding else { return }
+    guard draft.attachmentReviewIssue == nil else {
+      lastError = draft.attachmentReviewIssue
+      return
+    }
     if reviewState == .scheduledDraft {
       approveSchedule()
     } else {

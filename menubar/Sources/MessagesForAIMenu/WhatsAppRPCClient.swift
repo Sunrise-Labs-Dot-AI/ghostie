@@ -37,8 +37,11 @@ enum WhatsAppRPCClient {
   /// Mark a draft `approval_state: "approved"`. The daemon refuses to
   /// `sendDraft` until this returns success. Called by the menubar's
   /// hold-to-fire interaction BEFORE `sendDraft`.
-  static func approveDraft(id: String) async throws -> ApproveResult {
-    let params = DraftIdParams(draft_id: id)
+  static func approveDraft(id: String, expectedPayloadDigest: String) async throws -> ApproveResult {
+    let params = ApproveDraftParams(
+      draft_id: id,
+      expected_payload_digest: expectedPayloadDigest
+    )
     let raw = try await call(method: "approveDraft", params: params)
     return try JSONDecoder().decode(ApproveResult.self, from: raw)
   }
@@ -305,6 +308,11 @@ enum WhatsAppRPCClient {
 
   struct DraftIdParams: Encodable {
     let draft_id: String
+  }
+
+  private struct ApproveDraftParams: Encodable {
+    let draft_id: String
+    let expected_payload_digest: String
   }
 
   struct ApproveResult: Decodable {

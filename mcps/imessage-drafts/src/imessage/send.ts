@@ -64,35 +64,6 @@ on run argv
 end run
 `;
 
-// Attachment variant: `send (POSIX file …)` instead of a text string. Mirrors
-// the menu bar app's first-party file-send path (DraftSender.buddyFileScript)
-// so an MCP-staged draft and a hand-composed one deliver media the same way.
-// The file is copied into Messages' own attachment store at send time, so the
-// source path only needs to exist for the duration of this call.
-const FILE_SCRIPT = `
-on run argv
-  set theAddress to item 1 of argv
-  set theFile to POSIX file (item 2 of argv)
-  tell application "Messages"
-    try
-      set theService to first service whose service type is iMessage
-      set theBuddy to buddy theAddress of theService
-      send theFile to theBuddy
-      return "iMessage"
-    on error errMsg number errNum
-      try
-        set smsService to first service whose service type is SMS
-        set smsBuddy to buddy theAddress of smsService
-        send theFile to smsBuddy
-        return "SMS"
-      on error smsErr number smsNum
-        return "ERROR: iMessage=" & errMsg & " (errNum=" & errNum & "); SMS=" & smsErr & " (errNum=" & smsNum & ")"
-      end try
-    end try
-  end tell
-end run
-`;
-
 // Group chats are addressed by `chat id` (their GUID), not by buddy.
 // The buddy cascade fails for group targets because the to_handle is a
 // canonical binding ("imessage-group:<guid>"), not a real phone or email.
@@ -111,27 +82,6 @@ on run argv
 end run
 `;
 
-// Group attachment send: a file (POSIX path) to a group chat id. Mirrors
-// GROUP_SCRIPT but for media, so group drafts deliver attachments the same way
-// direct drafts do.
-const GROUP_FILE_SCRIPT = `
-on run argv
-  set theChatId to item 1 of argv
-  set theFile to POSIX file (item 2 of argv)
-  tell application "Messages"
-    try
-      send theFile to chat id theChatId
-      return "iMessage"
-    on error errMsg number errNum
-      return "ERROR: chat file send=" & errMsg & " (errNum=" & errNum & ")"
-    end try
-  end tell
-end run
-`;
-
-// Shared osascript runner for every Messages.app send variant (text, file, or
-// group chat-id). Parses the "iMessage" / "SMS" / "ERROR: …" output contract
-// into a SendResult.
 function runOSAScript(script: string, args: string[]): Promise<SendResult> {
   const started = Date.now();
   return new Promise<SendResult>((resolve) => {
@@ -176,17 +126,6 @@ export async function sendIMessageToGroup(chatGUID: string, body: string): Promi
   return runOSAScript(GROUP_SCRIPT, [chatGUID, body]);
 }
 
-// Send a single file as an attachment to an existing group chat by its GUID.
-export async function sendIMessageAttachmentToGroup(chatGUID: string, filePath: string): Promise<SendResult> {
-  return runOSAScript(GROUP_FILE_SCRIPT, [chatGUID, filePath]);
-}
-
 export async function sendIMessage(toHandle: string, body: string): Promise<SendResult> {
   return runOSAScript(SCRIPT, [toHandle, body]);
-}
-
-// Send a single file as an iMessage/MMS attachment. `filePath` must be an
-// absolute local path that exists at call time.
-export async function sendIMessageAttachment(toHandle: string, filePath: string): Promise<SendResult> {
-  return runOSAScript(FILE_SCRIPT, [toHandle, filePath]);
 }

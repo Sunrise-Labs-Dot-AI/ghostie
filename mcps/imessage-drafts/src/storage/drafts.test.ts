@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll, beforeEach, afterAll, afterEach } from "bun:test";
-import { mkdtempSync, writeFileSync, rmSync, readdirSync, statSync, copyFileSync, symlinkSync, readFileSync } from "node:fs";
+import { mkdtempSync, writeFileSync, rmSync, readdirSync, statSync, copyFileSync, symlinkSync, readFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
@@ -81,6 +81,24 @@ describe("stageDraft / getDraft / discardDraft", () => {
 
   test("discardDraft returns false for unknown id", () => {
     expect(drafts.discardDraft(randomUUID())).toBe(false);
+  });
+
+  test("staging snapshots attachments and discard removes the private copy", () => {
+    const source = join(tmpHome, "stage-photo.png");
+    writeFileSync(source, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+    const { draft } = drafts.stageDraft({
+      to_handle: "+14155551234",
+      body: "photo",
+      attachments: [{ path: source }],
+    });
+    const attachment = draft.attachments[0]!;
+    rmSync(source);
+    expect(existsSync(attachment.path)).toBe(true);
+    expect(readFileSync(attachment.path).length).toBe(8);
+    expect(attachment.asset_id).toBeTruthy();
+    expect(attachment.sha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(drafts.discardDraft(draft.id)).toBe(true);
+    expect(existsSync(attachment.path)).toBe(false);
   });
 });
 

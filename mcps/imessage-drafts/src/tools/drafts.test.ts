@@ -3,9 +3,17 @@ import { mkdtempSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { _wrapDraftForResponse, minDraftAgeMs, resolveIMessageSendRoute, resolveDirectSendRoute } from "./drafts.ts";
+import {
+  _wrapDraftForResponse,
+  overrideScheduledDraft,
+  mcpMediaSendBlockMessage,
+  minDraftAgeMs,
+  resolveIMessageSendRoute,
+  resolveDirectSendRoute,
+} from "./drafts.ts";
 import * as storage from "../storage/drafts.ts";
 import type { Draft } from "../storage/drafts.ts";
+import { acquireSendLock } from "../storage/send-lock.ts";
 
 // Tool-layer tests for the response-wrap helper. The wrap is the
 // fix for PR 5b code-review finding #2 (prompt-injection via
@@ -61,6 +69,7 @@ describe("_wrapDraftForResponse", () => {
       schedule_hold_reason: null,
       override_send: null,
       schedule_approved: null,
+      delivery_progress: { completed_attachment_count: 0, body_sent: false, ambiguous_part: null },
     };
     const wrapped = _wrapDraftForResponse(d);
     expect(wrapped!.to_handle_name).toBe("<untrusted_content>\nAvery Example\n</untrusted_content>");
@@ -87,6 +96,7 @@ describe("_wrapDraftForResponse", () => {
       schedule_hold_reason: null,
       override_send: null,
       schedule_approved: null,
+      delivery_progress: { completed_attachment_count: 0, body_sent: false, ambiguous_part: null },
     };
     expect(_wrapDraftForResponse(d)!.to_handle_name).toBeNull();
   });
@@ -122,6 +132,7 @@ describe("_wrapDraftForResponse", () => {
       schedule_hold_reason: null,
       override_send: null,
       schedule_approved: null,
+      delivery_progress: { completed_attachment_count: 0, body_sent: false, ambiguous_part: null },
     };
     const wrapped = _wrapDraftForResponse(d);
     expect(wrapped!.to_handle_name).toContain("<untrusted_content>");
@@ -153,6 +164,7 @@ describe("_wrapDraftForResponse", () => {
       schedule_hold_reason: null,
       override_send: null,
       schedule_approved: null,
+      delivery_progress: { completed_attachment_count: 0, body_sent: false, ambiguous_part: null },
     };
     const wrapped = _wrapDraftForResponse(d)!;
     expect(wrapped.body).toBe("agent-typed body — stays raw");
@@ -183,6 +195,7 @@ describe("_wrapDraftForResponse", () => {
       schedule_hold_reason: null,
       override_send: null,
       schedule_approved: null,
+      delivery_progress: { completed_attachment_count: 0, body_sent: false, ambiguous_part: null },
     };
     _wrapDraftForResponse(d);
     expect(d.to_handle_name).toBe("Avery");
@@ -341,5 +354,41 @@ describe("storage layer stays raw (sanity check on the boundary)", () => {
     // And reading it back through getDraft returns raw too.
     const fetched = storage.getDraft(draft.id);
     expect(fetched!.to_handle_name).toBe("Avery Example");
+  });
+});
+
+describe("scheduled override locking", () => {
+  test("cannot erase a newer delivery marker while a send lock is held", () => {
+    const { draft } = storage.stageDraft({
+      to_handle: "+14155550123",
+      body: "later",
+      scheduled_send_at: "2026-07-17T18:00:00Z",
+    });
+    const lock = acquireSendLock(draft.id);
+    expect(lock).not.toBeNull();
+    try {
+      storage.updateDeliveryProgress(draft.id, {
+        completed_attachment_count: 0,
+        body_sent: false,
+        ambiguous_part: "body",
+      });
+      expect(() => overrideScheduledDraft(draft.id)).toThrow("send is already in flight");
+      expect(storage.getDraft(draft.id)!.delivery_progress.ambiguous_part).toBe("body");
+    } finally {
+      lock!.release();
+    }
+
+    const updated = overrideScheduledDraft(draft.id);
+    expect(updated.override_send).toBe(true);
+    expect(updated.delivery_progress.ambiguous_part).toBe("body");
+  });
+});
+
+describe("iMessage MCP media boundary", () => {
+  test("direct MCP media sends are routed to Ghostie's reviewed app surface", () => {
+    expect(mcpMediaSendBlockMessage("draft-123")).toBe(
+      "send blocked: media drafts are always dispatched from Ghostie's reviewed app surface, " +
+      "where the protected Messages storage handoff is available. Open Ghostie and hold Send for draft draft-123."
+    );
   });
 });

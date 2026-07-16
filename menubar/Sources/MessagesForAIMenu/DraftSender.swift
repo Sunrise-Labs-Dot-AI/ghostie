@@ -1,4 +1,5 @@
 import CryptoKit
+import Darwin
 import Foundation
 
 // Platform-aware send dispatch. Holds the iMessage AppleScript path
@@ -89,6 +90,14 @@ enum DraftSender {
   /// the daemon writes sent_at to disk itself. Caller MUST NOT call
   /// markSent — DraftStore's FS watcher picks up the change.
   static func send(draft: Draft) async -> SendResult {
+    guard isSafeDraftID(draft.id) else {
+      return SendResult(
+        ok: false,
+        service: nil,
+        error: "This draft has an invalid identifier and cannot be sent.",
+        durationMs: 0
+      )
+    }
     // Remote kill switch / forced-upgrade floor (issue #76). This is the single
     // chokepoint every send (scheduler, manual, automation, Don't-Ghost) routes
     // through, so one check blocks them all when a verified kill directive or a
@@ -126,30 +135,37 @@ enum DraftSender {
     }
     defer { lock.release() }
 
+    if let issue = draft.attachmentReviewIssue {
+      return SendResult(ok: false, service: nil, error: issue, durationMs: 0)
+    }
+
     let result: SendResult
     switch draft.effectivePlatform {
     case .imessage:
-      if let group = draft.imessage_group {
-        result = await sendIMessageGroup(group: group, body: draft.body)
-      } else if let chatGUID = Self.groupChatGUID(from: draft.to_handle) {
-        // Degraded group draft: imessage_group field was lost (e.g. written by
-        // an older process that didn't know about it), but the chat GUID is still
-        // encoded in to_handle as "imessage-group:<guid>". Send by chat id directly.
-        let raw = await runOSAScript(groupScript, args: [chatGUID, draft.body])
-        result = raw.ok
-          ? SendResult(ok: true, service: serviceFromChatGUID(chatGUID), error: nil, durationMs: raw.durationMs)
-          : raw
-      } else if draft.to_handle.hasPrefix("imessage-group") {
-        // Group binding with no recoverable GUID (pending hash only). The draft
-        // must be staged again from the Babysitter feature to re-resolve the GUID.
-        result = SendResult(
-          ok: false, service: nil,
-          error: "Can't send: this group draft's target was not resolved. Stage a new ask from the Babysitter feature.",
+      // The bubble is a snapshot of what the user reviewed. Re-read the draft
+      // under the cross-process send lock and compare the complete delivery
+      // digest before touching Messages.app. A same-user process that changes
+      // the JSON after it was rendered cannot change what gets sent.
+      guard let current = Self.readIMessageDraft(draftId: draft.id) else {
+        return SendResult(ok: false, service: nil, error: "The staged draft is no longer available.", durationMs: 0)
+      }
+      guard current.deliveryPayloadDigest == draft.deliveryPayloadDigest else {
+        return SendResult(
+          ok: false,
+          service: nil,
+          error: "This draft changed after you reviewed it. Review the updated draft before sending.",
           durationMs: 0
         )
-      } else {
-        result = await sendIMessageDirect(toHandle: draft.to_handle, body: draft.body)
       }
+      if let ambiguous = current.delivery_progress?.ambiguous_part {
+        return SendResult(
+          ok: false,
+          service: nil,
+          error: Self.ambiguousDeliveryMessage(part: ambiguous),
+          durationMs: 0
+        )
+      }
+      result = await sendIMessageDraft(current)
       // #88 (round 2): persist `sent_at` to the draft JSON on disk BEFORE the
       // `defer` releases the lock. The MCP's duplicate-send guard reads `sent_at`
       // from that file inside ITS lock; if we released the lock first and only the
@@ -161,9 +177,9 @@ enum DraftSender {
         Self.persistIMessageSentAt(draftId: draft.id, service: result.service ?? "iMessage")
       }
     case .whatsapp:
-      // WhatsApp is unaffected: the daemon writes `sent_at` itself, and the
-      // WhatsApp MCP holds this same lock across its daemon round-trip.
-      result = await sendWhatsApp(draftId: draft.id)
+      // The daemon compares this digest to its current on-disk draft before it
+      // records the approval, then checks it again immediately before sending.
+      result = await sendWhatsApp(draft: draft)
     }
     if !result.ok {
       SendFailureLog.record(
@@ -187,6 +203,252 @@ enum DraftSender {
       )
     }
     return result
+  }
+
+  enum IMessageDraftPart: Equatable {
+    case attachment(index: Int, attachment: DraftAttachment)
+    case body(String)
+
+    var marker: String {
+      switch self {
+      case .attachment(let index, _):
+        return "attachment:\(index)"
+      case .body:
+        return "body"
+      }
+    }
+  }
+
+  struct PreparedIMessageAttachment {
+    let fileURL: URL
+    let fileFD: Int32
+    let directoryFD: Int32
+    let spoolRootFD: Int32
+    let fileName: String
+    let directoryName: String
+  }
+
+  enum IMessageAttachmentPreparationError: LocalizedError {
+    case invalidSnapshot
+    case changedSnapshot
+    case spoolUnavailable
+
+    var errorDescription: String? {
+      switch self {
+      case .invalidSnapshot:
+        return "The staged attachment is missing or is no longer a regular managed file. Discard and stage it again."
+      case .changedSnapshot:
+        return "The staged attachment no longer matches the image you reviewed. Discard and stage it again."
+      case .spoolUnavailable:
+        return "Ghostie could not create a protected attachment handoff, so nothing was sent."
+      }
+    }
+  }
+
+  /// Pure delivery-plan builder used by the wire path and regression tests.
+  /// Confirmed parts are omitted, so an ordinary retry resumes after the last
+  /// durable success instead of replaying media that already reached Messages.
+  static func pendingIMessageParts(for draft: Draft) -> [IMessageDraftPart] {
+    let attachments = draft.attachments ?? []
+    let progress = draft.delivery_progress
+    let completed = min(max(progress?.completed_attachment_count ?? 0, 0), attachments.count)
+    var parts: [IMessageDraftPart] = attachments.enumerated().compactMap { index, attachment -> IMessageDraftPart? in
+      index >= completed ? .attachment(index: index, attachment: attachment) : nil
+    }
+    if progress?.body_sent != true, !draft.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+      parts.append(.body(draft.body))
+    }
+    return parts
+  }
+
+  private static func ambiguousDeliveryMessage(part: String) -> String {
+    "Ghostie cannot safely retry \(part) because its delivery status is unclear. Check the conversation, then discard this draft and restage only what is missing."
+  }
+
+  /// Deliver a staged iMessage manifest in review order: managed snapshots
+  /// first, then text. Every wire operation is bracketed by durable progress.
+  /// A crash or ambiguous transport failure leaves an `ambiguous_part` marker,
+  /// which blocks an ordinary retry instead of risking a duplicate.
+  private static func sendIMessageDraft(_ draft: Draft) async -> SendResult {
+    typealias SendAttachment = (DraftAttachment) async -> SendResult
+    typealias SendBody = (String) async -> SendResult
+
+    let sendAttachment: SendAttachment
+    let sendBody: SendBody
+
+    if let group = draft.imessage_group {
+      do {
+        try IMessageGroupTargetPolicy.validateTwoParticipantTarget(group.participant_handles)
+      } catch {
+        return SendResult(ok: false, service: nil, error: error.localizedDescription, durationMs: 0)
+      }
+      let storedGUID = group.chat_guid?.trimmingCharacters(in: .whitespacesAndNewlines)
+      let resolvedGUID = IMessageGroupResolver()
+        .resolveExactGroup(participantHandles: group.participant_handles)?.chatGUID
+      guard let chatGUID = [storedGUID, resolvedGUID]
+        .compactMap({ $0 })
+        .first(where: { !$0.isEmpty }) else {
+        if draft.attachments?.isEmpty == false {
+          return SendResult(
+            ok: false,
+            service: nil,
+            error: "Messages needs an existing group thread before Ghostie can send an attachment. Send one message to this group in Messages, then review the draft again.",
+            durationMs: 0
+          )
+        }
+        return await sendIMessageGroup(group: group, body: draft.body)
+      }
+      sendAttachment = { attachment in
+        let raw = await runOSAScript(groupFileScript, args: [chatGUID, attachment.path])
+        guard raw.ok else { return raw }
+        return SendResult(
+          ok: true,
+          service: serviceFromChatGUID(chatGUID),
+          error: nil,
+          durationMs: raw.durationMs
+        )
+      }
+      sendBody = { body in
+        let raw = await runOSAScript(groupScript, args: [chatGUID, body])
+        guard raw.ok else { return raw }
+        return SendResult(
+          ok: true,
+          service: serviceFromChatGUID(chatGUID),
+          error: nil,
+          durationMs: raw.durationMs
+        )
+      }
+    } else if let chatGUID = Self.groupChatGUID(from: draft.to_handle) {
+      sendAttachment = { attachment in
+        let raw = await runOSAScript(groupFileScript, args: [chatGUID, attachment.path])
+        guard raw.ok else { return raw }
+        return SendResult(ok: true, service: serviceFromChatGUID(chatGUID), error: nil, durationMs: raw.durationMs)
+      }
+      sendBody = { body in
+        let raw = await runOSAScript(groupScript, args: [chatGUID, body])
+        guard raw.ok else { return raw }
+        return SendResult(ok: true, service: serviceFromChatGUID(chatGUID), error: nil, durationMs: raw.durationMs)
+      }
+    } else if draft.to_handle.hasPrefix("imessage-group") {
+      return SendResult(
+        ok: false,
+        service: nil,
+        error: "Can't send: this group draft's target was not resolved. Stage a new ask from the Babysitter feature.",
+        durationMs: 0
+      )
+    } else if let resolved = IMessageDirectChatResolver().resolveDirectChat(handle: draft.to_handle),
+              IMessageDirectChatResolver.isAddressableChatGUID(resolved.chatGUID) {
+      let chatGUID = resolved.chatGUID
+      sendAttachment = { attachment in
+        let raw = await runOSAScript(groupFileScript, args: [chatGUID, attachment.path])
+        guard raw.ok else { return raw }
+        return SendResult(ok: true, service: serviceFromChatGUID(chatGUID), error: nil, durationMs: raw.durationMs)
+      }
+      sendBody = { body in
+        let raw = await runOSAScript(groupScript, args: [chatGUID, body])
+        guard raw.ok else { return raw }
+        return SendResult(ok: true, service: serviceFromChatGUID(chatGUID), error: nil, durationMs: raw.durationMs)
+      }
+    } else {
+      sendAttachment = { attachment in
+        await runOSAScript(buddyFileScript, args: [draft.to_handle, attachment.path])
+      }
+      sendBody = { body in
+        await sendIMessageDirect(toHandle: draft.to_handle, body: body)
+      }
+    }
+
+    var completed = min(
+      max(draft.delivery_progress?.completed_attachment_count ?? 0, 0),
+      draft.attachments?.count ?? 0
+    )
+    var bodySent = draft.delivery_progress?.body_sent ?? false
+    var totalDuration = 0
+    var lastService: String?
+    let parts = pendingIMessageParts(for: draft)
+
+    for part in parts {
+      guard persistIMessageDeliveryProgress(
+        draftId: draft.id,
+        completedAttachmentCount: completed,
+        bodySent: bodySent,
+        ambiguousPart: part.marker
+      ) else {
+        return SendResult(
+          ok: false,
+          service: nil,
+          error: "Ghostie could not record duplicate-send protection, so nothing was sent.",
+          durationMs: totalDuration
+        )
+      }
+
+      let wireResult: SendResult
+      switch part {
+      case .attachment(let index, let attachment):
+        let prepared: PreparedIMessageAttachment
+        do {
+          prepared = try prepareIMessageAttachment(attachment, draftId: draft.id)
+        } catch {
+          _ = persistIMessageDeliveryProgress(
+            draftId: draft.id,
+            completedAttachmentCount: completed,
+            bodySent: bodySent,
+            ambiguousPart: nil
+          )
+          return SendResult(
+            ok: false,
+            service: nil,
+            error: error.localizedDescription,
+            durationMs: totalDuration
+          )
+        }
+        let sendCopy = DraftAttachment(
+          path: prepared.fileURL.path,
+          filename: attachment.filename,
+          mime_type: attachment.mime_type,
+          byte_count: attachment.byte_count,
+          asset_id: attachment.asset_id,
+          sha256: attachment.sha256
+        )
+        wireResult = await sendAttachment(sendCopy)
+        cleanupIMessageAttachment(prepared)
+        if wireResult.ok { completed = index + 1 }
+      case .body(let body):
+        wireResult = await sendBody(body)
+        if wireResult.ok { bodySent = true }
+      }
+      totalDuration += wireResult.durationMs
+      guard wireResult.ok else {
+        return SendResult(
+          ok: false,
+          service: nil,
+          error: "\(wireResult.error ?? "The send failed.") \(ambiguousDeliveryMessage(part: part.marker))",
+          durationMs: totalDuration
+        )
+      }
+      lastService = wireResult.service ?? lastService
+
+      guard persistIMessageDeliveryProgress(
+        draftId: draft.id,
+        completedAttachmentCount: completed,
+        bodySent: bodySent,
+        ambiguousPart: nil
+      ) else {
+        return SendResult(
+          ok: false,
+          service: nil,
+          error: ambiguousDeliveryMessage(part: part.marker),
+          durationMs: totalDuration
+        )
+      }
+    }
+
+    return SendResult(
+      ok: true,
+      service: lastService ?? "iMessage",
+      error: nil,
+      durationMs: totalDuration
+    )
   }
 
   /// First-party typed send entrypoint for the Messages inline composer.
@@ -312,6 +574,341 @@ enum DraftSender {
 
   // MARK: - sent_at persistence (held inside the send lock)
 
+  private static func iMessageDraftURL(draftId: String) -> URL {
+    AppStoragePaths.homeDirectory
+      .appendingPathComponent(".messages-mcp/drafts", isDirectory: true)
+      .appendingPathComponent("\(draftId).json")
+  }
+
+  static func readIMessageDraft(draftId: String) -> Draft? {
+    guard isSafeDraftID(draftId) else { return nil }
+    guard let data = try? Data(contentsOf: iMessageDraftURL(draftId: draftId)) else { return nil }
+    return try? JSONDecoder().decode(Draft.self, from: data)
+  }
+
+  /// Atomically mutate one iMessage draft JSON file. The caller already holds
+  /// the cross-process send lock, so this is also the durable multipart journal.
+  private static func mutateIMessageDraftJSON(
+    draftId: String,
+    _ mutation: (inout [String: Any]) -> Bool
+  ) -> Bool {
+    guard isSafeDraftID(draftId) else { return false }
+    let url = iMessageDraftURL(draftId: draftId)
+    guard let data = try? Data(contentsOf: url),
+          var obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+    else { return false }
+    guard mutation(&obj) else { return true }
+    guard let out = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted]) else {
+      return false
+    }
+    do {
+      try out.write(to: url, options: .atomic)
+      try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  @discardableResult
+  static func persistIMessageDeliveryProgress(
+    draftId: String,
+    completedAttachmentCount: Int,
+    bodySent: Bool,
+    ambiguousPart: String?
+  ) -> Bool {
+    mutateIMessageDraftJSON(draftId: draftId) { obj in
+      let ambiguousValue: Any = ambiguousPart ?? NSNull()
+      obj["delivery_progress"] = [
+        "completed_attachment_count": max(0, completedAttachmentCount),
+        "body_sent": bodySent,
+        "ambiguous_part": ambiguousValue
+      ]
+      return true
+    }
+  }
+
+  static func fileSHA256(atPath path: String) -> String? {
+    guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+    defer { try? handle.close() }
+    var hasher = SHA256()
+    do {
+      while let chunk = try handle.read(upToCount: 1_048_576), !chunk.isEmpty {
+        hasher.update(data: chunk)
+      }
+    } catch {
+      return nil
+    }
+    return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+  }
+
+  /// Open every managed directory with O_NOFOLLOW, copy the reviewed bytes
+  /// into Ghostie's short-lived spool inside TCC-protected Messages storage,
+  /// then hand Messages a stable APFS file-id path. The protected file remains
+  /// open and user-immutable until osascript returns. The staging MCP does not
+  /// have Full Disk Access, so it cannot rewrite this final handoff.
+  static func prepareIMessageAttachment(
+    _ attachment: DraftAttachment,
+    draftId: String
+  ) throws -> PreparedIMessageAttachment {
+    guard let expectedBytes = attachment.byte_count,
+          expectedBytes >= 0,
+          expectedBytes <= 100 * 1024 * 1024,
+          let expectedSHA = attachment.sha256?.lowercased(),
+          expectedSHA.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil
+    else {
+      throw IMessageAttachmentPreparationError.invalidSnapshot
+    }
+
+    guard draftId.range(of: "^[A-Za-z0-9_-]+$", options: .regularExpression) != nil else {
+      throw IMessageAttachmentPreparationError.invalidSnapshot
+    }
+    let expandedPath = (attachment.path as NSString).expandingTildeInPath
+    let standardizedURL = URL(fileURLWithPath: expandedPath).standardizedFileURL
+    let expectedDirectory = AppStoragePaths.homeDirectory
+      .appendingPathComponent(".messages-mcp", isDirectory: true)
+      .appendingPathComponent("draft-attachments", isDirectory: true)
+      .appendingPathComponent(draftId, isDirectory: true)
+      .standardizedFileURL
+    guard expandedPath.hasPrefix("/"),
+          standardizedURL.deletingLastPathComponent() == expectedDirectory,
+          let assetID = attachment.asset_id,
+          isManagedAssetName(standardizedURL.lastPathComponent, assetID: assetID)
+    else {
+      throw IMessageAttachmentPreparationError.invalidSnapshot
+    }
+
+    let directoryFlags = O_RDONLY | O_DIRECTORY | O_NOFOLLOW
+    let homeFD = Darwin.open(AppStoragePaths.homeDirectory.path, directoryFlags)
+    guard homeFD >= 0 else { throw IMessageAttachmentPreparationError.invalidSnapshot }
+    defer { Darwin.close(homeFD) }
+    let transportFD = Darwin.openat(homeFD, ".messages-mcp", directoryFlags)
+    guard transportFD >= 0 else { throw IMessageAttachmentPreparationError.invalidSnapshot }
+    defer { Darwin.close(transportFD) }
+    let attachmentsFD = Darwin.openat(transportFD, "draft-attachments", directoryFlags)
+    guard attachmentsFD >= 0 else { throw IMessageAttachmentPreparationError.invalidSnapshot }
+    defer { Darwin.close(attachmentsFD) }
+    let draftFD = Darwin.openat(attachmentsFD, draftId, directoryFlags)
+    guard draftFD >= 0 else { throw IMessageAttachmentPreparationError.invalidSnapshot }
+    defer { Darwin.close(draftFD) }
+    let sourceFD = Darwin.openat(draftFD, standardizedURL.lastPathComponent, O_RDONLY | O_NOFOLLOW)
+    guard sourceFD >= 0 else { throw IMessageAttachmentPreparationError.invalidSnapshot }
+    defer { Darwin.close(sourceFD) }
+
+    var sourceStat = stat()
+    guard fstat(sourceFD, &sourceStat) == 0,
+          (sourceStat.st_mode & S_IFMT) == S_IFREG,
+          sourceStat.st_size == expectedBytes
+    else {
+      throw IMessageAttachmentPreparationError.changedSnapshot
+    }
+
+    _ = cleanupStaleIMessageAttachmentSpools()
+
+    let libraryFD = Darwin.openat(homeFD, "Library", directoryFlags)
+    guard libraryFD >= 0 else { throw IMessageAttachmentPreparationError.spoolUnavailable }
+    defer { Darwin.close(libraryFD) }
+    let messagesFD = Darwin.openat(libraryFD, "Messages", directoryFlags)
+    guard messagesFD >= 0 else { throw IMessageAttachmentPreparationError.spoolUnavailable }
+    defer { Darwin.close(messagesFD) }
+
+    if Darwin.mkdirat(messagesFD, "GhostieSendSpool", mode_t(0o700)) != 0 && errno != EEXIST {
+      throw IMessageAttachmentPreparationError.spoolUnavailable
+    }
+    let spoolRootFD = Darwin.openat(messagesFD, "GhostieSendSpool", directoryFlags)
+    guard spoolRootFD >= 0 else { throw IMessageAttachmentPreparationError.spoolUnavailable }
+    _ = Darwin.fchmod(spoolRootFD, mode_t(0o700))
+
+    let directoryName = UUID().uuidString.lowercased()
+    guard Darwin.mkdirat(spoolRootFD, directoryName, mode_t(0o700)) == 0 else {
+      Darwin.close(spoolRootFD)
+      throw IMessageAttachmentPreparationError.spoolUnavailable
+    }
+    let directoryFD = Darwin.openat(spoolRootFD, directoryName, directoryFlags)
+    guard directoryFD >= 0 else {
+      _ = Darwin.unlinkat(spoolRootFD, directoryName, AT_REMOVEDIR)
+      Darwin.close(spoolRootFD)
+      throw IMessageAttachmentPreparationError.spoolUnavailable
+    }
+
+    let pathExtension = standardizedURL.pathExtension.lowercased()
+    let safeExtension = pathExtension.range(of: "^[a-z0-9]{1,12}$", options: .regularExpression) != nil
+      ? ".\(pathExtension)"
+      : ""
+    let fileName = "\(UUID().uuidString.lowercased())\(safeExtension)"
+    let fileFD = Darwin.openat(
+      directoryFD,
+      fileName,
+      O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
+      mode_t(0o400)
+    )
+    guard fileFD >= 0 else {
+      Darwin.close(directoryFD)
+      _ = Darwin.unlinkat(spoolRootFD, directoryName, AT_REMOVEDIR)
+      Darwin.close(spoolRootFD)
+      throw IMessageAttachmentPreparationError.spoolUnavailable
+    }
+
+    var ownsSpool = true
+    defer {
+      if ownsSpool {
+        _ = Darwin.fchflags(fileFD, 0)
+        Darwin.close(fileFD)
+        _ = Darwin.unlinkat(directoryFD, fileName, 0)
+        Darwin.close(directoryFD)
+        _ = Darwin.unlinkat(spoolRootFD, directoryName, AT_REMOVEDIR)
+        Darwin.close(spoolRootFD)
+      }
+    }
+
+    guard Darwin.lseek(sourceFD, 0, SEEK_SET) == 0 else {
+      throw IMessageAttachmentPreparationError.changedSnapshot
+    }
+    var hasher = SHA256()
+    var total = 0
+    var buffer = [UInt8](repeating: 0, count: 1_048_576)
+    while true {
+      let count = buffer.withUnsafeMutableBytes { rawBuffer in
+        Darwin.read(sourceFD, rawBuffer.baseAddress, rawBuffer.count)
+      }
+      guard count >= 0 else {
+        throw IMessageAttachmentPreparationError.changedSnapshot
+      }
+      if count == 0 { break }
+      total += count
+      guard total <= expectedBytes else {
+        throw IMessageAttachmentPreparationError.changedSnapshot
+      }
+      hasher.update(data: Data(buffer[0..<count]))
+      var written = 0
+      while written < count {
+        let writeCount = buffer.withUnsafeBytes { rawBuffer in
+          Darwin.write(fileFD, rawBuffer.baseAddress?.advanced(by: written), count - written)
+        }
+        guard writeCount > 0 else {
+          throw IMessageAttachmentPreparationError.spoolUnavailable
+        }
+        written += writeCount
+      }
+    }
+    let actualSHA = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    guard total == expectedBytes, actualSHA == expectedSHA else {
+      throw IMessageAttachmentPreparationError.changedSnapshot
+    }
+
+    guard Darwin.fsync(fileFD) == 0,
+          Darwin.fchmod(fileFD, mode_t(0o400)) == 0,
+          Darwin.fchflags(fileFD, UInt32(UF_IMMUTABLE)) == 0
+    else {
+      throw IMessageAttachmentPreparationError.spoolUnavailable
+    }
+    var spoolStat = stat()
+    guard fstat(fileFD, &spoolStat) == 0,
+          (spoolStat.st_mode & S_IFMT) == S_IFREG,
+          spoolStat.st_size == expectedBytes
+    else {
+      throw IMessageAttachmentPreparationError.spoolUnavailable
+    }
+
+    let fileIDPath = "/.vol/\(spoolStat.st_dev)/\(spoolStat.st_ino)"
+    ownsSpool = false
+    return PreparedIMessageAttachment(
+      fileURL: URL(fileURLWithPath: fileIDPath),
+      fileFD: fileFD,
+      directoryFD: directoryFD,
+      spoolRootFD: spoolRootFD,
+      fileName: fileName,
+      directoryName: directoryName
+    )
+  }
+
+  static func cleanupIMessageAttachment(_ prepared: PreparedIMessageAttachment) {
+    _ = Darwin.fchflags(prepared.fileFD, 0)
+    Darwin.close(prepared.fileFD)
+    _ = Darwin.unlinkat(prepared.directoryFD, prepared.fileName, 0)
+    Darwin.close(prepared.directoryFD)
+    _ = Darwin.unlinkat(prepared.spoolRootFD, prepared.directoryName, AT_REMOVEDIR)
+    Darwin.close(prepared.spoolRootFD)
+  }
+
+  @discardableResult
+  static func cleanupStaleIMessageAttachmentSpools(now: Date = Date()) -> Int {
+    let directoryFlags = O_RDONLY | O_DIRECTORY | O_NOFOLLOW
+    let homeFD = Darwin.open(AppStoragePaths.homeDirectory.path, directoryFlags)
+    guard homeFD >= 0 else { return 0 }
+    defer { Darwin.close(homeFD) }
+    var removed = 0
+    let transportFD = Darwin.openat(homeFD, ".messages-mcp", directoryFlags)
+    if transportFD >= 0 {
+      removed += cleanupStaleSpool(parentFD: transportFD, rootName: "send-spool", now: now)
+      Darwin.close(transportFD)
+    }
+    let libraryFD = Darwin.openat(homeFD, "Library", directoryFlags)
+    if libraryFD >= 0 {
+      let messagesFD = Darwin.openat(libraryFD, "Messages", directoryFlags)
+      if messagesFD >= 0 {
+        removed += cleanupStaleSpool(parentFD: messagesFD, rootName: "GhostieSendSpool", now: now)
+        Darwin.close(messagesFD)
+      }
+      Darwin.close(libraryFD)
+    }
+    return removed
+  }
+
+  private static func isManagedAssetName(_ fileName: String, assetID: String) -> Bool {
+    if fileName == assetID { return true }
+    guard fileName.hasPrefix("\(assetID).") else { return false }
+    let suffix = String(fileName.dropFirst(assetID.count + 1))
+    return suffix.range(of: "^[a-z0-9]{1,12}$", options: .regularExpression) != nil
+  }
+
+  private static func isSafeDraftID(_ value: String) -> Bool {
+    !value.isEmpty && value.utf8.count <= 128 && value.range(
+      of: "^[A-Za-z0-9_-]+$",
+      options: .regularExpression
+    ) != nil
+  }
+
+  private static func cleanupStaleSpool(parentFD: Int32, rootName: String, now: Date) -> Int {
+    let directoryFlags = O_RDONLY | O_DIRECTORY | O_NOFOLLOW
+    let rootFD = Darwin.openat(parentFD, rootName, directoryFlags)
+    guard rootFD >= 0 else { return 0 }
+    defer { Darwin.close(rootFD) }
+    var rootStat = stat()
+    guard fstat(rootFD, &rootStat) == 0 else { return 0 }
+    let stableRoot = "/.vol/\(rootStat.st_dev)/\(rootStat.st_ino)"
+    guard let directories = try? FileManager.default.contentsOfDirectory(atPath: stableRoot) else { return 0 }
+
+    let cutoff = now.timeIntervalSince1970 - 3600
+    var removed = 0
+    for directoryName in directories where directoryName != "." && directoryName != ".." {
+      let directoryFD = Darwin.openat(rootFD, directoryName, directoryFlags)
+      guard directoryFD >= 0 else { continue }
+      var directoryStat = stat()
+      guard fstat(directoryFD, &directoryStat) == 0,
+            Double(directoryStat.st_mtimespec.tv_sec) < cutoff
+      else {
+        Darwin.close(directoryFD)
+        continue
+      }
+      let stableDirectory = "/.vol/\(directoryStat.st_dev)/\(directoryStat.st_ino)"
+      let files = (try? FileManager.default.contentsOfDirectory(atPath: stableDirectory)) ?? []
+      for fileName in files where fileName != "." && fileName != ".." {
+        let fileFD = Darwin.openat(directoryFD, fileName, O_RDONLY | O_NOFOLLOW)
+        if fileFD >= 0 {
+          _ = Darwin.fchflags(fileFD, 0)
+          Darwin.close(fileFD)
+        }
+        _ = Darwin.unlinkat(directoryFD, fileName, 0)
+      }
+      Darwin.close(directoryFD)
+      if Darwin.unlinkat(rootFD, directoryName, AT_REMOVEDIR) == 0 {
+        removed += 1
+      }
+    }
+    return removed
+  }
+
   /// Write `sent_at` (+ `send_service`) into the iMessage draft's JSON on disk,
   /// matching DraftStore's path + format (`<home>/.messages-mcp/drafts/<id>.json`,
   /// atomic, 0600). Idempotent: if `sent_at` is already set, leaves the file
@@ -321,26 +918,15 @@ enum DraftSender {
   /// Internal (not private) so the lock-ordering test can drive it directly without
   /// spawning osascript.
   static func persistIMessageSentAt(draftId: String, service: String) {
-    let url = AppStoragePaths.homeDirectory
-      .appendingPathComponent(".messages-mcp/drafts", isDirectory: true)
-      .appendingPathComponent("\(draftId).json")
-    guard let data = try? Data(contentsOf: url),
-          var obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
-      return
+    _ = mutateIMessageDraftJSON(draftId: draftId) { obj in
+      // Already sent on disk means idempotent no-op. Keep the first service.
+      if let existing = obj["sent_at"] as? String, !existing.isEmpty { return false }
+      let f = ISO8601DateFormatter()
+      f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+      obj["sent_at"] = f.string(from: Date())
+      obj["send_service"] = service
+      return true
     }
-    // Already sent on disk → idempotent no-op (don't overwrite the first sent_at).
-    if let existing = obj["sent_at"] as? String, !existing.isEmpty { return }
-
-    let f = ISO8601DateFormatter()
-    f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    obj["sent_at"] = f.string(from: Date())
-    obj["send_service"] = service
-
-    guard let out = try? JSONSerialization.data(withJSONObject: obj, options: [.prettyPrinted]) else {
-      return
-    }
-    try? out.write(to: url, options: .atomic)
-    try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
   }
 
   /// Extracts the chat GUID from a group draft's canonical `to_handle` binding
@@ -545,7 +1131,7 @@ enum DraftSender {
   private static let buddyFileScript = """
   on run argv
     set theAddress to item 1 of argv
-    set theFile to POSIX file (item 2 of argv)
+    set theFile to POSIX file (item 2 of argv) as alias
     tell application "Messages"
       try
         set theService to first service whose service type is iMessage
@@ -553,7 +1139,21 @@ enum DraftSender {
         send theFile to theBuddy
         return "iMessage"
       on error errMsg number errNum
-        return "ERROR: file send=" & errMsg & " (errNum=" & errNum & ")"
+        try
+          set rcsService to first service whose service type is RCS
+          set rcsBuddy to buddy theAddress of rcsService
+          send theFile to rcsBuddy
+          return "RCS"
+        on error rcsErr number rcsNum
+          try
+            set smsService to first service whose service type is SMS
+            set smsBuddy to buddy theAddress of smsService
+            send theFile to smsBuddy
+            return "SMS"
+          on error smsErr number smsNum
+            return "ERROR: iMessage=" & errMsg & " (errNum=" & errNum & "); RCS=" & rcsErr & " (errNum=" & rcsNum & "); SMS=" & smsErr & " (errNum=" & smsNum & ")"
+          end try
+        end try
       end try
     end tell
   end run
@@ -562,7 +1162,7 @@ enum DraftSender {
   private static let groupFileScript = """
   on run argv
     set theChatId to item 1 of argv
-    set theFile to POSIX file (item 2 of argv)
+    set theFile to POSIX file (item 2 of argv) as alias
     tell application "Messages"
       try
         send theFile to chat id theChatId
@@ -582,11 +1182,14 @@ enum DraftSender {
   /// `store.markSent(...)` after a successful WhatsApp send — the FS
   /// watcher takes care of it. (Calling markSent on a WhatsApp draft
   /// would throw `platformMismatch` regardless.)
-  private static func sendWhatsApp(draftId: String) async -> SendResult {
+  private static func sendWhatsApp(draft: Draft) async -> SendResult {
     let started = Date()
     do {
-      _ = try await WhatsAppRPCClient.approveDraft(id: draftId)
-      let result = try await WhatsAppRPCClient.sendDraft(id: draftId)
+      _ = try await WhatsAppRPCClient.approveDraft(
+        id: draft.id,
+        expectedPayloadDigest: draft.deliveryPayloadDigest
+      )
+      let result = try await WhatsAppRPCClient.sendDraft(id: draft.id)
       let elapsed = Int(Date().timeIntervalSince(started) * 1000)
       if result.ok {
         return SendResult(ok: true, service: "WhatsApp", error: nil, durationMs: elapsed, messageId: result.message_id)

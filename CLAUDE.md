@@ -126,10 +126,13 @@ bash scripts/build-dmg.sh vX.Y.Z       # → polished .dmg (stable name Messages
 - **State/config locations.** Settings: `~/.messages-mcp/settings.json` (v2
   schema, nested `transports.{imessage,whatsapp}`; flat `require_approval`
   mirrored at root for older MCP processes). Drafts:
-  `~/.messages-mcp/drafts/`. iMessage daemon: `~/.messages-mcp/daemon.sock` +
+  `~/.messages-mcp/drafts/`; managed iMessage draft media:
+  `~/.messages-mcp/draft-attachments/<draft-id>/`. iMessage daemon:
+  `~/.messages-mcp/daemon.sock` +
   `daemon.pid`; log `~/.messages-mcp/logs/imessage-daemon.log`. WhatsApp daemon
   state: `~/.whatsapp-mcp/` (session.db, daemon.sock, daemon.pid, messages.db,
-  audit.db, drafts/); log `~/.messages-mcp/logs/whatsapp-daemon.log`.
+  audit.db, drafts/, draft-attachments/); log
+  `~/.messages-mcp/logs/whatsapp-daemon.log`.
 - **Non-popover UI uses real `Window` scenes** (`Window(id:)` +
   `openWindow`/`dismissWindow`), not `MenuBarExtra(.window)` sheets (focus-bleed
   dismisses the popover). `applicationShouldTerminateAfterLastWindowClosed =

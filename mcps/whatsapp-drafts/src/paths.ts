@@ -27,6 +27,8 @@ export const PATHS = {
   get auditDb() { return join(home(), "audit.db"); },
   /** Staged drafts (JSON files, mode 0600). */
   get draftsDir() { return join(home(), "drafts"); },
+  /** Private, draft-owned outbound attachment snapshots. */
+  get draftAttachmentsDir() { return join(home(), "draft-attachments"); },
   /** On-demand-downloaded media payloads (photos/videos/docs), mode 0700.
    *  Swept by age on daemon start so it doesn't grow unbounded. */
   get mediaDir() { return join(home(), "media"); },

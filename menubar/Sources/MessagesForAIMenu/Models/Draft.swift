@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// Which transport this draft targets. Read from the draft JSON's
 /// `platform` field; defaults to `.imessage` when the field is absent
@@ -18,6 +19,15 @@ enum Platform: String, Codable, Equatable, CaseIterable, Hashable {
 enum ApprovalState: String, Codable, Equatable {
   case pending
   case approved
+}
+
+/// Durable multipart-send checkpoint. A sender advances this only after a part
+/// is known to have completed; `ambiguous_part` records the part that may have
+/// crossed the transport boundary before a failure was observed.
+struct DraftDeliveryProgress: Codable, Equatable {
+  let completed_attachment_count: Int
+  let body_sent: Bool
+  let ambiguous_part: String?
 }
 
 // Mirrors the on-disk JSON written by either MCP server's stage_draft
@@ -45,9 +55,12 @@ struct Draft: Codable, Identifiable, Equatable {
   let body: String
   /// Files staged to send with this draft (photos/videos/documents). Written
   /// by the MCP `stage_draft` tools; nil/empty on text-only drafts and on
-  /// drafts that predate media support. Display-only here — the actual send
-  /// reads these paths from the daemon / AppleScript at fire time.
+  /// drafts that predate media support. Senders verify the managed manifest
+  /// and its content hashes again at fire time.
   let attachments: [DraftAttachment]?
+  /// Durable checkpoint for a multipart delivery. Absent on drafts that have
+  /// never begun delivery and on legacy text-only drafts.
+  let delivery_progress: DraftDeliveryProgress?
   let in_reply_to_thread_id: Int?
   let staged_at: String
   let sent_at: String?
@@ -79,7 +92,7 @@ struct Draft: Codable, Identifiable, Equatable {
   /// held for explicit approval, never silently sent.
   let schedule_approved: Bool?
   /// HMAC tag authenticating that `schedule_approved` / `override_send` were set
-  /// by a real GUI action, bound to this draft's id + recipient + body. The
+  /// by a real GUI action, bound to this draft's complete delivery digest. The
   /// scheduler verifies this (or a same-session GUI approval) before auto-sending
   /// — a file that merely flips `schedule_approved`/`override_send` on disk has no
   /// valid tag and is held. See ApprovalAuthenticator + issue #77.
@@ -121,6 +134,7 @@ struct Draft: Codable, Identifiable, Equatable {
     imessage_group: IMessageGroupDraftTarget? = nil,
     body: String,
     attachments: [DraftAttachment]? = nil,
+    delivery_progress: DraftDeliveryProgress? = nil,
     in_reply_to_thread_id: Int?,
     staged_at: String,
     sent_at: String?,
@@ -146,6 +160,7 @@ struct Draft: Codable, Identifiable, Equatable {
     self.imessage_group = imessage_group
     self.body = body
     self.attachments = attachments
+    self.delivery_progress = delivery_progress
     self.in_reply_to_thread_id = in_reply_to_thread_id
     self.staged_at = staged_at
     self.sent_at = sent_at
@@ -198,7 +213,7 @@ struct Draft: Codable, Identifiable, Equatable {
     ApprovalAuthenticator.canonicalMessage(
       id: id,
       recipient: approvalRecipientBinding,
-      body: body,
+      body: deliveryPayloadDigest,
       scope: Self.scheduleApprovalScope
     )
   }
@@ -207,17 +222,149 @@ struct Draft: Codable, Identifiable, Equatable {
     imessage_group?.canonicalRecipient ?? to_handle
   }
 
+  /// SHA-256 over the complete ordered delivery semantics. Each component is
+  /// UTF-8 length-prefixed before joining, so delimiters and multi-byte text
+  /// cannot produce an ambiguous representation.
+  var deliveryPayloadDigest: String {
+    var components = [
+      "ghostie-draft-payload-v1",
+      id,
+      effectivePlatform.rawValue,
+      approvalRecipientBinding,
+      body,
+      quoted_message_id ?? "",
+      scheduled_send_at ?? "",
+      String(attachments?.count ?? 0)
+    ]
+    for attachment in attachments ?? [] {
+      components.append(contentsOf: [
+        attachment.asset_id ?? "",
+        attachment.path,
+        attachment.filename ?? "",
+        attachment.mime_type ?? "",
+        String(attachment.byte_count ?? -1),
+        attachment.sha256 ?? ""
+      ])
+    }
+    let canonical = components
+      .map { "\($0.utf8.count):\($0)" }
+      .joined(separator: "|")
+    return SHA256.hash(data: Data(canonical.utf8))
+      .map { String(format: "%02x", $0) }
+      .joined()
+  }
+
+  /// A non-nil result means the media manifest predates managed immutable
+  /// snapshots, or is malformed, and must be re-staged before approval. Legacy
+  /// text-only drafts remain valid.
+  var attachmentReviewIssue: String? {
+    guard let attachments, !attachments.isEmpty else { return nil }
+    let maximumAttachmentCount = 10
+    let maximumAttachmentBytes = 100 * 1024 * 1024
+    let maximumDraftAttachmentBytes = 250 * 1024 * 1024
+    guard attachments.count <= maximumAttachmentCount else {
+      return "This draft has more than 10 attachments. Re-stage it with fewer files before sending."
+    }
+    guard !id.isEmpty, id != ".", id != "..", !id.contains("/") else {
+      return "This draft has an invalid attachment owner. Re-stage it before sending."
+    }
+
+    let storageRoot = effectivePlatform == .imessage ? ".messages-mcp" : ".whatsapp-mcp"
+    let expectedDirectory = AppStoragePaths.homeDirectory
+      .appendingPathComponent(storageRoot, isDirectory: true)
+      .appendingPathComponent("draft-attachments", isDirectory: true)
+      .appendingPathComponent(id, isDirectory: true)
+      .standardizedFileURL
+    var aggregateBytes = 0
+    for (index, attachment) in attachments.enumerated() {
+      let number = index + 1
+      guard let assetID = attachment.asset_id,
+            assetID.range(
+              of: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              options: .regularExpression
+            ) != nil
+      else {
+        return "Attachment \(number) is missing its managed asset ID. Re-stage this draft before sending."
+      }
+      guard let sha256 = attachment.sha256,
+            sha256.utf8.count == 64,
+            sha256.utf8.allSatisfy({ ($0 >= 48 && $0 <= 57) || ($0 >= 97 && $0 <= 102) })
+      else {
+        return "Attachment \(number) is missing a valid SHA-256 fingerprint. Re-stage this draft before sending."
+      }
+      guard let byteCount = attachment.byte_count, byteCount >= 0 else {
+        return "Attachment \(number) is missing a valid byte count. Re-stage this draft before sending."
+      }
+      guard byteCount <= maximumAttachmentBytes else {
+        return "Attachment \(number) exceeds the 100 MB limit. Re-stage it with a smaller file."
+      }
+      let (newAggregate, overflow) = aggregateBytes.addingReportingOverflow(byteCount)
+      guard !overflow, newAggregate <= maximumDraftAttachmentBytes else {
+        return "This draft's attachments exceed the 250 MB limit. Re-stage it with fewer or smaller files."
+      }
+      aggregateBytes = newAggregate
+      let expandedPath = (attachment.path as NSString).expandingTildeInPath
+      let standardizedURL = URL(fileURLWithPath: expandedPath).standardizedFileURL
+      let managedName = standardizedURL.lastPathComponent
+      let managedExtension = managedName.hasPrefix("\(assetID).")
+        ? String(managedName.dropFirst(assetID.count + 1))
+        : ""
+      let validManagedName = managedName == assetID || (
+        managedExtension.range(of: "^[a-z0-9]{1,12}$", options: .regularExpression) != nil
+      )
+      guard expandedPath.hasPrefix("/"),
+            standardizedURL.deletingLastPathComponent() == expectedDirectory,
+            validManagedName
+      else {
+        return "Attachment \(number) is outside this draft's managed storage. Re-stage it before sending."
+      }
+    }
+    return nil
+  }
+
+  /// Copy used when a trusted GUI action authenticates the current payload.
+  /// The approval tag is not part of `deliveryPayloadDigest`.
+  func replacingScheduleApprovalTag(_ tag: String?) -> Draft {
+    Draft(
+      id: id,
+      to_handle: to_handle,
+      to_handle_name: to_handle_name,
+      imessage_group: imessage_group,
+      body: body,
+      attachments: attachments,
+      delivery_progress: delivery_progress,
+      in_reply_to_thread_id: in_reply_to_thread_id,
+      staged_at: staged_at,
+      sent_at: sent_at,
+      send_service: send_service,
+      source: source,
+      context_messages: context_messages,
+      context_diagnostic: context_diagnostic,
+      scheduled_send_at: scheduled_send_at,
+      schedule_hold_reason: schedule_hold_reason,
+      override_send: override_send,
+      schedule_approved: schedule_approved,
+      schedule_approval_tag: tag,
+      schema_version: schema_version,
+      platform: platform,
+      approval_state: approval_state,
+      induced_by_unknown_contact: induced_by_unknown_contact,
+      quoted_message_id: quoted_message_id,
+      quoted_preview: quoted_preview
+    )
+  }
+
   /// The scheduler's send gate for an approve-now/send-later draft (issue #77):
   /// the draft must be GUI-approved (`schedule_approved == true`) AND that
   /// approval must be authenticated — either approved in the GUI this session,
-  /// or carrying a valid HMAC tag bound to this id/recipient/body. A scheduled
+  /// or carrying a valid HMAC tag bound to every delivery-semantic field. A scheduled
   /// draft written by another process that merely sets `schedule_approved` or
   /// `override_send` has no valid tag and returns false (held for approval).
   var isScheduleAuthenticallyApproved: Bool {
     guard schedule_approved == true else { return false }
     // Recompute the canonical tag from the draft's CURRENT fields. A session
-    // approval only matches when id/recipient/body/scope are unchanged, so
-    // swapping recipient/body on disk invalidates the session gate too — not just
+    // approval only matches when the payload digest/scope are unchanged, so
+    // swapping any delivery field on disk invalidates the session gate too, not just
     // the persisted tag. (Issue #77, round 2.)
     let canonical = scheduleApprovalCanonicalMessage
     if ApprovalAuthenticator.hasSessionApproval(canonicalMessage: canonical) { return true }
@@ -451,13 +598,31 @@ struct ContextMessage: Codable, Hashable {
 
 /// A file staged to send with an outbound draft, decoded from the draft JSON's
 /// `attachments` array (written by the MCP `stage_draft` tools). Mirrors the
-/// TypeScript `DraftAttachment`. Display-only in the menubar — the send path
-/// reads these paths itself at fire time.
+/// TypeScript `DraftAttachment`; the send path verifies the managed snapshot at
+/// fire time.
 struct DraftAttachment: Codable, Equatable, Hashable {
   let path: String
   let filename: String?
   let mime_type: String?
   let byte_count: Int?
+  let asset_id: String?
+  let sha256: String?
+
+  init(
+    path: String,
+    filename: String?,
+    mime_type: String?,
+    byte_count: Int?,
+    asset_id: String? = nil,
+    sha256: String? = nil
+  ) {
+    self.path = path
+    self.filename = filename
+    self.mime_type = mime_type
+    self.byte_count = byte_count
+    self.asset_id = asset_id
+    self.sha256 = sha256
+  }
 
   /// Bridge to the read-side attachment type so staged-draft media renders
   /// through the same AttachmentBubbleView as incoming-message media.
