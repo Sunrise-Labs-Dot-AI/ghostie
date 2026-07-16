@@ -1,8 +1,13 @@
 import { mkdirSync, readdirSync, readFileSync, writeFileSync, unlinkSync, statSync, lstatSync, existsSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, basename } from "node:path";
+import { join, basename, dirname } from "node:path";
 import { randomUUID } from "node:crypto";
 import type { DraftContextMessage, ContextLookupDiagnostic } from "../chatdb/queries.ts";
+import {
+  cleanupDraftAttachments,
+  snapshotDraftAttachments,
+  type RawAttachmentInput,
+} from "../../../shared/src/attachments.ts";
 
 // Compute the drafts directory on every access rather than caching it at
 // module load. This is mostly for symmetry — the real test-seam below
@@ -24,22 +29,29 @@ export function _setDraftsDirForTesting(dir: string | null): void {
   testDirOverride = dir;
 }
 
-// A file staged to be sent alongside (or instead of) the draft body. The
-// human reviewer sees the filename + a preview before approving; the send path
-// hands the POSIX `path` to Messages.app (iMessage) or reads the bytes for
-// Baileys (WhatsApp) at fire time. Paths are resolved to absolute + checked for
-// existence when the draft is staged, but a file can still vanish before send —
-// the send path re-checks and fails gracefully.
+// A private, draft-owned file snapshot staged alongside (or instead of) the
+// body. New manifests are complete and hash-bound. Optional identity/hash
+// fields exist only so old path-only drafts remain listable before the send
+// path refuses them and asks the user to restage.
 export interface DraftAttachment {
+  // Present on every newly-staged draft. Optional only so legacy path-only
+  // manifests remain listable and can fail closed at send time with a clear
+  // restaging error.
+  asset_id?: string;
   path: string;
-  // Display name; the sender's label for the file. Defaults to basename(path).
+  // Actual basename of the source path at stage time.
   filename: string;
-  // Best-effort MIME, provided or inferred from the extension. Drives the
-  // WhatsApp send type; informational for iMessage.
+  // Best-effort MIME sniffed from bytes, then inferred from the extension.
   mime_type: string | null;
-  // Size in bytes at stage time, for the approval UI + a sanity gate. Null if
-  // it couldn't be stat'd.
+  // Exact private-snapshot size. Null only on legacy manifests.
   byte_count: number | null;
+  sha256?: string;
+}
+
+export interface DeliveryProgress {
+  completed_attachment_count: number;
+  body_sent: boolean;
+  ambiguous_part: string | null;
 }
 
 export interface Draft {
@@ -93,6 +105,7 @@ export interface Draft {
   // a scheduled draft written any other way (e.g. by a shell process) stays
   // unapproved and is HELD for explicit in-app approval, never silently sent.
   schedule_approved: boolean | null;
+  delivery_progress: DeliveryProgress;
 }
 
 function ensureDir(): void {
@@ -132,7 +145,7 @@ export interface StageDraftArgs {
   to_handle: string;
   to_handle_name?: string | null;
   body: string;
-  attachments?: DraftAttachment[] | null;
+  attachments?: RawAttachmentInput[] | null;
   in_reply_to_thread_id?: number | null;
   source?: string | null;
   context_messages?: DraftContextMessage[] | null;
@@ -143,12 +156,15 @@ export interface StageDraftArgs {
 
 export function stageDraft(args: StageDraftArgs): { draft: Draft; path: string } {
   ensureDir();
+  const id = randomUUID();
+  const transportRoot = draftTransportRoot();
+  const attachments = snapshotDraftAttachments(transportRoot, id, args.attachments);
   const draft: Draft = {
-    id: randomUUID(),
+    id,
     to_handle: args.to_handle,
     to_handle_name: args.to_handle_name ?? null,
     body: args.body,
-    attachments: args.attachments ?? [],
+    attachments,
     in_reply_to_thread_id: args.in_reply_to_thread_id ?? null,
     staged_at: new Date().toISOString(),
     sent_at: null,
@@ -160,9 +176,19 @@ export function stageDraft(args: StageDraftArgs): { draft: Draft; path: string }
     schedule_hold_reason: null,
     override_send: null,
     schedule_approved: args.schedule_approved ?? null,
+    delivery_progress: {
+      completed_attachment_count: 0,
+      body_sent: false,
+      ambiguous_part: null,
+    },
   };
   const path = draftPath(draft.id);
-  writeFileSync(path, JSON.stringify(draft, null, 2), { mode: 0o600 });
+  try {
+    writeFileSync(path, JSON.stringify(draft, null, 2), { mode: 0o600 });
+  } catch (e) {
+    cleanupDraftAttachments(transportRoot, id);
+    throw e;
+  }
   return { draft, path };
 }
 
@@ -212,10 +238,12 @@ function normalizeAttachments(raw: unknown): DraftAttachment[] {
     const path = typeof o.path === "string" ? o.path : null;
     if (!path) continue;
     out.push({
+      asset_id: typeof o.asset_id === "string" ? o.asset_id : undefined,
       path,
       filename: typeof o.filename === "string" && o.filename.length > 0 ? o.filename : basename(path),
       mime_type: typeof o.mime_type === "string" ? o.mime_type : null,
       byte_count: typeof o.byte_count === "number" && Number.isFinite(o.byte_count) ? o.byte_count : null,
+      sha256: typeof o.sha256 === "string" ? o.sha256 : undefined,
     });
   }
   return out;
@@ -225,12 +253,13 @@ function normalizeAttachments(raw: unknown): DraftAttachment[] {
 // the current Draft shape regardless of when the file was written.
 function normalizeDraft(raw: Partial<Draft>): Draft | null {
   if (!raw || !raw.id || !raw.to_handle || raw.body == null || !raw.staged_at) return null;
+  const attachments = normalizeAttachments(raw.attachments);
   return {
     id: raw.id,
     to_handle: raw.to_handle,
     to_handle_name: raw.to_handle_name ?? null,
     body: raw.body,
-    attachments: normalizeAttachments(raw.attachments),
+    attachments,
     in_reply_to_thread_id: raw.in_reply_to_thread_id ?? null,
     staged_at: raw.staged_at,
     sent_at: raw.sent_at ?? null,
@@ -242,6 +271,23 @@ function normalizeDraft(raw: Partial<Draft>): Draft | null {
     schedule_hold_reason: raw.schedule_hold_reason ?? null,
     override_send: raw.override_send ?? null,
     schedule_approved: raw.schedule_approved ?? null,
+    delivery_progress: normalizeDeliveryProgress(raw.delivery_progress, attachments.length),
+  };
+}
+
+function normalizeDeliveryProgress(raw: unknown, attachmentCount: number): DeliveryProgress {
+  if (!raw || typeof raw !== "object") {
+    return { completed_attachment_count: 0, body_sent: false, ambiguous_part: null };
+  }
+  const p = raw as Record<string, unknown>;
+  const completed =
+    typeof p.completed_attachment_count === "number" && Number.isSafeInteger(p.completed_attachment_count)
+      ? Math.max(0, Math.min(attachmentCount, p.completed_attachment_count))
+      : 0;
+  return {
+    completed_attachment_count: completed,
+    body_sent: p.body_sent === true,
+    ambiguous_part: typeof p.ambiguous_part === "string" && p.ambiguous_part.length > 0 ? p.ambiguous_part : null,
   };
 }
 
@@ -334,14 +380,38 @@ export function updateScheduling(
   return updated;
 }
 
+export function updateDeliveryProgress(id: string, progress: DeliveryProgress): Draft | null {
+  const existing = getDraft(id);
+  if (!existing) return null;
+  const updated: Draft = { ...existing, delivery_progress: normalizeDeliveryProgress(progress, existing.attachments.length) };
+  const finalPath = draftPath(id);
+  if (existsSync(finalPath) && lstatSync(finalPath).isSymbolicLink()) {
+    throw new Error(`draft path is a symlink, refusing to overwrite: ${finalPath}`);
+  }
+  const tmpPath = `${finalPath}.tmp-${randomUUID()}`;
+  writeFileSync(tmpPath, JSON.stringify(updated, null, 2), { mode: 0o600 });
+  try {
+    renameSync(tmpPath, finalPath);
+  } catch (err) {
+    try { unlinkSync(tmpPath); } catch { /* best effort */ }
+    throw err;
+  }
+  return updated;
+}
+
 export function discardDraft(id: string): boolean {
   ensureDir();
   const path = draftPath(id);
-  if (!existsSync(path)) return false;
-  unlinkSync(path);
-  return true;
+  const existed = existsSync(path);
+  if (existed) unlinkSync(path);
+  cleanupDraftAttachments(draftTransportRoot(), id);
+  return existed;
 }
 
 export function draftsDir(): string {
   return draftsDirPath();
+}
+
+export function draftTransportRoot(): string {
+  return dirname(draftsDirPath());
 }

@@ -21,7 +21,8 @@ import type { Settings } from "../settings.ts";
 import { readSettings, SettingsError } from "../settings.ts";
 import { acquireSendLock } from "../storage/send-lock.ts";
 import { assertSendAllowed, ControlBlockedError } from "../control-gate.ts";
-import { resolveDraftAttachments, type ResolvedAttachment } from "../../../shared/src/attachments.ts";
+import { isManagedDraftAttachment, type ManagedDraftAttachment } from "../../../shared/src/attachments.ts";
+import { draftPayloadDigest } from "../../../shared/src/draft-payload.ts";
 import { errorResult, jsonResult } from "./_result.ts";
 import { wrapBodyInPlace, wrapUntrusted } from "./_untrusted.ts";
 import { mapDaemonDependentToolError } from "./_daemon-errors.ts";
@@ -84,7 +85,7 @@ export interface DraftRpc {
   // Files to send with this draft. Resolved (absolute path + size + mime) at
   // stage time; the daemon reads the bytes and picks the Baileys media type at
   // send. Empty for text-only drafts. Older draft files lack this field.
-  attachments?: ResolvedAttachment[];
+  attachments?: ManagedDraftAttachment[];
 }
 
 /** Wrap untrusted fields (peer-authored context messages) but leave
@@ -136,22 +137,20 @@ export function registerDraftTools(server: McpServer) {
         "settings.require_approval is OFF, via send_whatsapp_draft. Drafts " +
         "include a 5-message thread-context snapshot for the approval surface. " +
         "Pass `attachments` (array of `{path, filename?, mime_type?}`) to send photos/" +
-        "videos/documents/audio — each `path` must exist on disk now. The body may be " +
+        "videos/documents/audio. Each source is copied into a private draft-owned snapshot now; " +
+        "filename and MIME are derived from the source rather than trusted caller labels. The body may be " +
         "empty when attachments are present (it becomes the media caption).",
       inputSchema: StageDraftShape,
     },
     async (raw) => {
       const parsed = StageDraftInput.safeParse(raw);
       if (!parsed.success) return errorResult(parsed.error.errors.map((e) => e.message).join("; "));
-      const resolved = resolveDraftAttachments(parsed.data.attachments);
-      if (!resolved.ok) return errorResult(resolved.error);
-      if (parsed.data.body.trim().length === 0 && resolved.attachments.length === 0) {
+      if (parsed.data.body.trim().length === 0 && (parsed.data.attachments?.length ?? 0) === 0) {
         return errorResult("provide a non-empty `body`, one or more `attachments`, or both");
       }
       try {
         const { draft } = await callDaemon<{ draft: DraftRpc }>("stageDraft", {
           ...parsed.data,
-          attachments: resolved.attachments,
         });
         return jsonResult({ ok: true, draft: maskDraft(draft) });
       } catch (e) {
@@ -278,7 +277,21 @@ export function registerDraftTools(server: McpServer) {
           // Flip approval_state for the user. In production this happens
           // via the menu bar app's hold-to-fire UI.
           try {
-            await callDaemon("approveDraft", parsed.data);
+            const { draft } = await callDaemon<{ draft: DraftRpc }>("getDraft", parsed.data);
+            const attachments = draft.attachments ?? [];
+            if (!attachments.every(isManagedDraftAttachment)) {
+              return errorResult("SEND_FAILED: legacy or incomplete attachment manifest; discard and restage this draft");
+            }
+            const expected_payload_digest = draftPayloadDigest({
+              id: draft.id,
+              platform: "whatsapp",
+              to_handle: draft.to_handle,
+              body: draft.body,
+              quoted_message_id: draft.quoted_message_id,
+              scheduled_send_at: null,
+              attachments,
+            });
+            await callDaemon("approveDraft", { draft_id: parsed.data.draft_id, expected_payload_digest });
           } catch (e) {
             return mapDaemonError(e);
           }

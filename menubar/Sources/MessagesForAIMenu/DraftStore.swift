@@ -18,6 +18,8 @@ final class DraftStore: ObservableObject {
 
   private let imessageDir: URL
   private let whatsappDir: URL
+  private let imessageAttachmentDir: URL
+  private let whatsappAttachmentDir: URL
   private var whatsappEnabled: Bool
 
   private var imessageSource: DispatchSourceFileSystemObject?
@@ -37,6 +39,8 @@ final class DraftStore: ObservableObject {
     let home = homeOverride ?? AppStoragePaths.homeDirectory
     imessageDir = home.appendingPathComponent(".messages-mcp/drafts")
     whatsappDir = home.appendingPathComponent(".whatsapp-mcp/drafts")
+    imessageAttachmentDir = home.appendingPathComponent(".messages-mcp/draft-attachments")
+    whatsappAttachmentDir = home.appendingPathComponent(".whatsapp-mcp/draft-attachments")
     // Create the iMessage dir if it doesn't exist — this app IS the
     // iMessage menubar surface, so creating it here is fine and matches
     // pre-v0.3.0 behavior. The WhatsApp dir is NOT created here; see
@@ -96,6 +100,8 @@ final class DraftStore: ObservableObject {
       to_handle_name: existing.to_handle_name,
       imessage_group: existing.imessage_group,
       body: existing.body,
+      attachments: existing.attachments,
+      delivery_progress: existing.delivery_progress,
       in_reply_to_thread_id: existing.in_reply_to_thread_id,
       staged_at: existing.staged_at,
       sent_at: Self.isoString(sentAt),
@@ -141,27 +147,16 @@ final class DraftStore: ObservableObject {
     let newScheduleApproved = scheduleApproved == nil ? existing.schedule_approved : scheduleApproved!
     let newOverrideSend = overrideSend == nil ? existing.override_send : overrideSend!
 
-    // Authenticate a GUI approval (issue #77). Setting `schedule_approved=true`
-    // or `override_send=true` through this API is an explicit in-app action
-    // ("Schedule" / "Send now"), so mint a per-install HMAC tag bound to this
-    // draft and remember it for the session. The scheduler only ever PASSES
-    // `overrideSend=.some(false)` / holdReason here, so its internal rewrites
-    // never mint a tag from untrusted on-disk state.
-    var newTag = existing.schedule_approval_tag
-    if (scheduleApproved == .some(true)) || (overrideSend == .some(true)) {
-      ApprovalAuthenticator.recordSessionApproval(canonicalMessage: existing.scheduleApprovalCanonicalMessage)
-      newTag = ApprovalAuthenticator.tag(for: existing.scheduleApprovalCanonicalMessage)
-    } else if newScheduleApproved != true {
-      // Approval was cleared (e.g. revert) — drop any stale tag.
-      newTag = nil
-    }
-
-    let updated = Draft(
+    let nextScheduledSendAt = scheduledSendAt == nil ? existing.scheduled_send_at : scheduledSendAt!
+    let scheduleChanged = nextScheduledSendAt != existing.scheduled_send_at
+    var updated = Draft(
       id: existing.id,
       to_handle: existing.to_handle,
       to_handle_name: existing.to_handle_name,
       imessage_group: existing.imessage_group,
       body: existing.body,
+      attachments: existing.attachments,
+      delivery_progress: existing.delivery_progress,
       in_reply_to_thread_id: existing.in_reply_to_thread_id,
       staged_at: existing.staged_at,
       sent_at: existing.sent_at,
@@ -171,11 +166,11 @@ final class DraftStore: ObservableObject {
       context_diagnostic: existing.context_diagnostic,
       // Double-optional on every field: .some(value)/.some(nil) writes, nil
       // (the default) leaves the field unchanged.
-      scheduled_send_at: scheduledSendAt == nil ? existing.scheduled_send_at : scheduledSendAt!,
+      scheduled_send_at: nextScheduledSendAt,
       schedule_hold_reason: holdReason == nil ? existing.schedule_hold_reason : holdReason!,
       override_send: newOverrideSend,
       schedule_approved: newScheduleApproved,
-      schedule_approval_tag: newTag,
+      schedule_approval_tag: existing.schedule_approval_tag,
       schema_version: existing.schema_version,
       platform: existing.platform,
       approval_state: existing.approval_state,
@@ -183,6 +178,17 @@ final class DraftStore: ObservableObject {
       quoted_message_id: existing.quoted_message_id,
       quoted_preview: existing.quoted_preview
     )
+    // Setting schedule_approved/override_send, or changing an already-approved
+    // schedule, is a trusted in-app action. Authenticate the resulting payload,
+    // including its new scheduled time, not the pre-edit draft. Scheduler-only
+    // hold rewrites do not meet these conditions and never mint approval.
+    if (scheduleApproved == .some(true))
+        || (overrideSend == .some(true))
+        || (scheduleChanged && newScheduleApproved == true) {
+      updated = Self.authenticatingScheduleApproval(updated)
+    } else if newScheduleApproved != true {
+      updated = updated.replacingScheduleApprovalTag(nil)
+    }
     try writeDraft(updated)
     refresh()
     return updated
@@ -194,26 +200,22 @@ final class DraftStore: ObservableObject {
   func updateBody(id: String, body: String) throws -> Draft {
     guard let existing = readDraft(id: id) else { throw DraftStoreError.draftNotFound(id) }
     let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !trimmed.isEmpty else { throw DraftStoreError.emptyBody(id) }
+    guard !trimmed.isEmpty || existing.attachments?.isEmpty == false else {
+      throw DraftStoreError.emptyBody(id)
+    }
     // Editing the body via the inline GUI editor is a human action. The approval
     // tag binds the body, so a changed body invalidates the old tag — re-mint it
     // (and record the session approval) when the draft was already approved, so a
     // legitimate edit doesn't silently strand the scheduled draft as un-sendable.
     // (Issue #77.)
-    var newTag = existing.schedule_approval_tag
-    if existing.schedule_approved == true {
-      let canonical = ApprovalAuthenticator.canonicalMessage(
-        id: existing.id, recipient: existing.approvalRecipientBinding, body: trimmed, scope: Draft.scheduleApprovalScope
-      )
-      ApprovalAuthenticator.recordSessionApproval(canonicalMessage: canonical)
-      newTag = ApprovalAuthenticator.tag(for: canonical)
-    }
-    let updated = Draft(
+    var updated = Draft(
       id: existing.id,
       to_handle: existing.to_handle,
       to_handle_name: existing.to_handle_name,
       imessage_group: existing.imessage_group,
       body: trimmed,
+      attachments: existing.attachments,
+      delivery_progress: existing.delivery_progress,
       in_reply_to_thread_id: existing.in_reply_to_thread_id,
       staged_at: existing.staged_at,
       sent_at: existing.sent_at,
@@ -225,7 +227,7 @@ final class DraftStore: ObservableObject {
       schedule_hold_reason: existing.schedule_hold_reason,
       override_send: existing.override_send,
       schedule_approved: existing.schedule_approved,
-      schedule_approval_tag: newTag,
+      schedule_approval_tag: existing.schedule_approval_tag,
       schema_version: existing.schema_version,
       platform: existing.platform,
       approval_state: existing.approval_state,
@@ -233,6 +235,9 @@ final class DraftStore: ObservableObject {
       quoted_message_id: existing.quoted_message_id,
       quoted_preview: existing.quoted_preview
     )
+    if existing.schedule_approved == true {
+      updated = Self.authenticatingScheduleApproval(updated)
+    }
     try writeDraft(updated)
     refresh()
     return updated
@@ -266,10 +271,7 @@ final class DraftStore: ObservableObject {
     // draft is pre-approved we authenticate it: record the session approval and
     // mint a per-install HMAC tag bound to this draft. (Issue #77.)
     let scheduleApproved = scheduledAt == nil ? nil : (approveScheduledDraft ? true : nil)
-    let approvalTag = Self.mintScheduleApprovalTagIfNeeded(
-      approved: scheduleApproved == true, id: id, recipient: trimmedHandle, body: trimmedBody
-    )
-    let draft = Draft(
+    let unsignedDraft = Draft(
       id: id,
       to_handle: trimmedHandle,
       to_handle_name: toHandleName,
@@ -293,7 +295,7 @@ final class DraftStore: ObservableObject {
       schedule_hold_reason: nil,
       override_send: nil,
       schedule_approved: scheduleApproved,
-      schedule_approval_tag: approvalTag,
+      schedule_approval_tag: nil,
       schema_version: nil,
       platform: nil,
       approval_state: nil,
@@ -301,6 +303,9 @@ final class DraftStore: ObservableObject {
       quoted_message_id: nil,
       quoted_preview: nil
     )
+    let draft = scheduleApproved == true
+      ? Self.authenticatingScheduleApproval(unsignedDraft)
+      : unsignedDraft
     try writeIMessageDraft(draft)
     trackDraftStaged(draft, scheduledAt: scheduledAt)
     refresh()
@@ -326,10 +331,7 @@ final class DraftStore: ObservableObject {
     let id = UUID().uuidString.lowercased()
     let targetBinding = group.canonicalRecipient
     let scheduleApproved = scheduledAt == nil ? nil : (approveScheduledDraft ? true : nil)
-    let approvalTag = Self.mintScheduleApprovalTagIfNeeded(
-      approved: scheduleApproved == true, id: id, recipient: targetBinding, body: trimmedBody
-    )
-    let draft = Draft(
+    let unsignedDraft = Draft(
       id: id,
       to_handle: targetBinding,
       to_handle_name: group.displayName,
@@ -353,7 +355,7 @@ final class DraftStore: ObservableObject {
       schedule_hold_reason: nil,
       override_send: nil,
       schedule_approved: scheduleApproved,
-      schedule_approval_tag: approvalTag,
+      schedule_approval_tag: nil,
       schema_version: nil,
       platform: nil,
       approval_state: nil,
@@ -361,6 +363,9 @@ final class DraftStore: ObservableObject {
       quoted_message_id: nil,
       quoted_preview: nil
     )
+    let draft = scheduleApproved == true
+      ? Self.authenticatingScheduleApproval(unsignedDraft)
+      : unsignedDraft
     try writeIMessageDraft(draft)
     trackDraftStaged(draft, scheduledAt: scheduledAt)
     refresh()
@@ -389,10 +394,7 @@ final class DraftStore: ObservableObject {
     // See createIMessageDraft: in-process trusted caller, so authenticate a
     // pre-approved scheduled draft. (Issue #77.)
     let scheduleApproved = scheduledAt == nil ? nil : (approveScheduledDraft ? true : nil)
-    let approvalTag = Self.mintScheduleApprovalTagIfNeeded(
-      approved: scheduleApproved == true, id: id, recipient: trimmedHandle, body: trimmedBody
-    )
-    let draft = Draft(
+    let unsignedDraft = Draft(
       id: id,
       to_handle: trimmedHandle,
       to_handle_name: toHandleName,
@@ -416,7 +418,7 @@ final class DraftStore: ObservableObject {
       schedule_hold_reason: nil,
       override_send: nil,
       schedule_approved: scheduleApproved,
-      schedule_approval_tag: approvalTag,
+      schedule_approval_tag: nil,
       schema_version: 1,
       platform: .whatsapp,
       approval_state: .pending,
@@ -424,6 +426,9 @@ final class DraftStore: ObservableObject {
       quoted_message_id: nil,
       quoted_preview: nil
     )
+    let draft = scheduleApproved == true
+      ? Self.authenticatingScheduleApproval(unsignedDraft)
+      : unsignedDraft
     try writeDraft(draft)
     trackDraftStaged(draft, scheduledAt: scheduledAt)
     refresh()
@@ -465,6 +470,7 @@ final class DraftStore: ObservableObject {
       throw DraftStoreError.draftNotFound(id)
     }
     try FileManager.default.removeItem(at: draftURL(id: id, platform: existing.effectivePlatform))
+    try removeAttachmentSnapshot(id: id, platform: existing.effectivePlatform)
     refresh()
   }
 
@@ -483,7 +489,12 @@ final class DraftStore: ObservableObject {
             let draft = try? decoder.decode(Draft.self, from: data),
             Self.isExpiredSentDraft(draft, now: now, ttl: Self.sentDraftTTL)
       else { continue }
-      if (try? fm.removeItem(at: url)) != nil { removed += 1 }
+      if (try? fm.removeItem(at: url)) != nil {
+        // This sweep only enumerates the iMessage drafts directory. Use that
+        // storage root even if a malformed file forges its `platform` field.
+        try? removeAttachmentSnapshot(id: draft.id, platform: .imessage)
+        removed += 1
+      }
     }
     if removed > 0 { refresh() }
   }
@@ -526,6 +537,22 @@ final class DraftStore: ObservableObject {
     case .whatsapp: base = whatsappDir
     }
     return base.appendingPathComponent("\(id).json")
+  }
+
+  /// The snapshot directory is draft-owned. Validate that the id is one path
+  /// component before deriving a deletion target, so an untrusted draft file
+  /// cannot turn cleanup into traversal outside the managed root.
+  private func attachmentSnapshotURL(id: String, platform: Platform) -> URL? {
+    guard !id.isEmpty, id != ".", id != "..", !id.contains("/") else { return nil }
+    let base = platform == .imessage ? imessageAttachmentDir : whatsappAttachmentDir
+    return base.appendingPathComponent(id, isDirectory: true)
+  }
+
+  private func removeAttachmentSnapshot(id: String, platform: Platform) throws {
+    guard let url = attachmentSnapshotURL(id: id, platform: platform),
+          FileManager.default.fileExists(atPath: url.path)
+    else { return }
+    try FileManager.default.removeItem(at: url)
   }
 
   /// Look up a draft from the in-memory list. Cheaper than re-reading
@@ -587,18 +614,12 @@ final class DraftStore: ObservableObject {
     return f.string(from: date)
   }
 
-  /// Record an in-session approval and mint the schedule-approval HMAC tag for a
-  /// freshly-created, pre-approved scheduled draft. Returns nil when the draft
-  /// isn't pre-approved. (Issue #77.)
-  private static func mintScheduleApprovalTagIfNeeded(
-    approved: Bool, id: String, recipient: String, body: String
-  ) -> String? {
-    guard approved else { return nil }
-    let canonical = ApprovalAuthenticator.canonicalMessage(
-      id: id, recipient: recipient, body: body, scope: Draft.scheduleApprovalScope
-    )
+  /// Record an in-session approval and mint the schedule-approval HMAC tag over
+  /// the complete current delivery payload. (Issue #77.)
+  private static func authenticatingScheduleApproval(_ draft: Draft) -> Draft {
+    let canonical = draft.scheduleApprovalCanonicalMessage
     ApprovalAuthenticator.recordSessionApproval(canonicalMessage: canonical)
-    return ApprovalAuthenticator.tag(for: canonical)
+    return draft.replacingScheduleApprovalTag(ApprovalAuthenticator.tag(for: canonical))
   }
 
   private func startWatching() {

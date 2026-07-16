@@ -336,6 +336,7 @@ describe("ghostie MCP stdio contract", () => {
           to_handle: WA_JID,
           in_reply_to_thread_ref: `whatsapp:${WA_JID}`,
           body: "See you then",
+          attachments: [{ path: "/tmp/ghostie-forwarded-photo.jpg", filename: "ignored-name.png", mime_type: "image/png" }],
         }),
       ]);
 
@@ -383,6 +384,10 @@ describe("ghostie MCP stdio contract", () => {
         "getThreads",
         "searchMessages",
         "stageDraft",
+      ]);
+      const stageCall = whatsapp.calls.find((call) => call.method === "stageDraft")!;
+      expect((stageCall.params as { attachments?: unknown[] }).attachments).toEqual([
+        { path: "/tmp/ghostie-forwarded-photo.jpg", filename: "ignored-name.png", mime_type: "image/png" },
       ]);
 
       // Witness contract: every successful tool call lands a per-touched-

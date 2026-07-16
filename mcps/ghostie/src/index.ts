@@ -36,7 +36,6 @@ import {
 
 import { DaemonRpcError, DaemonUnavailableError } from "../../shared/src/daemon-client.ts";
 import { errorResult, jsonResult } from "../../shared/src/mcp-result.ts";
-import { resolveDraftAttachments } from "../../shared/src/attachments.ts";
 import { wrapBodyInPlace, wrapUntrusted } from "../../shared/src/untrusted.ts";
 import { registerWithWitness, setChatDbAccessProbe } from "./witness.ts";
 
@@ -582,7 +581,7 @@ function registerGeneralizedTools(server: McpServer): void {
   registerWithWitness(
     server,
     "stage_message_draft",
-    "Stage a message draft for human approval. Does NOT send. Pass `platform` as imessage or whatsapp; returns a stable `draft_ref`. Pass `attachments` (array of `{path, filename?, mime_type?}`) to send photos/videos/files — each `path` must exist on disk now; the body may be empty when attachments are present.",
+    "Stage a message draft for human approval. Does NOT send. Pass `platform` as imessage or whatsapp; returns a stable `draft_ref`. Pass `attachments` (array of `{path, filename?, mime_type?}`) to send photos/videos/files. The transport copies each source into a private draft-owned snapshot and derives filename/MIME from the source; the body may be empty when attachments are present.",
     StageDraftShape,
     async (args, witness) => {
       const targetError = validateStageTarget(args.platform, args.to_handle);
@@ -590,9 +589,7 @@ function registerGeneralizedTools(server: McpServer): void {
       if (args.platform === "imessage" && args.body.length > IMESSAGE_DRAFT_BODY_MAX) {
         return errorResult(`iMessage draft body must be at most ${IMESSAGE_DRAFT_BODY_MAX} characters`);
       }
-      const resolvedAttachments = resolveDraftAttachments(args.attachments);
-      if (!resolvedAttachments.ok) return errorResult(resolvedAttachments.error);
-      if (args.body.trim().length === 0 && resolvedAttachments.attachments.length === 0) {
+      if (args.body.trim().length === 0 && (args.attachments?.length ?? 0) === 0) {
         return errorResult("provide a non-empty `body`, one or more `attachments`, or both");
       }
       // Quoting a specific message is a WhatsApp-only capability — the
@@ -614,7 +611,7 @@ function registerGeneralizedTools(server: McpServer): void {
           const result = await stageIMessageDraft({
             to_handle: args.to_handle,
             body: args.body,
-            attachments: resolvedAttachments.attachments,
+            attachments: args.attachments,
             in_reply_to_thread_id: inReplyTo,
             source: args.source ?? "ghostie-mcp",
           });
@@ -640,7 +637,7 @@ function registerGeneralizedTools(server: McpServer): void {
           body: args.body,
           source: args.source ?? "ghostie-mcp",
           quoted_message_id: args.quoted_message_id,
-          attachments: resolvedAttachments.attachments,
+          attachments: args.attachments,
         });
         witness.touch("whatsapp");
         return jsonResult({

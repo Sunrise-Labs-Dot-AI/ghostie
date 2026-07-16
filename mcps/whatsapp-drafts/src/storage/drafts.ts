@@ -27,6 +27,11 @@ import {
 import { join } from "node:path";
 
 import { PATHS } from "../paths.ts";
+import {
+  cleanupDraftAttachments,
+  snapshotDraftAttachments,
+  type RawAttachmentInput,
+} from "../../../shared/src/attachments.ts";
 
 export const DRAFT_SCHEMA_VERSION = 1;
 
@@ -64,14 +69,21 @@ export interface QuotedPreview {
   sender_name: string | null;
 }
 
-// A file to send with the draft. `path` is an absolute local path resolved +
-// existence-checked by the MCP stage tool; the daemon reads its bytes and picks
-// the Baileys media type from `mime_type` at send time.
+// A private, draft-owned attachment snapshot. Optional identity/hash fields
+// retain read compatibility with legacy path-only drafts; send rejects those.
 export interface DraftAttachment {
+  asset_id?: string;
   path: string;
   filename: string;
   mime_type: string | null;
   byte_count: number | null;
+  sha256?: string;
+}
+
+export interface DeliveryProgress {
+  completed_attachment_count: number;
+  body_sent: boolean;
+  ambiguous_part: string | null;
 }
 
 export interface Draft extends DraftContext {
@@ -101,6 +113,7 @@ export interface Draft extends DraftContext {
    *  text-only drafts. Additive optional field — schema_version stays 1; older
    *  readers ignore it. The body may be empty when this is non-empty. */
   attachments: DraftAttachment[];
+  delivery_progress: DeliveryProgress;
 }
 
 export class DraftSchemaError extends Error {
@@ -134,13 +147,14 @@ export interface StageInput {
   induced_by_unknown_contact?: boolean;
   quoted_message_id?: string | null;
   quoted_preview?: QuotedPreview | null;
-  attachments?: DraftAttachment[] | null;
+  attachments?: RawAttachmentInput[] | null;
 }
 
 /** Stage a new draft. Returns the full draft object as written. */
 export function stageDraft(input: StageInput): Draft {
   ensureDir();
   const id = crypto.randomUUID();
+  const attachments = snapshotDraftAttachments(PATHS.root, id, input.attachments);
   const draft: Draft = {
     id,
     schema_version: DRAFT_SCHEMA_VERSION,
@@ -157,9 +171,19 @@ export function stageDraft(input: StageInput): Draft {
     induced_by_unknown_contact: input.induced_by_unknown_contact ?? false,
     quoted_message_id: input.quoted_message_id ?? null,
     quoted_preview: input.quoted_preview ?? null,
-    attachments: input.attachments ?? [],
+    attachments,
+    delivery_progress: {
+      completed_attachment_count: 0,
+      body_sent: false,
+      ambiguous_part: null,
+    },
   };
-  writeFileSync(draftPath(id), JSON.stringify(draft, null, 2), { mode: 0o600 });
+  try {
+    writeFileSync(draftPath(id), JSON.stringify(draft, null, 2), { mode: 0o600 });
+  } catch (e) {
+    cleanupDraftAttachments(PATHS.root, id);
+    throw e;
+  }
   return draft;
 }
 
@@ -182,9 +206,45 @@ export function getDraft(id: string): Draft | null {
       `${path}: unknown schema_version ${String(parsed.schema_version)} — expected ${DRAFT_SCHEMA_VERSION}`,
     );
   }
-  // Backfill the additive `attachments` field so older draft files (written
-  // before media support) read as the current shape.
-  return { ...(parsed as Draft), attachments: Array.isArray(parsed.attachments) ? parsed.attachments : [] };
+  const attachments = normalizeAttachments(parsed.attachments);
+  return {
+    ...(parsed as Draft),
+    attachments,
+    delivery_progress: normalizeDeliveryProgress((parsed as Partial<Draft>).delivery_progress, attachments.length),
+  };
+}
+
+function normalizeAttachments(raw: unknown): DraftAttachment[] {
+  if (!Array.isArray(raw)) return [];
+  const out: DraftAttachment[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") continue;
+    const a = item as Record<string, unknown>;
+    if (typeof a.path !== "string" || a.path.length === 0) continue;
+    out.push({
+      asset_id: typeof a.asset_id === "string" ? a.asset_id : undefined,
+      path: a.path,
+      filename: typeof a.filename === "string" && a.filename.length > 0 ? a.filename : "attachment",
+      mime_type: typeof a.mime_type === "string" ? a.mime_type : null,
+      byte_count: typeof a.byte_count === "number" && Number.isFinite(a.byte_count) ? a.byte_count : null,
+      sha256: typeof a.sha256 === "string" ? a.sha256 : undefined,
+    });
+  }
+  return out;
+}
+
+function normalizeDeliveryProgress(raw: unknown, attachmentCount: number): DeliveryProgress {
+  if (!raw || typeof raw !== "object") return { completed_attachment_count: 0, body_sent: false, ambiguous_part: null };
+  const p = raw as Record<string, unknown>;
+  const completed =
+    typeof p.completed_attachment_count === "number" && Number.isSafeInteger(p.completed_attachment_count)
+      ? Math.max(0, Math.min(attachmentCount, p.completed_attachment_count))
+      : 0;
+  return {
+    completed_attachment_count: completed,
+    body_sent: p.body_sent === true,
+    ambiguous_part: typeof p.ambiguous_part === "string" && p.ambiguous_part.length > 0 ? p.ambiguous_part : null,
+  };
 }
 
 /** List drafts, newest-first by staged_at. Skips files that fail schema check. */
@@ -214,7 +274,7 @@ export function listDrafts(): { drafts: Draft[]; skipped: number } {
  * files added, removed, renamed). The rename here produces a `.write`
  * event on the directory FD, which the menubar's DraftStore consumes
  * to re-list drafts and surface the `sent_at` flip. */
-export function updateDraft(id: string, patch: Partial<Pick<Draft, "approval_state" | "sent_at">>): Draft {
+export function updateDraft(id: string, patch: Partial<Pick<Draft, "approval_state" | "sent_at" | "delivery_progress">>): Draft {
   const cur = getDraft(id);
   if (cur == null) throw new DraftSchemaError(`draft not found: ${id}`);
   const next: Draft = { ...cur, ...patch };
@@ -228,9 +288,10 @@ export function updateDraft(id: string, patch: Partial<Pick<Draft, "approval_sta
 /** Delete a draft. Returns true if the file existed. */
 export function discardDraft(id: string): boolean {
   const path = draftPath(id);
-  if (!existsSync(path)) return false;
-  unlinkSync(path);
-  return true;
+  const existed = existsSync(path);
+  if (existed) unlinkSync(path);
+  cleanupDraftAttachments(PATHS.root, id);
+  return existed;
 }
 
 /**
@@ -279,5 +340,15 @@ export function enforcePermissions(): void {
   for (const f of readdirSync(PATHS.draftsDir)) {
     if (!f.endsWith(".json")) continue;
     try { chmodSync(join(PATHS.draftsDir, f), 0o600); } catch { /* ignore */ }
+  }
+  if (existsSync(PATHS.draftAttachmentsDir)) {
+    try { chmodSync(PATHS.draftAttachmentsDir, 0o700); } catch { /* ignore */ }
+    for (const draftId of readdirSync(PATHS.draftAttachmentsDir)) {
+      const dir = join(PATHS.draftAttachmentsDir, draftId);
+      try { chmodSync(dir, 0o700); } catch { continue; }
+      try {
+        for (const asset of readdirSync(dir)) chmodSync(join(dir, asset), 0o600);
+      } catch { /* ignore */ }
+    }
   }
 }

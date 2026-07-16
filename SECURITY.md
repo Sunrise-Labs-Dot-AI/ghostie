@@ -85,6 +85,9 @@ is "I trust this .app the way I trust software I write myself" — not
 | **Send audit log** at `~/.messages-mcp/send-audit.log` | Forensic gap (post-hoc only) | Doesn't prevent; helps investigate. Body content is SHA-256-hashed, not stored. |
 | **`destructiveHint: true` + `idempotentHint: false` annotations on send** | MCP clients can surface confirmation prompts | Depends on the client implementing the hint |
 | **Sent-state lock** (`sent_at` set on draft → refused) | Double-send via retry loops | Doesn't stop staging a fresh draft |
+| **Managed attachment snapshots** | Source-file deletion or replacement changing a staged media draft; WhatsApp daemon opening an arbitrary agent-selected path | Draft-owned files remain readable by other processes running as the same user |
+| **Full-payload approval digest** | Recipient, body, quote, schedule, platform, or attachment-manifest changes after the human reviewed the draft | File bytes are re-hashed again at send time; an invalid digest or changed file fails closed |
+| **Multipart delivery journal** | An ordinary retry replaying a photo that was delivered before a later caption or file failed | Ambiguous delivery is held for manual reconciliation because transports cannot provide a transaction across parts |
 | **SQL parameterized everywhere** | SQL injection | — |
 | **`osascript` argv passing** (not string interpolation) | AppleScript injection via `to_handle` / `body` | — |
 | **UUID validation on `draft_id`** | Path traversal via draft id | — |

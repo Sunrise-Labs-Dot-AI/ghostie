@@ -61,6 +61,7 @@ describe("_wrapDraftForResponse", () => {
       schedule_hold_reason: null,
       override_send: null,
       schedule_approved: null,
+      delivery_progress: { completed_attachment_count: 0, body_sent: false, ambiguous_part: null },
     };
     const wrapped = _wrapDraftForResponse(d);
     expect(wrapped!.to_handle_name).toBe("<untrusted_content>\nAvery Example\n</untrusted_content>");
@@ -87,6 +88,7 @@ describe("_wrapDraftForResponse", () => {
       schedule_hold_reason: null,
       override_send: null,
       schedule_approved: null,
+      delivery_progress: { completed_attachment_count: 0, body_sent: false, ambiguous_part: null },
     };
     expect(_wrapDraftForResponse(d)!.to_handle_name).toBeNull();
   });
@@ -122,6 +124,7 @@ describe("_wrapDraftForResponse", () => {
       schedule_hold_reason: null,
       override_send: null,
       schedule_approved: null,
+      delivery_progress: { completed_attachment_count: 0, body_sent: false, ambiguous_part: null },
     };
     const wrapped = _wrapDraftForResponse(d);
     expect(wrapped!.to_handle_name).toContain("<untrusted_content>");
@@ -153,6 +156,7 @@ describe("_wrapDraftForResponse", () => {
       schedule_hold_reason: null,
       override_send: null,
       schedule_approved: null,
+      delivery_progress: { completed_attachment_count: 0, body_sent: false, ambiguous_part: null },
     };
     const wrapped = _wrapDraftForResponse(d)!;
     expect(wrapped.body).toBe("agent-typed body — stays raw");
@@ -183,6 +187,7 @@ describe("_wrapDraftForResponse", () => {
       schedule_hold_reason: null,
       override_send: null,
       schedule_approved: null,
+      delivery_progress: { completed_attachment_count: 0, body_sent: false, ambiguous_part: null },
     };
     _wrapDraftForResponse(d);
     expect(d.to_handle_name).toBe("Avery");

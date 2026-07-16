@@ -482,13 +482,20 @@ Coverage highlights:
   (iMessage) and caption (WhatsApp) — so the agent can see what media a thread
   contains, not just that it has some. Outbound, `stage_draft` /
   `stage_whatsapp_draft` / `stage_message_draft` accept an `attachments` array
-  of local file paths (≤10 files, ≤100 MB each); the file is sent before the
-  body (so the text reads as a caption) once the human approves the draft —
-  via the menu bar's hold-to-fire (which previews the media in the card) or, if
-  approval is off, the explicit send tool. iMessage media goes through
+  of local file paths (≤10 files, ≤100 MB each, ≤250 MB total). At staging,
+  Ghostie copies each regular, non-symlink source into private draft-owned
+  storage and records its SHA-256 digest. The original can be moved or deleted
+  without changing the draft. The managed snapshot is sent before the body
+  (so the text reads as a caption) once the human approves the exact recipient,
+  text, quote target, schedule, and ordered media manifest in the menu bar.
+  The approval card previews the managed media; changed or legacy-unhashed
+  attachments fail closed and must be restaged. iMessage media goes through
   Messages.app (POSIX file → iMessage/MMS); WhatsApp media goes through Baileys
-  (image/video/audio/document by MIME). The bytes are never inlined into model
-  context — only metadata + the path. The menu-bar transcript also displays
+  (image/video/audio/document by MIME). Multipart progress is journaled before
+  and after every wire operation, so an ambiguous failure is held for review
+  instead of blindly replaying an already-delivered part. The bytes are never
+  inlined into model context; only metadata and the proposed source path cross
+  the MCP boundary. The menu-bar transcript also displays
   iMessage Tapbacks/custom reaction emoji and WhatsApp reactions. WhatsApp reactions can be sent only from the visible
   Messages tab; MCP/agent tools do not expose a reaction-send method.
   Experimental iMessage Tapback sending lives behind the

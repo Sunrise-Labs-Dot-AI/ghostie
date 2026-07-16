@@ -55,6 +55,8 @@ import {
 import { reserveSend, SEND_ERR, type ReserveErr } from "../storage/audit.ts";
 import { readSettings, SettingsError, type Settings } from "../settings.ts";
 import { assertSendAllowed, ControlBlockedError } from "../control-gate.ts";
+import { isManagedDraftAttachment, verifyManagedDraftAttachment } from "../../../shared/src/attachments.ts";
+import { draftPayloadDigest } from "../../../shared/src/draft-payload.ts";
 
 // Per-connection inbound frame cap (#84). A single JSON-RPC frame is
 // newline-delimited and tiny in practice; anything past this without a
@@ -129,6 +131,11 @@ const RPC_ERR = {
 
 const DIRECT_SEND_SOURCE = "first_party_inline_composer";
 const DIRECT_REACTION_SOURCE = "first_party_message_tab";
+
+// Approval is intentionally process-memory-only. A daemon restart requires a
+// fresh human approval, and an on-disk `approval_state: approved` bit alone is
+// never authority to send a changed payload.
+const approvedPayloadDigests = new Map<string, string>();
 
 interface RpcNotification {
   jsonrpc: "2.0";
@@ -488,6 +495,7 @@ async function handle(
         if (typeof p?.draft_id !== "string") return err(id, RPC_ERR.INVALID_PARAMS, "draft_id required");
         try {
           const existed = discardDraft(p.draft_id);
+          approvedPayloadDigests.delete(p.draft_id);
           return ok(id, { ok: true, existed });
         } catch (e) {
           if (e instanceof DraftSchemaError) return err(id, RPC_ERR.INVALID_PARAMS, e.message);
@@ -498,10 +506,21 @@ async function handle(
         // Called by the menu bar app's hold-to-fire BEFORE sendDraft.
         // Also callable from MCP when settings.require_approval = false
         // (the MCP tool side handles that gate).
-        const p = req.params as { draft_id: string };
-        if (typeof p?.draft_id !== "string") return err(id, RPC_ERR.INVALID_PARAMS, "draft_id required");
+        const p = req.params as { draft_id: string; expected_payload_digest: string };
+        if (typeof p?.draft_id !== "string" || typeof p?.expected_payload_digest !== "string") {
+          return err(id, RPC_ERR.INVALID_PARAMS, "draft_id and expected_payload_digest required");
+        }
         try {
+          const current = getDraft(p.draft_id);
+          if (current == null) return err(id, RPC_ERR.DRAFT_NOT_FOUND, `no draft ${p.draft_id}`);
+          const digest = payloadDigestForDraft(current);
+          if (!digest.ok) return err(id, RPC_ERR.SEND_FAILED, digest.error);
+          if (digest.digest !== p.expected_payload_digest) {
+            approvedPayloadDigests.delete(p.draft_id);
+            return err(id, RPC_ERR.PENDING_APPROVAL, "draft payload changed before approval; review the current draft and approve again");
+          }
           const d = updateDraft(p.draft_id, { approval_state: "approved" });
+          approvedPayloadDigests.set(p.draft_id, digest.digest);
           return ok(id, { draft: d });
         } catch (e) {
           if (e instanceof DraftSchemaError) return err(id, RPC_ERR.INVALID_PARAMS, e.message);
@@ -738,9 +757,24 @@ async function handleSendDraft(
   if (draft == null) return err(id, RPC_ERR.DRAFT_NOT_FOUND, `no draft ${draftId}`);
   if (draft.sent_at != null) return err(id, RPC_ERR.INVALID_PARAMS, "draft already sent");
 
+  const currentDigest = payloadDigestForDraft(draft);
+  if (!currentDigest.ok) return err(id, RPC_ERR.SEND_FAILED, currentDigest.error);
+
   // 3. Approval gate.
   if (draft.approval_state !== "approved") {
     return err(id, RPC_ERR.PENDING_APPROVAL, "draft has not been approved");
+  }
+  const approvedDigest = approvedPayloadDigests.get(draft.id);
+  if (approvedDigest == null || approvedDigest !== currentDigest.digest) {
+    approvedPayloadDigests.delete(draft.id);
+    return err(id, RPC_ERR.PENDING_APPROVAL, "draft payload is not bound to the current daemon approval; review and approve it again");
+  }
+  if (draft.delivery_progress.ambiguous_part != null) {
+    return err(
+      id,
+      RPC_ERR.SEND_FAILED,
+      `draft has an ambiguous prior wire attempt (${draft.delivery_progress.ambiguous_part}); refusing ordinary retry to prevent duplicates`,
+    );
   }
 
   // 4. Min staged age.
@@ -765,7 +799,7 @@ async function handleSendDraft(
   // is already counted but Meta's anti-bot heuristics see staggered timing.
   await waitSendJitter();
 
-  // 7. Baileys send.
+  // 7. Baileys send with durable per-part progress.
   try {
     // Reply-draft: reconstruct the quoted message from the cache so Baileys
     // threads the reply. Null (quoted message no longer cached) degrades
@@ -779,33 +813,72 @@ async function handleSendDraft(
     // message. Otherwise: each file (quoting only the first), then the body as
     // its own text message. `message_id` is the last message sent.
     const atts = draft.attachments ?? [];
+    let progress = draft.delivery_progress;
     let messageId: string;
     if (atts.length === 0) {
-      const result = await connection.sendText(draft.to_handle, draft.body, quoted);
-      messageId = result.message_id;
+      if (!progress.body_sent) {
+        progress = updateDraft(draft.id, { delivery_progress: { ...progress, ambiguous_part: "body" } }).delivery_progress;
+        const result = await connection.sendText(draft.to_handle, draft.body, quoted);
+        messageId = result.message_id;
+        progress = updateDraft(draft.id, {
+          delivery_progress: { ...progress, body_sent: true, ambiguous_part: null },
+        }).delivery_progress;
+      } else {
+        messageId = "resumed-complete";
+      }
     } else {
       const body = draft.body ?? "";
       const firstMime = (atts[0]!.mime_type ?? "").toLowerCase();
       const canCaption = !firstMime.startsWith("audio/");
       if (atts.length === 1 && body.length > 0 && canCaption) {
-        const result = await connection.sendMedia(draft.to_handle, atts[0]!, body, quoted);
-        messageId = result.message_id;
+        if (progress.completed_attachment_count === 1 && progress.body_sent) {
+          messageId = "resumed-complete";
+        } else {
+          if (progress.completed_attachment_count !== 0 || progress.body_sent) {
+            throw new Error("combined media-caption delivery progress is inconsistent; discard and restage");
+          }
+          const verified = verifyManagedDraftAttachment(PATHS.root, draft.id, atts[0]);
+          if (!verified.ok) throw new Error(verified.error);
+          progress = updateDraft(draft.id, {
+            delivery_progress: { ...progress, ambiguous_part: "attachment:0+body" },
+          }).delivery_progress;
+          const result = await connection.sendMedia(draft.to_handle, verified.attachment, body, quoted);
+          messageId = result.message_id;
+          progress = updateDraft(draft.id, {
+            delivery_progress: { completed_attachment_count: 1, body_sent: true, ambiguous_part: null },
+          }).delivery_progress;
+        }
       } else {
         let last = "";
-        for (let i = 0; i < atts.length; i++) {
-          const r = await connection.sendMedia(draft.to_handle, atts[i]!, null, i === 0 ? quoted : null);
+        for (let i = progress.completed_attachment_count; i < atts.length; i++) {
+          const verified = verifyManagedDraftAttachment(PATHS.root, draft.id, atts[i]);
+          if (!verified.ok) throw new Error(verified.error);
+          progress = updateDraft(draft.id, {
+            delivery_progress: { ...progress, ambiguous_part: `attachment:${i}` },
+          }).delivery_progress;
+          const r = await connection.sendMedia(draft.to_handle, verified.attachment, null, i === 0 ? quoted : null);
           last = r.message_id;
+          progress = updateDraft(draft.id, {
+            delivery_progress: { completed_attachment_count: i + 1, body_sent: progress.body_sent, ambiguous_part: null },
+          }).delivery_progress;
         }
-        if (body.length > 0) {
+        if (body.length > 0 && !progress.body_sent) {
+          progress = updateDraft(draft.id, {
+            delivery_progress: { ...progress, ambiguous_part: "body" },
+          }).delivery_progress;
           const r = await connection.sendText(draft.to_handle, body, null);
           last = r.message_id;
+          progress = updateDraft(draft.id, {
+            delivery_progress: { ...progress, body_sent: true, ambiguous_part: null },
+          }).delivery_progress;
         }
-        messageId = last;
+        messageId = last || "resumed-complete";
       }
     }
     reservation.commit("ok");
     const sent_at = new Date().toISOString();
     try { updateDraft(draft.id, { sent_at }); } catch { /* draft sweep handles cleanup */ }
+    approvedPayloadDigests.delete(draft.id);
     return ok(id, {
       ok: true,
       draft_id: draft.id,
@@ -816,4 +889,24 @@ async function handleSendDraft(
     reservation.commit("send_failed");
     return err(id, RPC_ERR.SEND_FAILED, (e as Error).message);
   }
+}
+
+function payloadDigestForDraft(
+  draft: import("../storage/drafts.ts").Draft,
+): { ok: true; digest: string } | { ok: false; error: string } {
+  if (!draft.attachments.every(isManagedDraftAttachment)) {
+    return { ok: false, error: "legacy or incomplete attachment manifest; discard and restage this draft" };
+  }
+  return {
+    ok: true,
+    digest: draftPayloadDigest({
+      id: draft.id,
+      platform: "whatsapp",
+      to_handle: draft.to_handle,
+      body: draft.body,
+      quoted_message_id: draft.quoted_message_id,
+      scheduled_send_at: null,
+      attachments: draft.attachments,
+    }),
+  };
 }

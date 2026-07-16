@@ -135,6 +135,92 @@ final class DraftSenderTests: XCTestCase {
     XCTAssertNil(DraftSender.groupChatGUID(from: "imessage-group:"))
   }
 
+  // MARK: - Staged attachment delivery journal
+
+  func testPendingIMessagePartsPreserveReviewedOrderThenBody() {
+    let first = attachment(assetID: "asset-1", filename: "first.png")
+    let second = attachment(assetID: "asset-2", filename: "second.jpg")
+    let draft = mediaDraft(attachments: [first, second], body: "caption")
+
+    XCTAssertEqual(
+      DraftSender.pendingIMessageParts(for: draft),
+      [
+        .attachment(index: 0, attachment: first),
+        .attachment(index: 1, attachment: second),
+        .body("caption")
+      ]
+    )
+  }
+
+  func testPendingIMessagePartsResumeAfterConfirmedAttachmentWithoutReplay() {
+    let first = attachment(assetID: "asset-1", filename: "first.png")
+    let second = attachment(assetID: "asset-2", filename: "second.jpg")
+    let progress = DraftDeliveryProgress(
+      completed_attachment_count: 1,
+      body_sent: false,
+      ambiguous_part: nil
+    )
+    let draft = mediaDraft(attachments: [first, second], body: "caption", progress: progress)
+
+    XCTAssertEqual(
+      DraftSender.pendingIMessageParts(for: draft),
+      [.attachment(index: 1, attachment: second), .body("caption")]
+    )
+  }
+
+  @MainActor
+  func testDeliveryProgressPersistsAmbiguousAndConfirmedStates() throws {
+    let store = DraftStore(homeOverride: tmpHome)
+    let draft = try store.createIMessageDraft(
+      toHandle: "+12155550121", toHandleName: "Ryan", body: "caption"
+    )
+    XCTAssertTrue(
+      DraftSender.persistIMessageDeliveryProgress(
+        draftId: draft.id,
+        completedAttachmentCount: 0,
+        bodySent: false,
+        ambiguousPart: "attachment:0"
+      )
+    )
+    let url = tmpHome
+      .appendingPathComponent(".messages-mcp/drafts", isDirectory: true)
+      .appendingPathComponent("\(draft.id).json")
+    XCTAssertEqual(
+      try XCTUnwrap(reload(url)).delivery_progress,
+      DraftDeliveryProgress(
+        completed_attachment_count: 0,
+        body_sent: false,
+        ambiguous_part: "attachment:0"
+      )
+    )
+
+    XCTAssertTrue(
+      DraftSender.persistIMessageDeliveryProgress(
+        draftId: draft.id,
+        completedAttachmentCount: 1,
+        bodySent: false,
+        ambiguousPart: nil
+      )
+    )
+    XCTAssertEqual(
+      try XCTUnwrap(reload(url)).delivery_progress,
+      DraftDeliveryProgress(
+        completed_attachment_count: 1,
+        body_sent: false,
+        ambiguous_part: nil
+      )
+    )
+  }
+
+  func testFileHashChangesWhenManagedSnapshotBytesChange() throws {
+    let file = tmpHome.appendingPathComponent("managed-photo.png")
+    try Data("reviewed bytes".utf8).write(to: file)
+    let reviewedHash = try XCTUnwrap(DraftSender.fileSHA256(atPath: file.path))
+    try Data("different bytes".utf8).write(to: file)
+
+    XCTAssertNotEqual(DraftSender.fileSHA256(atPath: file.path), reviewedHash)
+  }
+
   // MARK: - Helpers
 
   private func diskSentAt(_ url: URL) throws -> String? {
@@ -146,5 +232,51 @@ final class DraftSenderTests: XCTestCase {
   private func reload(_ url: URL) -> Draft? {
     guard let data = try? Data(contentsOf: url) else { return nil }
     return try? JSONDecoder().decode(Draft.self, from: data)
+  }
+
+  private func attachment(assetID: String, filename: String) -> DraftAttachment {
+    DraftAttachment(
+      path: tmpHome
+        .appendingPathComponent(".messages-mcp/draft-attachments/media-draft/\(assetID)-\(filename)")
+        .path,
+      filename: filename,
+      mime_type: filename.hasSuffix(".png") ? "image/png" : "image/jpeg",
+      byte_count: 10,
+      asset_id: assetID,
+      sha256: String(repeating: "a", count: 64)
+    )
+  }
+
+  private func mediaDraft(
+    attachments: [DraftAttachment],
+    body: String,
+    progress: DraftDeliveryProgress? = nil
+  ) -> Draft {
+    Draft(
+      id: "media-draft",
+      to_handle: "+12155550121",
+      to_handle_name: "Ryan",
+      body: body,
+      attachments: attachments,
+      delivery_progress: progress,
+      in_reply_to_thread_id: nil,
+      staged_at: "2026-07-16T00:00:00Z",
+      sent_at: nil,
+      send_service: nil,
+      source: "test",
+      context_messages: nil,
+      context_diagnostic: nil,
+      scheduled_send_at: nil,
+      schedule_hold_reason: nil,
+      override_send: nil,
+      schedule_approved: nil,
+      schedule_approval_tag: nil,
+      schema_version: nil,
+      platform: .imessage,
+      approval_state: nil,
+      induced_by_unknown_contact: nil,
+      quoted_message_id: nil,
+      quoted_preview: nil
+    )
   }
 }
