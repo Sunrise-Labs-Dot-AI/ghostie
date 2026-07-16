@@ -259,16 +259,30 @@ struct Draft: Codable, Identifiable, Equatable {
   /// text-only drafts remain valid.
   var attachmentReviewIssue: String? {
     guard let attachments, !attachments.isEmpty else { return nil }
+    let maximumAttachmentCount = 10
+    let maximumAttachmentBytes = 100 * 1024 * 1024
+    let maximumDraftAttachmentBytes = 250 * 1024 * 1024
+    guard attachments.count <= maximumAttachmentCount else {
+      return "This draft has more than 10 attachments. Re-stage it with fewer files before sending."
+    }
     guard !id.isEmpty, id != ".", id != "..", !id.contains("/") else {
       return "This draft has an invalid attachment owner. Re-stage it before sending."
     }
 
     let storageRoot = effectivePlatform == .imessage ? ".messages-mcp" : ".whatsapp-mcp"
-    let managedPathMarker = "/\(storageRoot)/draft-attachments/\(id)/"
+    let expectedDirectory = AppStoragePaths.homeDirectory
+      .appendingPathComponent(storageRoot, isDirectory: true)
+      .appendingPathComponent("draft-attachments", isDirectory: true)
+      .appendingPathComponent(id, isDirectory: true)
+      .standardizedFileURL
+    var aggregateBytes = 0
     for (index, attachment) in attachments.enumerated() {
       let number = index + 1
       guard let assetID = attachment.asset_id,
-            !assetID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            assetID.range(
+              of: "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$",
+              options: .regularExpression
+            ) != nil
       else {
         return "Attachment \(number) is missing its managed asset ID. Re-stage this draft before sending."
       }
@@ -281,9 +295,27 @@ struct Draft: Codable, Identifiable, Equatable {
       guard let byteCount = attachment.byte_count, byteCount >= 0 else {
         return "Attachment \(number) is missing a valid byte count. Re-stage this draft before sending."
       }
+      guard byteCount <= maximumAttachmentBytes else {
+        return "Attachment \(number) exceeds the 100 MB limit. Re-stage it with a smaller file."
+      }
+      let (newAggregate, overflow) = aggregateBytes.addingReportingOverflow(byteCount)
+      guard !overflow, newAggregate <= maximumDraftAttachmentBytes else {
+        return "This draft's attachments exceed the 250 MB limit. Re-stage it with fewer or smaller files."
+      }
+      aggregateBytes = newAggregate
       let expandedPath = (attachment.path as NSString).expandingTildeInPath
-      let standardizedPath = URL(fileURLWithPath: expandedPath).standardizedFileURL.path
-      guard expandedPath.hasPrefix("/"), standardizedPath.contains(managedPathMarker) else {
+      let standardizedURL = URL(fileURLWithPath: expandedPath).standardizedFileURL
+      let managedName = standardizedURL.lastPathComponent
+      let managedExtension = managedName.hasPrefix("\(assetID).")
+        ? String(managedName.dropFirst(assetID.count + 1))
+        : ""
+      let validManagedName = managedName == assetID || (
+        managedExtension.range(of: "^[a-z0-9]{1,12}$", options: .regularExpression) != nil
+      )
+      guard expandedPath.hasPrefix("/"),
+            standardizedURL.deletingLastPathComponent() == expectedDirectory,
+            validManagedName
+      else {
         return "Attachment \(number) is outside this draft's managed storage. Re-stage it before sending."
       }
     }

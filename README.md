@@ -27,7 +27,7 @@ Claims below describe Anthropic's plugin as published at the linked commit on 20
 
 | | Anthropic `imessage` plugin | Ghostie (this project) |
 |---|---|---|
-| **Send model** | Direct — Claude sends immediately on tool call | Staged (default) — `send_draft` is gated by a `require_approval` toggle that ships ON; sends route through the menu bar's hold-to-fire Send button. Users can disable the toggle in the menu bar footer to allow direct MCP sends. |
+| **Send model** | Direct: Claude sends immediately on tool call | Staged (default): `send_draft` is gated by a `require_approval` toggle that ships ON; sends route through the menu bar's hold-to-fire Send button. Users can disable the toggle for direct text-only MCP sends. Media always requires review and hold-to-fire in Ghostie. |
 | **Approval surface** | macOS Automation TCC prompt on first send only | Menu bar review: hold-to-fire Send / Discard per draft (no in-place edit yet — discard and re-stage instead) |
 | **Audit log** | Not present at the linked revision | Every **successful** MCP send appended to `~/.messages-mcp/send-audit.log` with timestamp, recipient handle, and SHA-256 of body. Discards and blocked sends are not currently logged. |
 | **UI** | CLI-only | Menu bar surface with thread-context bubbles |
@@ -475,7 +475,10 @@ Coverage highlights:
 - **Network.** Stdio only. If you ever want a cloud agent to call this,
   wrap the same query + draft code behind a tunnel + bearer secret —
   the data layer stays unchanged.
-- **Attachments, tapbacks, reactions.** Mixed media now has read + send parity
+
+## Media and reactions
+
+Mixed media now has read + send parity
   with Messages: agent read tools (`get_thread`, `search_messages`, the Ghostie
   facade) surface per-message attachment metadata — filename, local path,
   MIME, a coarse `kind` (image/video/audio/document), byte size, sticker flag
@@ -489,9 +492,15 @@ Coverage highlights:
   (so the text reads as a caption) once the human approves the exact recipient,
   text, quote target, schedule, and ordered media manifest in the menu bar.
   The approval card previews the managed media; changed or legacy-unhashed
-  attachments fail closed and must be restaged. iMessage media goes through
-  Messages.app (POSIX file → iMessage/MMS); WhatsApp media goes through Baileys
-  (image/video/audio/document by MIME). Multipart progress is journaled before
+  attachments fail closed and must be restaged. iMessage media can be staged
+  through the MCP, but it is always sent from Ghostie's reviewed app surface.
+  After approval, the app copies the exact verified bytes into a short-lived
+  handoff under the TCC-protected `~/Library/Messages/GhostieSendSpool`, keeps
+  a no-follow descriptor open, makes that copy user-immutable, and gives
+  Messages.app its stable macOS file-ID path. Direct MCP media send is blocked,
+  even when direct text sending is enabled. WhatsApp media goes through Baileys using the exact bytes read
+  and hashed through one no-follow file descriptor (image/video/audio/document
+  by MIME). Multipart progress is journaled before
   and after every wire operation, so an ambiguous failure is held for review
   instead of blindly replaying an already-delivered part. The bytes are never
   inlined into model context; only metadata and the proposed source path cross

@@ -13,15 +13,23 @@
 // but we always also include a human-readable message.
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { randomUUID } from "node:crypto";
 
-import { callDaemon, DaemonRpcError } from "../daemon/rpc-client.ts";
+import { callDaemon, DaemonRpcError, DaemonUnavailableError } from "../daemon/rpc-client.ts";
 import { registerWithWitness } from "../witness.ts";
 import { DraftIdInput, DraftIdShape, StageDraftInput, StageDraftShape } from "../schema.ts";
 import type { Settings } from "../settings.ts";
 import { readSettings, SettingsError } from "../settings.ts";
 import { acquireSendLock } from "../storage/send-lock.ts";
 import { assertSendAllowed, ControlBlockedError } from "../control-gate.ts";
-import { isManagedDraftAttachment, type ManagedDraftAttachment } from "../../../shared/src/attachments.ts";
+import { PATHS } from "../paths.ts";
+import {
+  cleanupDraftAttachments,
+  isManagedDraftAttachment,
+  snapshotDraftAttachments,
+  type ManagedDraftAttachment,
+  type RawAttachmentInput,
+} from "../../../shared/src/attachments.ts";
 import { draftPayloadDigest } from "../../../shared/src/draft-payload.ts";
 import { errorResult, jsonResult } from "./_result.ts";
 import { wrapBodyInPlace, wrapUntrusted } from "./_untrusted.ts";
@@ -82,10 +90,51 @@ export interface DraftRpc {
     from_me: boolean;
     sender_name: string | null;
   } | null;
-  // Files to send with this draft. Resolved (absolute path + size + mime) at
-  // stage time; the daemon reads the bytes and picks the Baileys media type at
-  // send. Empty for text-only drafts. Older draft files lack this field.
+  // Files to send with this draft. The unprivileged MCP caller snapshots and
+  // hashes them at stage time; the daemon accepts only that managed manifest,
+  // then reads exact verified bytes for Baileys at send. Empty for text-only
+  // drafts. Older draft files lack this field.
   attachments?: ManagedDraftAttachment[];
+  scheduled_send_at?: string | null;
+}
+
+export interface StageWhatsAppDraftArgs {
+  to_handle: string;
+  body: string;
+  source?: string;
+  quoted_message_id?: string;
+  attachments?: RawAttachmentInput[];
+}
+
+/**
+ * Snapshot caller-selected files in the MCP process, then ask the app-launched
+ * daemon to adopt only that verified managed manifest. This keeps arbitrary
+ * source paths outside the daemon's broader launcher-attributed permissions.
+ */
+export async function stageWhatsAppDraft(
+  args: StageWhatsAppDraftArgs,
+  rpc: typeof callDaemon = callDaemon,
+): Promise<{ draft: DraftRpc }> {
+  const draftId = randomUUID();
+  const attachments = snapshotDraftAttachments(PATHS.root, draftId, args.attachments);
+  try {
+    return await rpc<{ draft: DraftRpc }>("stageDraft", {
+      ...args,
+      draft_id: draftId,
+      attachments,
+    });
+  } catch (error) {
+    // A daemon RPC rejection and a connection failure before request handoff
+    // are definitive: no draft was committed. Timeouts and post-write socket
+    // failures are ambiguous, so their snapshot is left for the daemon sweep.
+    if (
+      error instanceof DaemonRpcError ||
+      (error instanceof DaemonUnavailableError && !error.requestMayHaveBeenSent)
+    ) {
+      cleanupDraftAttachments(PATHS.root, draftId);
+    }
+    throw error;
+  }
 }
 
 /** Wrap untrusted fields (peer-authored context messages) but leave
@@ -149,9 +198,7 @@ export function registerDraftTools(server: McpServer) {
         return errorResult("provide a non-empty `body`, one or more `attachments`, or both");
       }
       try {
-        const { draft } = await callDaemon<{ draft: DraftRpc }>("stageDraft", {
-          ...parsed.data,
-        });
+        const { draft } = await stageWhatsAppDraft(parsed.data);
         return jsonResult({ ok: true, draft: maskDraft(draft) });
       } catch (e) {
         return mapDaemonError(e);
@@ -288,7 +335,7 @@ export function registerDraftTools(server: McpServer) {
               to_handle: draft.to_handle,
               body: draft.body,
               quoted_message_id: draft.quoted_message_id,
-              scheduled_send_at: null,
+              scheduled_send_at: draft.scheduled_send_at ?? null,
               attachments,
             });
             await callDaemon("approveDraft", { draft_id: parsed.data.draft_id, expected_payload_digest });

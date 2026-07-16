@@ -27,7 +27,11 @@ import {
 } from "../../imessage-drafts/src/storage/priorities.ts";
 
 import { callDaemon as callWhatsAppDaemon } from "../../whatsapp-drafts/src/daemon/rpc-client.ts";
-import { maskDraft as maskWhatsAppDraft, type DraftRpc as WhatsAppDraft } from "../../whatsapp-drafts/src/tools/drafts.ts";
+import {
+  maskDraft as maskWhatsAppDraft,
+  stageWhatsAppDraft,
+  type DraftRpc as WhatsAppDraft,
+} from "../../whatsapp-drafts/src/tools/drafts.ts";
 import {
   clearThreadPriority as clearWhatsAppThreadPriority,
   listThreadPriorities as listWhatsAppThreadPriorities,
@@ -632,7 +636,7 @@ function registerGeneralizedTools(server: McpServer): void {
             return errorResult("for WhatsApp drafts, in_reply_to_thread_ref must match to_handle");
           }
         }
-        const { draft } = await callWhatsAppDaemon<{ draft: WhatsAppDraft }>("stageDraft", {
+        const { draft } = await stageWhatsAppDraft({
           to_handle: args.to_handle,
           body: args.body,
           source: args.source ?? "ghostie-mcp",

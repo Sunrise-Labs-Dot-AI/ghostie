@@ -270,8 +270,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var visibleWindows = 0
   private var fullExperienceServicesStarted = false
   private var cancellables: Set<AnyCancellable> = []
+  private var attachmentSpoolCleanupTimer: Timer?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
+    _ = DraftSender.cleanupStaleIMessageAttachmentSpools()
+    attachmentSpoolCleanupTimer = Timer.scheduledTimer(
+      withTimeInterval: 30 * 60,
+      repeats: true
+    ) { _ in
+      _ = DraftSender.cleanupStaleIMessageAttachmentSpools()
+    }
     AnalyticsClient.shared.configure(userEnabled: settings.productAnalyticsEnabled)
     AnalyticsClient.shared.safeCapture(.appLaunched)
     AnalyticsClient.shared.safeCapture(.appVersionSeen)
@@ -360,6 +368,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   func applicationWillTerminate(_ notification: Notification) {
+    attachmentSpoolCleanupTimer?.invalidate()
     DiagnosticsStore.shared.log("app_terminate")
     imessageDaemon.stopBlocking()
     whatsappDaemon.stopBlocking()

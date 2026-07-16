@@ -1,4 +1,5 @@
 import CryptoKit
+import Darwin
 import Foundation
 
 // Platform-aware send dispatch. Holds the iMessage AppleScript path
@@ -89,6 +90,14 @@ enum DraftSender {
   /// the daemon writes sent_at to disk itself. Caller MUST NOT call
   /// markSent — DraftStore's FS watcher picks up the change.
   static func send(draft: Draft) async -> SendResult {
+    guard isSafeDraftID(draft.id) else {
+      return SendResult(
+        ok: false,
+        service: nil,
+        error: "This draft has an invalid identifier and cannot be sent.",
+        durationMs: 0
+      )
+    }
     // Remote kill switch / forced-upgrade floor (issue #76). This is the single
     // chokepoint every send (scheduler, manual, automation, Don't-Ghost) routes
     // through, so one check blocks them all when a verified kill directive or a
@@ -206,6 +215,32 @@ enum DraftSender {
         return "attachment:\(index)"
       case .body:
         return "body"
+      }
+    }
+  }
+
+  struct PreparedIMessageAttachment {
+    let fileURL: URL
+    let fileFD: Int32
+    let directoryFD: Int32
+    let spoolRootFD: Int32
+    let fileName: String
+    let directoryName: String
+  }
+
+  enum IMessageAttachmentPreparationError: LocalizedError {
+    case invalidSnapshot
+    case changedSnapshot
+    case spoolUnavailable
+
+    var errorDescription: String? {
+      switch self {
+      case .invalidSnapshot:
+        return "The staged attachment is missing or is no longer a regular managed file. Discard and stage it again."
+      case .changedSnapshot:
+        return "The staged attachment no longer matches the image you reviewed. Discard and stage it again."
+      case .spoolUnavailable:
+        return "Ghostie could not create a protected attachment handoff, so nothing was sent."
       }
     }
   }
@@ -333,19 +368,6 @@ enum DraftSender {
     let parts = pendingIMessageParts(for: draft)
 
     for part in parts {
-      if case .attachment(_, let attachment) = part {
-        guard let expectedHash = attachment.sha256,
-              let actualHash = fileSHA256(atPath: attachment.path),
-              actualHash == expectedHash else {
-          return SendResult(
-            ok: false,
-            service: nil,
-            error: "The staged attachment no longer matches the image you reviewed. Discard this draft and stage the image again.",
-            durationMs: totalDuration
-          )
-        }
-      }
-
       guard persistIMessageDeliveryProgress(
         draftId: draft.id,
         completedAttachmentCount: completed,
@@ -363,7 +385,33 @@ enum DraftSender {
       let wireResult: SendResult
       switch part {
       case .attachment(let index, let attachment):
-        wireResult = await sendAttachment(attachment)
+        let prepared: PreparedIMessageAttachment
+        do {
+          prepared = try prepareIMessageAttachment(attachment, draftId: draft.id)
+        } catch {
+          _ = persistIMessageDeliveryProgress(
+            draftId: draft.id,
+            completedAttachmentCount: completed,
+            bodySent: bodySent,
+            ambiguousPart: nil
+          )
+          return SendResult(
+            ok: false,
+            service: nil,
+            error: error.localizedDescription,
+            durationMs: totalDuration
+          )
+        }
+        let sendCopy = DraftAttachment(
+          path: prepared.fileURL.path,
+          filename: attachment.filename,
+          mime_type: attachment.mime_type,
+          byte_count: attachment.byte_count,
+          asset_id: attachment.asset_id,
+          sha256: attachment.sha256
+        )
+        wireResult = await sendAttachment(sendCopy)
+        cleanupIMessageAttachment(prepared)
         if wireResult.ok { completed = index + 1 }
       case .body(let body):
         wireResult = await sendBody(body)
@@ -533,6 +581,7 @@ enum DraftSender {
   }
 
   static func readIMessageDraft(draftId: String) -> Draft? {
+    guard isSafeDraftID(draftId) else { return nil }
     guard let data = try? Data(contentsOf: iMessageDraftURL(draftId: draftId)) else { return nil }
     return try? JSONDecoder().decode(Draft.self, from: data)
   }
@@ -543,6 +592,7 @@ enum DraftSender {
     draftId: String,
     _ mutation: (inout [String: Any]) -> Bool
   ) -> Bool {
+    guard isSafeDraftID(draftId) else { return false }
     let url = iMessageDraftURL(draftId: draftId)
     guard let data = try? Data(contentsOf: url),
           var obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
@@ -590,6 +640,273 @@ enum DraftSender {
       return nil
     }
     return hasher.finalize().map { String(format: "%02x", $0) }.joined()
+  }
+
+  /// Open every managed directory with O_NOFOLLOW, copy the reviewed bytes
+  /// into Ghostie's short-lived spool inside TCC-protected Messages storage,
+  /// then hand Messages a stable APFS file-id path. The protected file remains
+  /// open and user-immutable until osascript returns. The staging MCP does not
+  /// have Full Disk Access, so it cannot rewrite this final handoff.
+  static func prepareIMessageAttachment(
+    _ attachment: DraftAttachment,
+    draftId: String
+  ) throws -> PreparedIMessageAttachment {
+    guard let expectedBytes = attachment.byte_count,
+          expectedBytes >= 0,
+          expectedBytes <= 100 * 1024 * 1024,
+          let expectedSHA = attachment.sha256?.lowercased(),
+          expectedSHA.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil
+    else {
+      throw IMessageAttachmentPreparationError.invalidSnapshot
+    }
+
+    guard draftId.range(of: "^[A-Za-z0-9_-]+$", options: .regularExpression) != nil else {
+      throw IMessageAttachmentPreparationError.invalidSnapshot
+    }
+    let expandedPath = (attachment.path as NSString).expandingTildeInPath
+    let standardizedURL = URL(fileURLWithPath: expandedPath).standardizedFileURL
+    let expectedDirectory = AppStoragePaths.homeDirectory
+      .appendingPathComponent(".messages-mcp", isDirectory: true)
+      .appendingPathComponent("draft-attachments", isDirectory: true)
+      .appendingPathComponent(draftId, isDirectory: true)
+      .standardizedFileURL
+    guard expandedPath.hasPrefix("/"),
+          standardizedURL.deletingLastPathComponent() == expectedDirectory,
+          let assetID = attachment.asset_id,
+          isManagedAssetName(standardizedURL.lastPathComponent, assetID: assetID)
+    else {
+      throw IMessageAttachmentPreparationError.invalidSnapshot
+    }
+
+    let directoryFlags = O_RDONLY | O_DIRECTORY | O_NOFOLLOW
+    let homeFD = Darwin.open(AppStoragePaths.homeDirectory.path, directoryFlags)
+    guard homeFD >= 0 else { throw IMessageAttachmentPreparationError.invalidSnapshot }
+    defer { Darwin.close(homeFD) }
+    let transportFD = Darwin.openat(homeFD, ".messages-mcp", directoryFlags)
+    guard transportFD >= 0 else { throw IMessageAttachmentPreparationError.invalidSnapshot }
+    defer { Darwin.close(transportFD) }
+    let attachmentsFD = Darwin.openat(transportFD, "draft-attachments", directoryFlags)
+    guard attachmentsFD >= 0 else { throw IMessageAttachmentPreparationError.invalidSnapshot }
+    defer { Darwin.close(attachmentsFD) }
+    let draftFD = Darwin.openat(attachmentsFD, draftId, directoryFlags)
+    guard draftFD >= 0 else { throw IMessageAttachmentPreparationError.invalidSnapshot }
+    defer { Darwin.close(draftFD) }
+    let sourceFD = Darwin.openat(draftFD, standardizedURL.lastPathComponent, O_RDONLY | O_NOFOLLOW)
+    guard sourceFD >= 0 else { throw IMessageAttachmentPreparationError.invalidSnapshot }
+    defer { Darwin.close(sourceFD) }
+
+    var sourceStat = stat()
+    guard fstat(sourceFD, &sourceStat) == 0,
+          (sourceStat.st_mode & S_IFMT) == S_IFREG,
+          sourceStat.st_size == expectedBytes
+    else {
+      throw IMessageAttachmentPreparationError.changedSnapshot
+    }
+
+    _ = cleanupStaleIMessageAttachmentSpools()
+
+    let libraryFD = Darwin.openat(homeFD, "Library", directoryFlags)
+    guard libraryFD >= 0 else { throw IMessageAttachmentPreparationError.spoolUnavailable }
+    defer { Darwin.close(libraryFD) }
+    let messagesFD = Darwin.openat(libraryFD, "Messages", directoryFlags)
+    guard messagesFD >= 0 else { throw IMessageAttachmentPreparationError.spoolUnavailable }
+    defer { Darwin.close(messagesFD) }
+
+    if Darwin.mkdirat(messagesFD, "GhostieSendSpool", mode_t(0o700)) != 0 && errno != EEXIST {
+      throw IMessageAttachmentPreparationError.spoolUnavailable
+    }
+    let spoolRootFD = Darwin.openat(messagesFD, "GhostieSendSpool", directoryFlags)
+    guard spoolRootFD >= 0 else { throw IMessageAttachmentPreparationError.spoolUnavailable }
+    _ = Darwin.fchmod(spoolRootFD, mode_t(0o700))
+
+    let directoryName = UUID().uuidString.lowercased()
+    guard Darwin.mkdirat(spoolRootFD, directoryName, mode_t(0o700)) == 0 else {
+      Darwin.close(spoolRootFD)
+      throw IMessageAttachmentPreparationError.spoolUnavailable
+    }
+    let directoryFD = Darwin.openat(spoolRootFD, directoryName, directoryFlags)
+    guard directoryFD >= 0 else {
+      _ = Darwin.unlinkat(spoolRootFD, directoryName, AT_REMOVEDIR)
+      Darwin.close(spoolRootFD)
+      throw IMessageAttachmentPreparationError.spoolUnavailable
+    }
+
+    let pathExtension = standardizedURL.pathExtension.lowercased()
+    let safeExtension = pathExtension.range(of: "^[a-z0-9]{1,12}$", options: .regularExpression) != nil
+      ? ".\(pathExtension)"
+      : ""
+    let fileName = "\(UUID().uuidString.lowercased())\(safeExtension)"
+    let fileFD = Darwin.openat(
+      directoryFD,
+      fileName,
+      O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW,
+      mode_t(0o400)
+    )
+    guard fileFD >= 0 else {
+      Darwin.close(directoryFD)
+      _ = Darwin.unlinkat(spoolRootFD, directoryName, AT_REMOVEDIR)
+      Darwin.close(spoolRootFD)
+      throw IMessageAttachmentPreparationError.spoolUnavailable
+    }
+
+    var ownsSpool = true
+    defer {
+      if ownsSpool {
+        _ = Darwin.fchflags(fileFD, 0)
+        Darwin.close(fileFD)
+        _ = Darwin.unlinkat(directoryFD, fileName, 0)
+        Darwin.close(directoryFD)
+        _ = Darwin.unlinkat(spoolRootFD, directoryName, AT_REMOVEDIR)
+        Darwin.close(spoolRootFD)
+      }
+    }
+
+    guard Darwin.lseek(sourceFD, 0, SEEK_SET) == 0 else {
+      throw IMessageAttachmentPreparationError.changedSnapshot
+    }
+    var hasher = SHA256()
+    var total = 0
+    var buffer = [UInt8](repeating: 0, count: 1_048_576)
+    while true {
+      let count = buffer.withUnsafeMutableBytes { rawBuffer in
+        Darwin.read(sourceFD, rawBuffer.baseAddress, rawBuffer.count)
+      }
+      guard count >= 0 else {
+        throw IMessageAttachmentPreparationError.changedSnapshot
+      }
+      if count == 0 { break }
+      total += count
+      guard total <= expectedBytes else {
+        throw IMessageAttachmentPreparationError.changedSnapshot
+      }
+      hasher.update(data: Data(buffer[0..<count]))
+      var written = 0
+      while written < count {
+        let writeCount = buffer.withUnsafeBytes { rawBuffer in
+          Darwin.write(fileFD, rawBuffer.baseAddress?.advanced(by: written), count - written)
+        }
+        guard writeCount > 0 else {
+          throw IMessageAttachmentPreparationError.spoolUnavailable
+        }
+        written += writeCount
+      }
+    }
+    let actualSHA = hasher.finalize().map { String(format: "%02x", $0) }.joined()
+    guard total == expectedBytes, actualSHA == expectedSHA else {
+      throw IMessageAttachmentPreparationError.changedSnapshot
+    }
+
+    guard Darwin.fsync(fileFD) == 0,
+          Darwin.fchmod(fileFD, mode_t(0o400)) == 0,
+          Darwin.fchflags(fileFD, UInt32(UF_IMMUTABLE)) == 0
+    else {
+      throw IMessageAttachmentPreparationError.spoolUnavailable
+    }
+    var spoolStat = stat()
+    guard fstat(fileFD, &spoolStat) == 0,
+          (spoolStat.st_mode & S_IFMT) == S_IFREG,
+          spoolStat.st_size == expectedBytes
+    else {
+      throw IMessageAttachmentPreparationError.spoolUnavailable
+    }
+
+    let fileIDPath = "/.vol/\(spoolStat.st_dev)/\(spoolStat.st_ino)"
+    ownsSpool = false
+    return PreparedIMessageAttachment(
+      fileURL: URL(fileURLWithPath: fileIDPath),
+      fileFD: fileFD,
+      directoryFD: directoryFD,
+      spoolRootFD: spoolRootFD,
+      fileName: fileName,
+      directoryName: directoryName
+    )
+  }
+
+  static func cleanupIMessageAttachment(_ prepared: PreparedIMessageAttachment) {
+    _ = Darwin.fchflags(prepared.fileFD, 0)
+    Darwin.close(prepared.fileFD)
+    _ = Darwin.unlinkat(prepared.directoryFD, prepared.fileName, 0)
+    Darwin.close(prepared.directoryFD)
+    _ = Darwin.unlinkat(prepared.spoolRootFD, prepared.directoryName, AT_REMOVEDIR)
+    Darwin.close(prepared.spoolRootFD)
+  }
+
+  @discardableResult
+  static func cleanupStaleIMessageAttachmentSpools(now: Date = Date()) -> Int {
+    let directoryFlags = O_RDONLY | O_DIRECTORY | O_NOFOLLOW
+    let homeFD = Darwin.open(AppStoragePaths.homeDirectory.path, directoryFlags)
+    guard homeFD >= 0 else { return 0 }
+    defer { Darwin.close(homeFD) }
+    var removed = 0
+    let transportFD = Darwin.openat(homeFD, ".messages-mcp", directoryFlags)
+    if transportFD >= 0 {
+      removed += cleanupStaleSpool(parentFD: transportFD, rootName: "send-spool", now: now)
+      Darwin.close(transportFD)
+    }
+    let libraryFD = Darwin.openat(homeFD, "Library", directoryFlags)
+    if libraryFD >= 0 {
+      let messagesFD = Darwin.openat(libraryFD, "Messages", directoryFlags)
+      if messagesFD >= 0 {
+        removed += cleanupStaleSpool(parentFD: messagesFD, rootName: "GhostieSendSpool", now: now)
+        Darwin.close(messagesFD)
+      }
+      Darwin.close(libraryFD)
+    }
+    return removed
+  }
+
+  private static func isManagedAssetName(_ fileName: String, assetID: String) -> Bool {
+    if fileName == assetID { return true }
+    guard fileName.hasPrefix("\(assetID).") else { return false }
+    let suffix = String(fileName.dropFirst(assetID.count + 1))
+    return suffix.range(of: "^[a-z0-9]{1,12}$", options: .regularExpression) != nil
+  }
+
+  private static func isSafeDraftID(_ value: String) -> Bool {
+    !value.isEmpty && value.utf8.count <= 128 && value.range(
+      of: "^[A-Za-z0-9_-]+$",
+      options: .regularExpression
+    ) != nil
+  }
+
+  private static func cleanupStaleSpool(parentFD: Int32, rootName: String, now: Date) -> Int {
+    let directoryFlags = O_RDONLY | O_DIRECTORY | O_NOFOLLOW
+    let rootFD = Darwin.openat(parentFD, rootName, directoryFlags)
+    guard rootFD >= 0 else { return 0 }
+    defer { Darwin.close(rootFD) }
+    var rootStat = stat()
+    guard fstat(rootFD, &rootStat) == 0 else { return 0 }
+    let stableRoot = "/.vol/\(rootStat.st_dev)/\(rootStat.st_ino)"
+    guard let directories = try? FileManager.default.contentsOfDirectory(atPath: stableRoot) else { return 0 }
+
+    let cutoff = now.timeIntervalSince1970 - 3600
+    var removed = 0
+    for directoryName in directories where directoryName != "." && directoryName != ".." {
+      let directoryFD = Darwin.openat(rootFD, directoryName, directoryFlags)
+      guard directoryFD >= 0 else { continue }
+      var directoryStat = stat()
+      guard fstat(directoryFD, &directoryStat) == 0,
+            Double(directoryStat.st_mtimespec.tv_sec) < cutoff
+      else {
+        Darwin.close(directoryFD)
+        continue
+      }
+      let stableDirectory = "/.vol/\(directoryStat.st_dev)/\(directoryStat.st_ino)"
+      let files = (try? FileManager.default.contentsOfDirectory(atPath: stableDirectory)) ?? []
+      for fileName in files where fileName != "." && fileName != ".." {
+        let fileFD = Darwin.openat(directoryFD, fileName, O_RDONLY | O_NOFOLLOW)
+        if fileFD >= 0 {
+          _ = Darwin.fchflags(fileFD, 0)
+          Darwin.close(fileFD)
+        }
+        _ = Darwin.unlinkat(directoryFD, fileName, 0)
+      }
+      Darwin.close(directoryFD)
+      if Darwin.unlinkat(rootFD, directoryName, AT_REMOVEDIR) == 0 {
+        removed += 1
+      }
+    }
+    return removed
   }
 
   /// Write `sent_at` (+ `send_service`) into the iMessage draft's JSON on disk,
@@ -814,7 +1131,7 @@ enum DraftSender {
   private static let buddyFileScript = """
   on run argv
     set theAddress to item 1 of argv
-    set theFile to POSIX file (item 2 of argv)
+    set theFile to POSIX file (item 2 of argv) as alias
     tell application "Messages"
       try
         set theService to first service whose service type is iMessage
@@ -845,7 +1162,7 @@ enum DraftSender {
   private static let groupFileScript = """
   on run argv
     set theChatId to item 1 of argv
-    set theFile to POSIX file (item 2 of argv)
+    set theFile to POSIX file (item 2 of argv) as alias
     tell application "Messages"
       try
         send theFile to chat id theChatId

@@ -13,10 +13,12 @@ import {
   mkdirSync,
   openSync,
   readSync,
-  rmSync,
+  readdirSync,
+  rmdirSync,
   unlinkSync,
   writeSync,
 } from "node:fs";
+import { promises as fsPromises } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from "node:path";
@@ -41,6 +43,18 @@ export interface ManagedDraftAttachment {
   mime_type: string | null;
   byte_count: number;
   sha256: string;
+}
+
+export interface VerifiedAttachmentBytes {
+  attachment: ManagedDraftAttachment;
+  bytes: Buffer;
+}
+
+interface StableDirectory {
+  fd: number;
+  path: string;
+  dev: bigint;
+  ino: bigint;
 }
 
 const EXT_MIME: Record<string, string> = {
@@ -79,6 +93,19 @@ const EXT_MIME: Record<string, string> = {
   zip: "application/zip",
 };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function isManagedAssetName(fileName: string, assetId: string): boolean {
+  if (fileName === assetId) return true;
+  return fileName.startsWith(`${assetId}.`) && /^[a-z0-9]{1,12}$/.test(fileName.slice(assetId.length + 1));
+}
+
+function isManagedSnapshotFileName(fileName: string): boolean {
+  const dot = fileName.indexOf(".");
+  const assetId = dot === -1 ? fileName : fileName.slice(0, dot);
+  return UUID_RE.test(assetId) && isManagedAssetName(fileName, assetId);
+}
+
 export function inferMimeFromPath(path: string): string | null {
   const ext = extname(path).slice(1).toLowerCase();
   return EXT_MIME[ext] ?? null;
@@ -109,7 +136,7 @@ export function expandPath(input: string): string {
 }
 
 function assertDraftId(draftId: string): void {
-  if (!/^[A-Za-z0-9_-]+$/.test(draftId)) throw new Error(`invalid draft id: ${draftId}`);
+  if (!UUID_RE.test(draftId)) throw new Error(`invalid draft id: ${draftId}`);
 }
 
 function ensurePrivateDirectory(path: string): void {
@@ -124,29 +151,90 @@ function ensurePrivateDirectory(path: string): void {
   }
 }
 
+function fileIdPath(stat: { dev: bigint; ino: bigint }): string {
+  return `/.vol/${stat.dev.toString()}/${stat.ino.toString()}`;
+}
+
+/** Open a directory without following its final component and bind it by inode. */
+function openStableDirectory(path: string): StableDirectory {
+  const directoryFlag = (constants as typeof constants & { O_DIRECTORY: number }).O_DIRECTORY;
+  const fd = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW | directoryFlag);
+  try {
+    const stat = fstatSync(fd, { bigint: true });
+    if (!stat.isDirectory()) throw new Error(`not a directory: ${path}`);
+    return { fd, path: fileIdPath(stat), dev: stat.dev, ino: stat.ino };
+  } catch (error) {
+    closeSync(fd);
+    throw error;
+  }
+}
+
+/**
+ * Pin every managed-directory component, then address the asset through the
+ * draft directory's file-id path. Renaming or replacing any pathname after
+ * this point cannot redirect the open to a different directory.
+ */
+function openManagedDraftDirectory(transportRoot: string, draftId: string): StableDirectory {
+  assertDraftId(draftId);
+  const root = openStableDirectory(transportRoot);
+  try {
+    const attachmentRoot = openStableDirectory(join(root.path, "draft-attachments"));
+    try {
+      return openStableDirectory(join(attachmentRoot.path, draftId));
+    } finally {
+      closeSync(attachmentRoot.fd);
+    }
+  } finally {
+    closeSync(root.fd);
+  }
+}
+
 export function draftAttachmentDirectory(transportRoot: string, draftId: string): string {
   assertDraftId(draftId);
   return join(transportRoot, "draft-attachments", draftId);
 }
 
 export function cleanupDraftAttachments(transportRoot: string, draftId: string): void {
-  const attachmentsRoot = join(transportRoot, "draft-attachments");
+  assertDraftId(draftId);
+  let root: StableDirectory | null = null;
+  let attachmentsRoot: StableDirectory | null = null;
+  let draftDirectory: StableDirectory | null = null;
   try {
-    const rootStat = lstatSync(attachmentsRoot);
-    if (rootStat.isSymbolicLink() || !rootStat.isDirectory()) {
-      throw new Error(`attachment root is not a real directory: ${attachmentsRoot}`);
+    root = openStableDirectory(transportRoot);
+    attachmentsRoot = openStableDirectory(join(root.path, "draft-attachments"));
+    draftDirectory = openStableDirectory(join(attachmentsRoot.path, draftId));
+
+    for (const fileName of readdirSync(draftDirectory.path)) {
+      if (!isManagedSnapshotFileName(fileName)) continue;
+      const filePath = join(draftDirectory.path, fileName);
+      try {
+        const fileStat = lstatSync(filePath);
+        if (!fileStat.isFile() || fileStat.isSymbolicLink()) continue;
+        try { unlinkSync(filePath); } catch (error) {
+          if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+        }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") continue;
+        throw error;
+      }
     }
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === "ENOENT") return;
-    throw e;
-  }
-  const dir = draftAttachmentDirectory(transportRoot, draftId);
-  try {
-    const st = lstatSync(dir);
-    if (st.isSymbolicLink()) unlinkSync(dir);
-    else rmSync(dir, { recursive: true, force: true });
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+
+    // Remove the parent entry only if it still names the exact directory we
+    // pinned. A concurrent rename/replacement can leave an orphan, but it can
+    // never redirect cleanup into another tree.
+    const current = lstatSync(join(attachmentsRoot.path, draftId), { bigint: true });
+    if (current.isDirectory() && current.dev === draftDirectory.dev && current.ino === draftDirectory.ino) {
+      try { rmdirSync(join(attachmentsRoot.path, draftId)); } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "ENOENT" &&
+            (error as NodeJS.ErrnoException).code !== "ENOTEMPTY") throw error;
+      }
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  } finally {
+    if (draftDirectory != null) try { closeSync(draftDirectory.fd); } catch { /* best effort */ }
+    if (attachmentsRoot != null) try { closeSync(attachmentsRoot.fd); } catch { /* best effort */ }
+    if (root != null) try { closeSync(root.fd); } catch { /* best effort */ }
   }
 }
 
@@ -267,13 +355,81 @@ export function isManagedDraftAttachment(value: unknown): value is ManagedDraftA
   if (!value || typeof value !== "object") return false;
   const a = value as Record<string, unknown>;
   return (
-    typeof a.asset_id === "string" && /^[0-9a-f-]{36}$/i.test(a.asset_id) &&
+    typeof a.asset_id === "string" && UUID_RE.test(a.asset_id) &&
     typeof a.path === "string" &&
     typeof a.filename === "string" && a.filename.length > 0 &&
     (a.mime_type === null || typeof a.mime_type === "string") &&
     typeof a.byte_count === "number" && Number.isSafeInteger(a.byte_count) && a.byte_count >= 0 &&
     typeof a.sha256 === "string" && /^[0-9a-f]{64}$/i.test(a.sha256)
   );
+}
+
+export function validateManagedDraftAttachmentSet(
+  attachments: readonly unknown[],
+): { ok: true; attachments: ManagedDraftAttachment[] } | { ok: false; error: string } {
+  if (attachments.length > MAX_DRAFT_ATTACHMENTS) {
+    return { ok: false, error: `too many attachments (max ${MAX_DRAFT_ATTACHMENTS}); discard and restage` };
+  }
+  const managed: ManagedDraftAttachment[] = [];
+  let total = 0;
+  for (const attachment of attachments) {
+    if (!isManagedDraftAttachment(attachment)) {
+      return { ok: false, error: "legacy or incomplete attachment manifest; discard and restage this draft" };
+    }
+    if (attachment.byte_count > MAX_ATTACHMENT_BYTES) {
+      return { ok: false, error: "an attachment exceeds the 100 MB limit; discard and restage" };
+    }
+    total += attachment.byte_count;
+    if (!Number.isSafeInteger(total) || total > MAX_DRAFT_ATTACHMENT_BYTES) {
+      return { ok: false, error: "attachments exceed the 250 MB per-draft limit; discard and restage" };
+    }
+    managed.push(attachment);
+  }
+  return { ok: true, attachments: managed };
+}
+
+/**
+ * Validate a managed manifest and regular-file ownership without reading the
+ * payload. The WhatsApp daemon uses this at stage time so adopting a caller's
+ * already-hashed snapshot never blocks its event loop on up to 250 MB of I/O.
+ * Full descriptor-pinned hashing still runs immediately before delivery.
+ */
+export function validateManagedDraftAttachmentSnapshot(
+  transportRoot: string,
+  draftId: string,
+  attachment: unknown,
+): { ok: true; attachment: ManagedDraftAttachment } | { ok: false; error: string } {
+  if (!isManagedDraftAttachment(attachment)) {
+    return { ok: false, error: "legacy or incomplete attachment manifest; discard and restage this draft" };
+  }
+  if (attachment.byte_count > MAX_ATTACHMENT_BYTES) {
+    return { ok: false, error: "managed attachment exceeds the 100 MB limit; discard and restage" };
+  }
+  const expectedDir = draftAttachmentDirectory(transportRoot, draftId);
+  const managedPath = resolve(attachment.path);
+  if (dirname(managedPath) !== resolve(expectedDir) || !managedPath.startsWith(resolve(expectedDir) + sep)) {
+    return { ok: false, error: "attachment path is outside this draft's managed snapshot; discard and restage" };
+  }
+  if (!isManagedAssetName(basename(managedPath), attachment.asset_id)) {
+    return { ok: false, error: "attachment path does not match its asset id; discard and restage" };
+  }
+  let fd: number | null = null;
+  let draftDirectory: StableDirectory | null = null;
+  try {
+    draftDirectory = openManagedDraftDirectory(transportRoot, draftId);
+    fd = openSync(join(draftDirectory.path, basename(managedPath)), constants.O_RDONLY | constants.O_NOFOLLOW);
+    const st = fstatSync(fd);
+    if (!st.isFile()) return { ok: false, error: "managed attachment is not a regular file; discard and restage" };
+    if (st.size !== attachment.byte_count) {
+      return { ok: false, error: "managed attachment byte count changed; discard and restage" };
+    }
+    return { ok: true, attachment };
+  } catch {
+    return { ok: false, error: "managed attachment is missing or unreadable; discard and restage" };
+  } finally {
+    if (fd != null) try { closeSync(fd); } catch { /* best effort */ }
+    if (draftDirectory != null) try { closeSync(draftDirectory.fd); } catch { /* best effort */ }
+  }
 }
 
 /** Verify ownership, regular-file shape, byte count, and SHA-256 immediately before delivery. */
@@ -285,22 +441,22 @@ export function verifyManagedDraftAttachment(
   if (!isManagedDraftAttachment(attachment)) {
     return { ok: false, error: "legacy or incomplete attachment manifest; discard and restage this draft" };
   }
+  if (attachment.byte_count > MAX_ATTACHMENT_BYTES) {
+    return { ok: false, error: "managed attachment exceeds the 100 MB limit; discard and restage" };
+  }
   const expectedDir = draftAttachmentDirectory(transportRoot, draftId);
   const managedPath = resolve(attachment.path);
   if (dirname(managedPath) !== resolve(expectedDir) || !managedPath.startsWith(resolve(expectedDir) + sep)) {
     return { ok: false, error: "attachment path is outside this draft's managed snapshot; discard and restage" };
   }
-  if (!basename(managedPath).startsWith(attachment.asset_id)) {
+  if (!isManagedAssetName(basename(managedPath), attachment.asset_id)) {
     return { ok: false, error: "attachment path does not match its asset id; discard and restage" };
   }
   let fd: number | null = null;
+  let draftDirectory: StableDirectory | null = null;
   try {
-    const rootStat = lstatSync(join(transportRoot, "draft-attachments"));
-    const dirStat = lstatSync(expectedDir);
-    if (rootStat.isSymbolicLink() || !rootStat.isDirectory() || dirStat.isSymbolicLink() || !dirStat.isDirectory()) {
-      return { ok: false, error: "attachment snapshot directory is not trustworthy; discard and restage" };
-    }
-    fd = openSync(managedPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+    draftDirectory = openManagedDraftDirectory(transportRoot, draftId);
+    fd = openSync(join(draftDirectory.path, basename(managedPath)), constants.O_RDONLY | constants.O_NOFOLLOW);
     const st = fstatSync(fd);
     if (!st.isFile()) return { ok: false, error: "managed attachment is not a regular file; discard and restage" };
     if (st.size !== attachment.byte_count) return { ok: false, error: "managed attachment byte count changed; discard and restage" };
@@ -319,5 +475,63 @@ export function verifyManagedDraftAttachment(
     return { ok: false, error: "managed attachment is missing or unreadable; discard and restage" };
   } finally {
     if (fd != null) try { closeSync(fd); } catch { /* best effort */ }
+    if (draftDirectory != null) try { closeSync(draftDirectory.fd); } catch { /* best effort */ }
+  }
+}
+
+/**
+ * Load the exact verified bytes through one O_NOFOLLOW descriptor. The caller
+ * must pass the returned Buffer directly to its transport instead of reopening
+ * `attachment.path`, which would reintroduce a post-verification swap window.
+ * Async file I/O keeps the WhatsApp daemon event loop responsive for large
+ * (up to 100 MB) media.
+ */
+export async function loadVerifiedDraftAttachmentBytes(
+  transportRoot: string,
+  draftId: string,
+  attachment: unknown,
+): Promise<{ ok: true; value: VerifiedAttachmentBytes } | { ok: false; error: string }> {
+  if (!isManagedDraftAttachment(attachment)) {
+    return { ok: false, error: "legacy or incomplete attachment manifest; discard and restage this draft" };
+  }
+  if (attachment.byte_count > MAX_ATTACHMENT_BYTES) {
+    return { ok: false, error: "managed attachment exceeds the 100 MB limit; discard and restage" };
+  }
+  const expectedDir = draftAttachmentDirectory(transportRoot, draftId);
+  const managedPath = resolve(attachment.path);
+  if (dirname(managedPath) !== resolve(expectedDir) || !managedPath.startsWith(resolve(expectedDir) + sep)) {
+    return { ok: false, error: "attachment path is outside this draft's managed snapshot; discard and restage" };
+  }
+  if (!isManagedAssetName(basename(managedPath), attachment.asset_id)) {
+    return { ok: false, error: "attachment path does not match its asset id; discard and restage" };
+  }
+
+  let handle: Awaited<ReturnType<typeof fsPromises.open>> | null = null;
+  let draftDirectory: StableDirectory | null = null;
+  try {
+    draftDirectory = openManagedDraftDirectory(transportRoot, draftId);
+    handle = await fsPromises.open(
+      join(draftDirectory.path, basename(managedPath)),
+      constants.O_RDONLY | constants.O_NOFOLLOW,
+    );
+    const st = await handle.stat();
+    if (!st.isFile()) return { ok: false, error: "managed attachment is not a regular file; discard and restage" };
+    if (st.size !== attachment.byte_count) {
+      return { ok: false, error: "managed attachment byte count changed; discard and restage" };
+    }
+    const bytes = await handle.readFile();
+    if (bytes.byteLength !== attachment.byte_count) {
+      return { ok: false, error: "managed attachment changed while being read; discard and restage" };
+    }
+    const actualHash = createHash("sha256").update(bytes).digest("hex");
+    if (actualHash !== attachment.sha256.toLowerCase()) {
+      return { ok: false, error: "managed attachment hash changed; discard and restage" };
+    }
+    return { ok: true, value: { attachment, bytes } };
+  } catch {
+    return { ok: false, error: "managed attachment is missing or unreadable; discard and restage" };
+  } finally {
+    if (handle != null) await handle.close().catch(() => undefined);
+    if (draftDirectory != null) try { closeSync(draftDirectory.fd); } catch { /* best effort */ }
   }
 }

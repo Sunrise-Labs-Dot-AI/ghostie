@@ -6688,7 +6688,11 @@ struct PendingMessageBubble: View {
   }
 
   private var actionsVisible: Bool {
-    isHovering || isEditing
+    isHovering || isEditing || draft.attachmentReviewIssue != nil
+  }
+
+  private var hasReviewText: Bool {
+    !draft.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
 
   private var shouldConstrainBubbleWidth: Bool {
@@ -6728,6 +6732,9 @@ struct PendingMessageBubble: View {
       editedHasSchedule = draft.isScheduled
       scheduleDate = draft.scheduledDate ?? defaultScheduleDate
     }
+    .onChange(of: lastError) { _, error in
+      if let error { announceAccessibility(error) }
+    }
   }
 
   private var bubbleStack: some View {
@@ -6766,6 +6773,7 @@ struct PendingMessageBubble: View {
           .foregroundStyle(DS.Color.red)
           .frame(maxWidth: 420, alignment: .trailing)
           .accessibilityLabel("Attachment cannot be approved: \(issue)")
+          .onAppear { announceAccessibility("Attachment cannot be approved. \(issue)") }
       }
     }
   }
@@ -6774,11 +6782,21 @@ struct PendingMessageBubble: View {
   private var attachmentPreviews: some View {
     if !stagedAttachments.isEmpty {
       VStack(alignment: .trailing, spacing: 6) {
-        Text("Sends first")
+        Text(hasReviewText ? "Sends first" : "Attachment only")
           .font(DS.Font.monoMicro)
           .foregroundStyle(DS.Color.ink3(colorScheme))
-        ForEach(Array(stagedAttachments.enumerated()), id: \.offset) { _, attachment in
-          AttachmentBubbleView(attachment: attachment.asRef, fromMe: true)
+        ForEach(Array(stagedAttachments.enumerated()), id: \.offset) { index, attachment in
+          Button {
+            NSWorkspace.shared.open(URL(fileURLWithPath: attachment.path))
+          } label: {
+            AttachmentBubbleView(attachment: attachment.asRef, fromMe: true)
+              .allowsHitTesting(false)
+          }
+          .buttonStyle(.plain)
+          .accessibilityLabel(
+            "Open attachment \(index + 1) of \(stagedAttachments.count) for review: "
+              + (attachment.filename?.isEmpty == false ? attachment.filename! : "attachment")
+          )
         }
       }
       .frame(maxWidth: 420, alignment: .trailing)
@@ -6903,7 +6921,7 @@ struct PendingMessageBubble: View {
   private var holdableBubble: some View {
     TimelineView(.animation(minimumInterval: reduceMotion ? holdDuration : 1.0 / 30.0)) { context in
       let bubbleProgress = displayedProgress(at: context.date)
-      Text(reviewBubbleText)
+      let bubble = Text(reviewBubbleText)
         .font(DS.Font.bubbleBody)
         .foregroundStyle(approvalTextColor)
         .multilineTextAlignment(.leading)
@@ -6950,10 +6968,24 @@ struct PendingMessageBubble: View {
         .onChange(of: sending) { _, isSending in
           if isSending { disarm() }
         }
+
+      accessibilityReviewSurface(bubble)
+    }
+  }
+
+  @ViewBuilder
+  private func accessibilityReviewSurface<Content: View>(_ content: Content) -> some View {
+    if let issue = draft.attachmentReviewIssue {
+      content
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Draft cannot be sent. \(issue)")
+        .accessibilityHint("Delete this draft, then stage it again with the attachment.")
+    } else {
+      content
         .accessibilityLabel(accessibilitySendLabel)
         .accessibilityValue(armed ? "Armed, ready to send" : "")
         .accessibilityHint(
-          featureFlags.resolved(.draftSafetyStates) && draft.attachmentReviewIssue == nil
+          featureFlags.resolved(.draftSafetyStates)
             ? (armed ? "Activate again to send" : "Activate twice to send")
             : ""
         )
@@ -7156,7 +7188,10 @@ struct PendingMessageBubble: View {
       attachment.filename?.isEmpty == false ? attachment.filename! : "attachment"
     }.joined(separator: ", ")
     let noun = count == 1 ? "attachment" : "attachments"
-    return "\(count) \(noun), sent before the text: \(names)"
+    if hasReviewText {
+      return "\(count) \(noun), sent before the text: \(names)"
+    }
+    return "Attachment-only draft with \(count) \(noun); no text follows: \(names)"
   }
 
   private var accessibilityActionName: String {
@@ -7320,6 +7355,17 @@ struct PendingMessageBubble: View {
         lastError = "Couldn't discard: \(error.localizedDescription)"
       }
     }
+  }
+
+  private func announceAccessibility(_ message: String) {
+    NSAccessibility.post(
+      element: NSApp.mainWindow ?? NSApp as Any,
+      notification: .announcementRequested,
+      userInfo: [
+        .announcement: message,
+        .priority: NSAccessibilityPriorityLevel.high.rawValue
+      ]
+    )
   }
 
   private func undoDiscard() {

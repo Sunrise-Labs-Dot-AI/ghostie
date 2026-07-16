@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { createServer, type Server } from "node:net";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -326,6 +326,8 @@ describe("ghostie MCP stdio contract", () => {
     const imessage = await startFakeDaemon(paths.imessage, fakeIMessage);
     const whatsapp = await startFakeDaemon(paths.whatsapp, fakeWhatsApp);
     try {
+      const attachmentSource = join(home, "ghostie-forwarded-photo.jpg");
+      writeFileSync(attachmentSource, Buffer.from([0xff, 0xd8, 0xff, 0x11]));
       const rows = await runMcp(home, [
         toolCall(2, "list_message_threads", { since: RECENT_SINCE, limit: 5 }),
         toolCall(3, "get_message_thread", { thread_ref: "imessage:42", limit: 5 }),
@@ -336,7 +338,7 @@ describe("ghostie MCP stdio contract", () => {
           to_handle: WA_JID,
           in_reply_to_thread_ref: `whatsapp:${WA_JID}`,
           body: "See you then",
-          attachments: [{ path: "/tmp/ghostie-forwarded-photo.jpg", filename: "ignored-name.png", mime_type: "image/png" }],
+          attachments: [{ path: attachmentSource, filename: "ignored-name.png", mime_type: "image/png" }],
         }),
       ]);
 
@@ -386,9 +388,26 @@ describe("ghostie MCP stdio contract", () => {
         "stageDraft",
       ]);
       const stageCall = whatsapp.calls.find((call) => call.method === "stageDraft")!;
-      expect((stageCall.params as { attachments?: unknown[] }).attachments).toEqual([
-        { path: "/tmp/ghostie-forwarded-photo.jpg", filename: "ignored-name.png", mime_type: "image/png" },
-      ]);
+      const stageParams = stageCall.params as {
+        draft_id: string;
+        attachments: Array<{
+          asset_id: string;
+          path: string;
+          filename: string;
+          mime_type: string | null;
+          byte_count: number;
+          sha256: string;
+        }>;
+      };
+      expect(stageParams.draft_id).toMatch(/^[0-9a-f-]{36}$/);
+      expect(stageParams.attachments).toHaveLength(1);
+      expect(stageParams.attachments[0]!.path).toStartWith(
+        join(home, ".whatsapp-mcp", "draft-attachments", stageParams.draft_id),
+      );
+      expect(stageParams.attachments[0]!.filename).toBe("ghostie-forwarded-photo.jpg");
+      expect(stageParams.attachments[0]!.mime_type).toBe("image/jpeg");
+      expect(stageParams.attachments[0]!.byte_count).toBe(4);
+      expect(stageParams.attachments[0]!.sha256).toMatch(/^[0-9a-f]{64}$/);
 
       // Witness contract: every successful tool call lands a per-touched-
       // transport witness record in the exact files the menubar watches.

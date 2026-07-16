@@ -3,8 +3,13 @@ import { Socket } from "node:net";
 import { makeFrameReader, type RpcResponse } from "./rpc.ts";
 
 export class DaemonUnavailableError extends Error {
-  constructor(message: string = "daemon unavailable") {
+  constructor(
+    message: string = "daemon unavailable",
+    /** False only when the client knows no request bytes reached the daemon. */
+    public requestMayHaveBeenSent: boolean = false,
+  ) {
     super(message);
+    this.name = "DaemonUnavailableError";
   }
 }
 
@@ -75,7 +80,7 @@ export function createDaemonCaller(options: DaemonCallerOptions) {
               process.stderr.write(`[daemon-client] peer-auth rejection during ${method}: ${resp.error.message}\n`);
               done(() => {
                 sock.destroy();
-                reject(new DaemonUnavailableError("daemon rejected connection (peer-auth failed)"));
+                reject(new DaemonUnavailableError("daemon rejected connection (peer-auth failed)", false));
               });
             }
             // id:null without error is a notification or protocol frame — ignore.
@@ -97,9 +102,16 @@ export function createDaemonCaller(options: DaemonCallerOptions) {
         }),
       );
       sock.on("data", (chunk: Buffer) => reader.push(chunk));
-      sock.on("error", (err) => done(() => { sock.destroy(); reject(err); }));
+      sock.on("error", () => done(() => {
+        sock.destroy();
+        reject(new DaemonUnavailableError(
+          `daemon connection failed after request handoff during ${method}`,
+          true,
+        ));
+      }));
       sock.on("close", () => done(() => reject(new DaemonUnavailableError(
-        `daemon closed connection unexpectedly during ${method}`
+        `daemon closed connection unexpectedly during ${method}`,
+        true,
       ))));
       sock.write(JSON.stringify(req) + "\n");
     });

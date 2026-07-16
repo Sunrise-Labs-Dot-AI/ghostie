@@ -44,18 +44,23 @@ import {
 } from "../storage/messages.ts";
 import { deleteSession } from "../storage/session.ts";
 import {
+  type Draft,
   type StageInput,
   discardDraft,
   getDraft,
   listDrafts,
   stageDraft,
+  sweepDrafts,
   updateDraft,
   DraftSchemaError,
 } from "../storage/drafts.ts";
 import { reserveSend, SEND_ERR, type ReserveErr } from "../storage/audit.ts";
 import { readSettings, SettingsError, type Settings } from "../settings.ts";
 import { assertSendAllowed, ControlBlockedError } from "../control-gate.ts";
-import { isManagedDraftAttachment, verifyManagedDraftAttachment } from "../../../shared/src/attachments.ts";
+import {
+  loadVerifiedDraftAttachmentBytes,
+  validateManagedDraftAttachmentSet,
+} from "../../../shared/src/attachments.ts";
 import { draftPayloadDigest } from "../../../shared/src/draft-payload.ts";
 
 // Per-connection inbound frame cap (#84). A single JSON-RPC frame is
@@ -152,6 +157,13 @@ export function runMessageRetentionSweep(
   return sweep(settings.message_retention_days * DAY_MS);
 }
 
+export function runDraftRetentionSweep(
+  settings: Pick<Settings, "draft_ttl_days">,
+  sweep: typeof sweepDrafts = sweepDrafts,
+): ReturnType<typeof sweepDrafts> {
+  return sweep(settings.draft_ttl_days);
+}
+
 function startMessageRetentionSweep(): Timer {
   const run = () => {
     try {
@@ -162,6 +174,18 @@ function startMessageRetentionSweep(): Timer {
       }
     } catch (e) {
       process.stderr.write(`message retention sweep skipped: ${(e as Error).message}\n`);
+    }
+    try {
+      const settings = readSettings();
+      const result = runDraftRetentionSweep(settings);
+      if (result.deleted > 0 || result.orphaned_attachments > 0) {
+        process.stderr.write(
+          `draft retention sweep deleted ${result.deleted} draft(s) and ` +
+          `${result.orphaned_attachments} orphan attachment snapshot(s)\n`,
+        );
+      }
+    } catch (e) {
+      process.stderr.write(`draft retention sweep skipped: ${(e as Error).message}\n`);
     }
   };
   run();
@@ -390,15 +414,14 @@ async function handle(
         if (typeof p?.to_handle !== "string" || typeof p?.body !== "string") {
           return err(id, RPC_ERR.INVALID_PARAMS, "to_handle and body required");
         }
-        // Sanity-check attachments shape (the MCP already resolved + size-checked
-        // them; this is the daemon-side trust boundary). Empty body is allowed
-        // ONLY when at least one attachment is present (media-only message).
+        // Adopt only a complete snapshot manifest prepared by the MCP caller.
+        // This app-launched daemon must never open arbitrary source paths.
         const stageAttachments = Array.isArray(p.attachments) ? p.attachments : [];
-        for (const a of stageAttachments) {
-          if (!a || typeof a.path !== "string" || a.path.length === 0) {
-            return err(id, RPC_ERR.INVALID_PARAMS, "each attachment needs a string path");
-          }
+        if (stageAttachments.length > 0 && (typeof p.draft_id !== "string" || p.draft_id.length === 0)) {
+          return err(id, RPC_ERR.INVALID_PARAMS, "managed attachments require a caller-owned draft_id");
         }
+        const stageAttachmentSet = validateManagedDraftAttachmentSet(stageAttachments);
+        if (!stageAttachmentSet.ok) return err(id, RPC_ERR.INVALID_PARAMS, stageAttachmentSet.error);
         if (p.body.length === 0 && stageAttachments.length === 0) {
           return err(id, RPC_ERR.INVALID_PARAMS, "body must not be empty without attachments");
         }
@@ -444,6 +467,7 @@ async function handle(
           }
         }
         const draft = stageDraft({
+          draft_id: p.draft_id,
           to_handle: p.to_handle,
           to_handle_name: resolvedName,
           body: p.body,
@@ -808,73 +832,7 @@ async function handleSendDraft(
       draft.quoted_message_id != null
         ? getQuotedReconstruction(draft.to_handle, draft.quoted_message_id)
         : null;
-    // Attachments + body are one logical send (one reserved slot). Common case
-    // — a single captionable file with body text — goes as one captioned media
-    // message. Otherwise: each file (quoting only the first), then the body as
-    // its own text message. `message_id` is the last message sent.
-    const atts = draft.attachments ?? [];
-    let progress = draft.delivery_progress;
-    let messageId: string;
-    if (atts.length === 0) {
-      if (!progress.body_sent) {
-        progress = updateDraft(draft.id, { delivery_progress: { ...progress, ambiguous_part: "body" } }).delivery_progress;
-        const result = await connection.sendText(draft.to_handle, draft.body, quoted);
-        messageId = result.message_id;
-        progress = updateDraft(draft.id, {
-          delivery_progress: { ...progress, body_sent: true, ambiguous_part: null },
-        }).delivery_progress;
-      } else {
-        messageId = "resumed-complete";
-      }
-    } else {
-      const body = draft.body ?? "";
-      const firstMime = (atts[0]!.mime_type ?? "").toLowerCase();
-      const canCaption = !firstMime.startsWith("audio/");
-      if (atts.length === 1 && body.length > 0 && canCaption) {
-        if (progress.completed_attachment_count === 1 && progress.body_sent) {
-          messageId = "resumed-complete";
-        } else {
-          if (progress.completed_attachment_count !== 0 || progress.body_sent) {
-            throw new Error("combined media-caption delivery progress is inconsistent; discard and restage");
-          }
-          const verified = verifyManagedDraftAttachment(PATHS.root, draft.id, atts[0]);
-          if (!verified.ok) throw new Error(verified.error);
-          progress = updateDraft(draft.id, {
-            delivery_progress: { ...progress, ambiguous_part: "attachment:0+body" },
-          }).delivery_progress;
-          const result = await connection.sendMedia(draft.to_handle, verified.attachment, body, quoted);
-          messageId = result.message_id;
-          progress = updateDraft(draft.id, {
-            delivery_progress: { completed_attachment_count: 1, body_sent: true, ambiguous_part: null },
-          }).delivery_progress;
-        }
-      } else {
-        let last = "";
-        for (let i = progress.completed_attachment_count; i < atts.length; i++) {
-          const verified = verifyManagedDraftAttachment(PATHS.root, draft.id, atts[i]);
-          if (!verified.ok) throw new Error(verified.error);
-          progress = updateDraft(draft.id, {
-            delivery_progress: { ...progress, ambiguous_part: `attachment:${i}` },
-          }).delivery_progress;
-          const r = await connection.sendMedia(draft.to_handle, verified.attachment, null, i === 0 ? quoted : null);
-          last = r.message_id;
-          progress = updateDraft(draft.id, {
-            delivery_progress: { completed_attachment_count: i + 1, body_sent: progress.body_sent, ambiguous_part: null },
-          }).delivery_progress;
-        }
-        if (body.length > 0 && !progress.body_sent) {
-          progress = updateDraft(draft.id, {
-            delivery_progress: { ...progress, ambiguous_part: "body" },
-          }).delivery_progress;
-          const r = await connection.sendText(draft.to_handle, body, null);
-          last = r.message_id;
-          progress = updateDraft(draft.id, {
-            delivery_progress: { ...progress, body_sent: true, ambiguous_part: null },
-          }).delivery_progress;
-        }
-        messageId = last || "resumed-complete";
-      }
-    }
+    const messageId = await deliverDraftParts(draft, connection, quoted);
     reservation.commit("ok");
     const sent_at = new Date().toISOString();
     try { updateDraft(draft.id, { sent_at }); } catch { /* draft sweep handles cleanup */ }
@@ -891,12 +849,108 @@ async function handleSendDraft(
   }
 }
 
-function payloadDigestForDraft(
-  draft: import("../storage/drafts.ts").Draft,
-): { ok: true; digest: string } | { ok: false; error: string } {
-  if (!draft.attachments.every(isManagedDraftAttachment)) {
-    return { ok: false, error: "legacy or incomplete attachment manifest; discard and restage this draft" };
+/**
+ * Deliver one logical WhatsApp draft with a durable journal around every wire
+ * call. Exported as a deterministic seam so multipart retry behavior is tested
+ * without contacting WhatsApp.
+ */
+export async function deliverDraftParts(
+  draft: Draft,
+  connection: Pick<WhatsAppConnection, "sendText" | "sendMedia">,
+  quoted: ReturnType<typeof getQuotedReconstruction>,
+  options: {
+    transportRoot?: string;
+    update?: typeof updateDraft;
+    loadAttachment?: typeof loadVerifiedDraftAttachmentBytes;
+  } = {},
+): Promise<string> {
+  const transportRoot = options.transportRoot ?? PATHS.root;
+  const persist = options.update ?? updateDraft;
+  const loadAttachment = options.loadAttachment ?? loadVerifiedDraftAttachmentBytes;
+  const atts = draft.attachments ?? [];
+  const attachmentSet = validateManagedDraftAttachmentSet(atts);
+  if (!attachmentSet.ok) throw new Error(attachmentSet.error);
+  let progress = draft.delivery_progress;
+
+  if (atts.length === 0) {
+    if (progress.body_sent) return "resumed-complete";
+    progress = persist(draft.id, {
+      delivery_progress: { ...progress, ambiguous_part: "body" },
+    }).delivery_progress;
+    const result = await connection.sendText(draft.to_handle, draft.body, quoted);
+    persist(draft.id, {
+      delivery_progress: { ...progress, body_sent: true, ambiguous_part: null },
+    });
+    return result.message_id;
   }
+
+  const body = draft.body ?? "";
+  const firstMime = (atts[0]!.mime_type ?? "").toLowerCase();
+  const canCaption = !firstMime.startsWith("audio/");
+  if (atts.length === 1 && body.length > 0 && canCaption) {
+    if (progress.completed_attachment_count === 1 && progress.body_sent) return "resumed-complete";
+    if (progress.completed_attachment_count !== 0 || progress.body_sent) {
+      throw new Error("combined media-caption delivery progress is inconsistent; discard and restage");
+    }
+    const verified = await loadAttachment(transportRoot, draft.id, atts[0]);
+    if (!verified.ok) throw new Error(verified.error);
+    progress = persist(draft.id, {
+      delivery_progress: { ...progress, ambiguous_part: "attachment:0+body" },
+    }).delivery_progress;
+    const result = await connection.sendMedia(
+      draft.to_handle,
+      verified.value.attachment,
+      verified.value.bytes,
+      body,
+      quoted,
+    );
+    persist(draft.id, {
+      delivery_progress: { completed_attachment_count: 1, body_sent: true, ambiguous_part: null },
+    });
+    return result.message_id;
+  }
+
+  let last = "";
+  for (let i = progress.completed_attachment_count; i < atts.length; i++) {
+    const verified = await loadAttachment(transportRoot, draft.id, atts[i]);
+    if (!verified.ok) throw new Error(verified.error);
+    progress = persist(draft.id, {
+      delivery_progress: { ...progress, ambiguous_part: `attachment:${i}` },
+    }).delivery_progress;
+    const result = await connection.sendMedia(
+      draft.to_handle,
+      verified.value.attachment,
+      verified.value.bytes,
+      null,
+      i === 0 ? quoted : null,
+    );
+    last = result.message_id;
+    progress = persist(draft.id, {
+      delivery_progress: {
+        completed_attachment_count: i + 1,
+        body_sent: progress.body_sent,
+        ambiguous_part: null,
+      },
+    }).delivery_progress;
+  }
+  if (body.length > 0 && !progress.body_sent) {
+    progress = persist(draft.id, {
+      delivery_progress: { ...progress, ambiguous_part: "body" },
+    }).delivery_progress;
+    const result = await connection.sendText(draft.to_handle, body, null);
+    last = result.message_id;
+    persist(draft.id, {
+      delivery_progress: { ...progress, body_sent: true, ambiguous_part: null },
+    });
+  }
+  return last || "resumed-complete";
+}
+
+export function payloadDigestForDraft(
+  draft: Draft,
+): { ok: true; digest: string } | { ok: false; error: string } {
+  const attachmentSet = validateManagedDraftAttachmentSet(draft.attachments);
+  if (!attachmentSet.ok) return attachmentSet;
   return {
     ok: true,
     digest: draftPayloadDigest({
@@ -905,8 +959,8 @@ function payloadDigestForDraft(
       to_handle: draft.to_handle,
       body: draft.body,
       quoted_message_id: draft.quoted_message_id,
-      scheduled_send_at: null,
-      attachments: draft.attachments,
+      scheduled_send_at: draft.scheduled_send_at,
+      attachments: attachmentSet.attachments,
     }),
   };
 }

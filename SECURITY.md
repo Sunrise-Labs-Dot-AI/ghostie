@@ -79,13 +79,14 @@ is "I trust this .app the way I trust software I write myself" — not
 | **Required `since` (≤2y) or `contact_filter` on read/search** | Unbounded history dumps into agent context | Doesn't stop reads inside the bounded window |
 | **8 KB body truncation** | Mega-payload prompt injections | A 4 KB injection works the same as an 8 KB one |
 | **Send-only-from-draft** | Ad-hoc send tool calls | Agent can stage + send in one turn (see next) |
-| **`require_approval` setting** (default ON) | All MCP send paths — agents can only stage; the menu bar app is the sole send surface | User-controllable toggle in the menu bar footer. Off if the user explicitly disables. |
+| **`require_approval` setting** (default ON) | All MCP send paths; agents can only stage and the menu bar app is the sole send surface | User-controllable toggle in the menu bar footer. Disabling it permits direct text sends only; iMessage media remains app-reviewed. |
 | **Minimum staged-age (default 5s)** | Single-turn stage-and-send bypassing human review when `require_approval` is off | Configurable, can be disabled |
 | **Daily send cap (default 50/UTC day)** | Runaway loops, blast attacks | Cap is per-day, not per-recipient; configurable |
 | **Send audit log** at `~/.messages-mcp/send-audit.log` | Forensic gap (post-hoc only) | Doesn't prevent; helps investigate. Body content is SHA-256-hashed, not stored. |
 | **`destructiveHint: true` + `idempotentHint: false` annotations on send** | MCP clients can surface confirmation prompts | Depends on the client implementing the hint |
 | **Sent-state lock** (`sent_at` set on draft → refused) | Double-send via retry loops | Doesn't stop staging a fresh draft |
 | **Managed attachment snapshots** | Source-file deletion or replacement changing a staged media draft; WhatsApp daemon opening an arbitrary agent-selected path | Draft-owned files remain readable by other processes running as the same user |
+| **Descriptor-pinned media handoff** | A staged path or parent directory being swapped after send-time validation | WhatsApp sends the exact verified buffer. iMessage media is blocked in the MCP and sent only from the reviewed app surface. The app copies verified bytes into `~/Library/Messages/GhostieSendSpool`, which is protected by the Messages TCC boundary, then holds a no-follow descriptor to an immutable file-ID path. Another process explicitly granted Full Disk Access remains inside this trust boundary. |
 | **Full-payload approval digest** | Recipient, body, quote, schedule, platform, or attachment-manifest changes after the human reviewed the draft | File bytes are re-hashed again at send time; an invalid digest or changed file fails closed |
 | **Multipart delivery journal** | An ordinary retry replaying a photo that was delivered before a later caption or file failed | Ambiguous delivery is held for manual reconciliation because transports cannot provide a transaction across parts |
 | **SQL parameterized everywhere** | SQL injection | — |

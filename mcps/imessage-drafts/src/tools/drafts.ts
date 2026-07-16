@@ -8,17 +8,20 @@ import {
   SendDraftShape,
   OverrideScheduledSendShape,
 } from "../schema.ts";
-import { stageDraft, listDrafts, getDraft, discardDraft, markDraftSent, updateScheduling, updateDeliveryProgress, draftsDir, draftTransportRoot } from "../storage/drafts.ts";
+import { stageDraft, listDrafts, getDraft, discardDraft, markDraftSent, updateScheduling, updateDeliveryProgress, draftsDir } from "../storage/drafts.ts";
 import { acquireSendLock } from "../storage/send-lock.ts";
 import { assertSendAllowed, ControlBlockedError } from "../control-gate.ts";
 import { callDaemon } from "../daemon/rpc-client.ts";
 import type { DraftContextMessage, ContextLookupDiagnostic, ContextLookupResult, ResolvedDirectChat } from "../chatdb/queries.ts";
 import { isAddressableChatGUID } from "../imessage/chat-guid.ts";
-import { sendIMessage, sendIMessageToGroup, sendIMessageAttachment, sendIMessageAttachmentToGroup, type SendResult } from "../imessage/send.ts";
+import { sendIMessage, sendIMessageToGroup, type SendResult } from "../imessage/send.ts";
 import { appendAudit, checkDailyCap, wasSentInAudit } from "../imessage/audit.ts";
 import { record as recordSendFailure, type SendFailureRoute } from "../imessage/failure-log.ts";
 import { requireApproval } from "../storage/settings.ts";
-import { verifyManagedDraftAttachment, type RawAttachmentInput } from "../../../shared/src/attachments.ts";
+import {
+  validateManagedDraftAttachmentSet,
+  type RawAttachmentInput,
+} from "../../../shared/src/attachments.ts";
 import { errorResult, jsonResult } from "./_result.ts";
 import { wrapBodyInPlace, wrapUntrusted } from "./_untrusted.ts";
 import { daemonBlockedMessage, isDaemonBlockedError } from "./_daemon-errors.ts";
@@ -112,6 +115,46 @@ export function minDraftAgeMs(): number {
   // strictness). The result is always >= HARD_MIN_DRAFT_AGE_MS, so the
   // caller's `minAge > 0` guard is always true.
   return Math.max(HARD_MIN_DRAFT_AGE_MS, Math.floor(n));
+}
+
+/** Mutate a scheduled draft only while holding the same lock as every send. */
+export function overrideScheduledDraft(id: string): Draft {
+  const lock = acquireSendLock(id);
+  if (lock == null) {
+    throw new Error(`draft ${id} is busy because a send is already in flight`);
+  }
+  try {
+    const draft = getDraft(id);
+    if (!draft) throw new Error(`draft not found: ${id}`);
+    if (draft.sent_at) throw new Error(`draft ${id} was already sent at ${draft.sent_at}`);
+    if (!draft.scheduled_send_at) {
+      throw new Error(`draft ${id} is not a scheduled draft (no scheduled_send_at); use send_draft instead`);
+    }
+    const updated = updateScheduling(id, { override_send: true, schedule_hold_reason: null });
+    if (!updated) throw new Error(`draft not found: ${id}`);
+    return updated;
+  } finally {
+    lock.release();
+  }
+}
+
+/** Delete a draft only while a send cannot be using its journal or media. */
+export function discardDraftWithLock(id: string): boolean {
+  const lock = acquireSendLock(id);
+  if (lock == null) {
+    throw new Error(`draft ${id} is busy because a send is already in flight`);
+  }
+  try {
+    return discardDraft(id);
+  } finally {
+    lock.release();
+  }
+}
+
+/** iMessage media needs Ghostie's FDA-protected handoff and is never sent by MCP. */
+export function mcpMediaSendBlockMessage(draftId: string): string {
+  return `send blocked: media drafts are always dispatched from Ghostie's reviewed app surface, ` +
+    `where the protected Messages storage handoff is available. Open Ghostie and hold Send for draft ${draftId}.`;
 }
 
 // Wrap untrusted fields when returning a draft over the MCP wire.
@@ -286,7 +329,7 @@ export function registerDraftTools(server: McpServer): void {
     },
     async (args) => {
       try {
-        const ok = discardDraft(args.draft_id);
+        const ok = discardDraftWithLock(args.draft_id);
         if (!ok) return errorResult(`draft not found: ${args.draft_id}`);
         return jsonResult({ ok: true, draft_id: args.draft_id });
       } catch (e) {
@@ -317,18 +360,12 @@ export function registerDraftTools(server: McpServer): void {
     },
     async (args) => {
       try {
-        const draft = getDraft(args.draft_id);
-        if (!draft) return errorResult(`draft not found: ${args.draft_id}`);
-        if (draft.sent_at) return errorResult(`draft ${args.draft_id} was already sent at ${draft.sent_at}`);
-        if (!draft.scheduled_send_at) {
-          return errorResult(`draft ${args.draft_id} is not a scheduled draft (no scheduled_send_at); use send_draft instead`);
-        }
         // Clear any hold + set the override; the menu-bar scheduler sends it next tick.
-        const updated = updateScheduling(args.draft_id, { override_send: true, schedule_hold_reason: null });
+        const updated = overrideScheduledDraft(args.draft_id);
         return jsonResult({
           ok: true,
           draft_id: args.draft_id,
-          override_send: updated?.override_send ?? true,
+          override_send: updated.override_send ?? true,
           note: "Override set. The menu-bar app will send within ~60s if it's running.",
         });
       } catch (e) {
@@ -416,6 +453,11 @@ export function registerDraftTools(server: McpServer): void {
             "Refusing an ordinary retry because that part may already have been delivered; discard and restage after checking the conversation."
           );
         }
+        const attachmentSet = validateManagedDraftAttachmentSet(draft.attachments);
+        if (!attachmentSet.ok) return errorResult(`send blocked: ${attachmentSet.error}`);
+        if (attachmentSet.attachments.length > 0) {
+          return errorResult(mcpMediaSendBlockMessage(draft.id));
+        }
 
         // Guardrail #0: user-controlled "require draft approval" toggle.
         // When on (default), the MCP send path is disabled entirely and
@@ -471,11 +513,9 @@ export function registerDraftTools(server: McpServer): void {
         // addressable GUID, degrade to the legacy buddy cascade.
         let failureRoute: SendFailureRoute;
         let sendBody: (body: string) => Promise<SendResult>;
-        let sendAttachment: (path: string) => Promise<SendResult>;
         if (sendRoute.kind === "group") {
           failureRoute = "group";
           sendBody = (body) => sendIMessageToGroup(sendRoute.chatGUID, body);
-          sendAttachment = (path) => sendIMessageAttachmentToGroup(sendRoute.chatGUID, path);
         } else {
           let resolvedChat: ResolvedDirectChat | null = null;
           try {
@@ -491,47 +531,17 @@ export function registerDraftTools(server: McpServer): void {
           if (directRoute.kind === "direct-chat") {
             failureRoute = "chat-id";
             sendBody = (body) => sendIMessageToGroup(directRoute.chatGUID, body);
-            sendAttachment = (path) => sendIMessageAttachmentToGroup(directRoute.chatGUID, path);
           } else {
             failureRoute = "buddy-cascade";
             sendBody = (body) => sendIMessage(draft.to_handle, body);
-            sendAttachment = (path) => sendIMessageAttachment(draft.to_handle, path);
           }
         }
 
-        // Send. Durable progress is persisted before and after every wire part.
+        // Send. Durable progress is persisted before and after the wire call.
         // A crash/throw after the pre-send write leaves ambiguous_part set, and
-        // the next ordinary retry refuses rather than risking a duplicate. A
-        // confirmed part advances progress, so a later definitive failure can
-        // resume from the next unsent part.
+        // the next ordinary retry refuses rather than risking a duplicate.
         let totalDuration = 0;
-        let lastService: "iMessage" | "SMS" | null = null;
         let progress = draft.delivery_progress;
-        for (let i = progress.completed_attachment_count; i < draft.attachments.length; i++) {
-          const verified = verifyManagedDraftAttachment(draftTransportRoot(), draft.id, draft.attachments[i]);
-          if (!verified.ok) return errorResult(`send failed for attachment ${i + 1}: ${verified.error}`);
-          progress = updateDeliveryProgress(draft.id, { ...progress, ambiguous_part: `attachment:${i}` })!.delivery_progress;
-          const ar = await sendAttachment(verified.attachment.path);
-          totalDuration += ar.duration_ms;
-          if (!ar.ok) {
-            recordSendFailure({
-              handle: draft.to_handle,
-              route: failureRoute,
-              error: ar.error ?? "unknown error",
-              duration_ms: ar.duration_ms,
-            });
-            return errorResult(
-              `send failed sending attachment ${verified.attachment.filename}: ${ar.error ?? "unknown error"} (took ${ar.duration_ms}ms). ` +
-              `Delivery is ambiguous; ordinary retry is held to prevent duplicates.`
-            );
-          }
-          lastService = ar.service ?? lastService;
-          progress = updateDeliveryProgress(draft.id, {
-            completed_attachment_count: i + 1,
-            body_sent: progress.body_sent,
-            ambiguous_part: null,
-          })!.delivery_progress;
-        }
 
         let result: SendResult;
         if (draft.body.trim().length > 0 && !progress.body_sent) {
@@ -555,12 +565,10 @@ export function registerDraftTools(server: McpServer): void {
             body_sent: true,
             ambiguous_part: null,
           })!.delivery_progress;
-          // Carry the attachment service if the text send didn't report one.
-          result = { ...result, service: result.service ?? lastService, duration_ms: totalDuration };
+          result = { ...result, duration_ms: totalDuration };
         } else {
-          // Attachment-only, or a resumed attempt whose body was already
-          // confirmed: synthesize success from this attempt's progress.
-          result = { ok: true, service: lastService, error: null, duration_ms: totalDuration };
+          // A resumed text draft whose body was already confirmed.
+          result = { ok: true, service: null, error: null, duration_ms: totalDuration };
         }
         // Fall back to "iMessage" when service detection misses. Previous
         // behavior returned errorResult here, which caused callers to
