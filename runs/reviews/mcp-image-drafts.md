@@ -36,6 +36,7 @@ Load-bearing invariants:
 | 2 | User-immutable source files alone did not protect against a hostile same-UID staging process. | ACCEPT | The source is no longer the wire object. The reviewed app creates the final copy inside the macOS Messages TCC boundary. The iMessage MCP has no media send function and returns an app-review instruction even when direct text send is enabled. The documented residual trust boundary includes any other process explicitly granted Full Disk Access. |
 | 3 | Shared TypeScript snapshot cleanup used an `lstat` followed by recursive pathname deletion, allowing an FDA-enabled daemon cleanup race. | ACCEPT | Cleanup now accepts only canonical UUID draft IDs, pins every directory with `O_NOFOLLOW`, enumerates by stable file-ID path, deletes only canonical managed regular files, and removes the parent only if its current device/inode still matches the pinned directory. Symlink-root and unrecognized-file tests pass. |
 | 3 | A protected spool younger than one hour at app startup could survive indefinitely if no later media send occurred. | ACCEPT | Ghostie now sweeps at startup and every 30 minutes, and clears the timer at termination. Immutable stale files are cleared and removed by descriptor. |
+| CI | `oven-sh/setup-bun` could not resolve `latest` because GitHub's tag API returned HTTP 503 before repository commands ran. | ACCEPT | All Bun jobs use the locally verified `1.3.14` toolchain, removing runtime tag discovery and making CI reproducible. |
 
 ## Reviewer verdicts
 
@@ -52,6 +53,7 @@ Load-bearing invariants:
 - Cross-language approval digest vector: `9c4c23978c28f9cbcf0310ff3711aec1ef6fb3925eca797f556d06121922207f`.
 - `git diff --check origin/main`: clean.
 - Added-line em dash scan: clean.
+- CI Bun version is pinned to locally verified `1.3.14`; no `latest` lookups remain.
 
 ## Overall verdict
 
