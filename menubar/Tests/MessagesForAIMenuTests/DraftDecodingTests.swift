@@ -225,7 +225,23 @@ final class DraftDecodingTests: XCTestCase {
       let diagnostic = try JSONDecoder().decode(ContextDiagnostic.self, from: Data("\"\(status)\"".utf8))
       XCTAssertEqual(diagnostic.status, status)
       XCTAssertEqual(diagnostic.humanExplanation, explanation)
+      let encoded = try JSONEncoder().encode(diagnostic)
+      XCTAssertEqual(
+        try JSONSerialization.jsonObject(with: encoded, options: .fragmentsAllowed) as? String,
+        status
+      )
     }
+  }
+
+  func test_contextDiagnostic_unknownCompactStatusPreservesWireShape() throws {
+    let status = "cache_unavailable"
+    let diagnostic = try JSONDecoder().decode(ContextDiagnostic.self, from: Data("\"\(status)\"".utf8))
+    XCTAssertEqual(diagnostic.humanExplanation, "Unknown diagnostic status: \(status)")
+    let encoded = try JSONEncoder().encode(diagnostic)
+    XCTAssertEqual(
+      try JSONSerialization.jsonObject(with: encoded, options: .fragmentsAllowed) as? String,
+      status
+    )
   }
 
   func test_contextDiagnostic_structuredObjectStaysStrictAndObjectShaped() throws {
@@ -243,6 +259,20 @@ final class DraftDecodingTests: XCTestCase {
     XCTAssertEqual(object["matched_handle_ids"] as? [Int], [42])
     XCTAssertEqual(object["message_count"] as? Int, 3)
     XCTAssertNoThrow(try JSONDecoder().decode(ContextDiagnostic.self, from: encoded))
+
+    let emptyError = ContextDiagnostic(
+      status: "error",
+      canonical_recipient: nil,
+      matched_handle_ids: [],
+      chat_id: nil,
+      message_count: 0,
+      error: nil
+    )
+    let encodedEmptyError = try JSONEncoder().encode(emptyError)
+    let emptyErrorObject = try XCTUnwrap(JSONSerialization.jsonObject(with: encodedEmptyError) as? [String: Any])
+    XCTAssertEqual(emptyErrorObject["status"] as? String, "error")
+    XCTAssertEqual(emptyErrorObject["matched_handle_ids"] as? [Int], [])
+    XCTAssertEqual(emptyErrorObject["message_count"] as? Int, 0)
 
     let malformed = Data(#"{"status":"ok"}"#.utf8)
     XCTAssertThrowsError(try JSONDecoder().decode(ContextDiagnostic.self, from: malformed))

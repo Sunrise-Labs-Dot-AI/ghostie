@@ -741,9 +741,9 @@ struct QuotedPreview: Codable, Hashable {
   }
 }
 
-// Mirrors `ContextLookupDiagnostic` on the TypeScript side. Surfaced when
-// `context_messages` is null so the user can tell empty-thread from
-// no-handle-match from a real error.
+// Accepts the structured iMessage diagnostic and the compact WhatsApp status.
+// The decoded wire shape is retained so app-side draft rewrites do not change
+// the format expected by either transport.
 struct ContextDiagnostic: Codable, Hashable {
   let status: String
   let canonical_recipient: String?
@@ -751,6 +751,13 @@ struct ContextDiagnostic: Codable, Hashable {
   let chat_id: Int?
   let message_count: Int
   let error: String?
+
+  private let wireShape: WireShape
+
+  private enum WireShape: Hashable {
+    case structured
+    case compact
+  }
 
   private enum CodingKeys: String, CodingKey {
     case status
@@ -761,12 +768,6 @@ struct ContextDiagnostic: Codable, Hashable {
     case error
   }
 
-  private static let compactWhatsAppStatuses: Set<String> = [
-    "no_thread_match",
-    "thread_empty",
-    "error"
-  ]
-
   init(
     status: String,
     canonical_recipient: String?,
@@ -775,12 +776,33 @@ struct ContextDiagnostic: Codable, Hashable {
     message_count: Int,
     error: String?
   ) {
+    self.init(
+      status: status,
+      canonical_recipient: canonical_recipient,
+      matched_handle_ids: matched_handle_ids,
+      chat_id: chat_id,
+      message_count: message_count,
+      error: error,
+      wireShape: .structured
+    )
+  }
+
+  private init(
+    status: String,
+    canonical_recipient: String?,
+    matched_handle_ids: [Int],
+    chat_id: Int?,
+    message_count: Int,
+    error: String?,
+    wireShape: WireShape
+  ) {
     self.status = status
     self.canonical_recipient = canonical_recipient
     self.matched_handle_ids = matched_handle_ids
     self.chat_id = chat_id
     self.message_count = message_count
     self.error = error
+    self.wireShape = wireShape
   }
 
   init(from decoder: Decoder) throws {
@@ -792,7 +814,8 @@ struct ContextDiagnostic: Codable, Hashable {
         matched_handle_ids: [],
         chat_id: nil,
         message_count: 0,
-        error: nil
+        error: nil,
+        wireShape: .compact
       )
       return
     }
@@ -804,17 +827,13 @@ struct ContextDiagnostic: Codable, Hashable {
       matched_handle_ids: try container.decode([Int].self, forKey: .matched_handle_ids),
       chat_id: try container.decodeIfPresent(Int.self, forKey: .chat_id),
       message_count: try container.decode(Int.self, forKey: .message_count),
-      error: try container.decodeIfPresent(String.self, forKey: .error)
+      error: try container.decodeIfPresent(String.self, forKey: .error),
+      wireShape: .structured
     )
   }
 
   func encode(to encoder: Encoder) throws {
-    if Self.compactWhatsAppStatuses.contains(status),
-       canonical_recipient == nil,
-       matched_handle_ids.isEmpty,
-       chat_id == nil,
-       message_count == 0,
-       error == nil {
+    if wireShape == .compact {
       var container = encoder.singleValueContainer()
       try container.encode(status)
       return
