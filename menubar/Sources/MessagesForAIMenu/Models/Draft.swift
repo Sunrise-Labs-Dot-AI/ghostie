@@ -741,9 +741,9 @@ struct QuotedPreview: Codable, Hashable {
   }
 }
 
-// Mirrors `ContextLookupDiagnostic` on the TypeScript side. Surfaced when
-// `context_messages` is null so the user can tell empty-thread from
-// no-handle-match from a real error.
+// Accepts the structured iMessage diagnostic and the compact WhatsApp status.
+// The decoded wire shape is retained so app-side draft rewrites do not change
+// the format expected by either transport.
 struct ContextDiagnostic: Codable, Hashable {
   let status: String
   let canonical_recipient: String?
@@ -751,6 +751,102 @@ struct ContextDiagnostic: Codable, Hashable {
   let chat_id: Int?
   let message_count: Int
   let error: String?
+
+  private let wireShape: WireShape
+
+  private enum WireShape: Hashable {
+    case structured
+    case compact
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case status
+    case canonical_recipient
+    case matched_handle_ids
+    case chat_id
+    case message_count
+    case error
+  }
+
+  init(
+    status: String,
+    canonical_recipient: String?,
+    matched_handle_ids: [Int],
+    chat_id: Int?,
+    message_count: Int,
+    error: String?
+  ) {
+    self.init(
+      status: status,
+      canonical_recipient: canonical_recipient,
+      matched_handle_ids: matched_handle_ids,
+      chat_id: chat_id,
+      message_count: message_count,
+      error: error,
+      wireShape: .structured
+    )
+  }
+
+  private init(
+    status: String,
+    canonical_recipient: String?,
+    matched_handle_ids: [Int],
+    chat_id: Int?,
+    message_count: Int,
+    error: String?,
+    wireShape: WireShape
+  ) {
+    self.status = status
+    self.canonical_recipient = canonical_recipient
+    self.matched_handle_ids = matched_handle_ids
+    self.chat_id = chat_id
+    self.message_count = message_count
+    self.error = error
+    self.wireShape = wireShape
+  }
+
+  init(from decoder: Decoder) throws {
+    let singleValue = try decoder.singleValueContainer()
+    if let compactStatus = try? singleValue.decode(String.self) {
+      self.init(
+        status: compactStatus,
+        canonical_recipient: nil,
+        matched_handle_ids: [],
+        chat_id: nil,
+        message_count: 0,
+        error: nil,
+        wireShape: .compact
+      )
+      return
+    }
+
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      status: try container.decode(String.self, forKey: .status),
+      canonical_recipient: try container.decodeIfPresent(String.self, forKey: .canonical_recipient),
+      matched_handle_ids: try container.decode([Int].self, forKey: .matched_handle_ids),
+      chat_id: try container.decodeIfPresent(Int.self, forKey: .chat_id),
+      message_count: try container.decode(Int.self, forKey: .message_count),
+      error: try container.decodeIfPresent(String.self, forKey: .error),
+      wireShape: .structured
+    )
+  }
+
+  func encode(to encoder: Encoder) throws {
+    if wireShape == .compact {
+      var container = encoder.singleValueContainer()
+      try container.encode(status)
+      return
+    }
+
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(status, forKey: .status)
+    try container.encodeIfPresent(canonical_recipient, forKey: .canonical_recipient)
+    try container.encode(matched_handle_ids, forKey: .matched_handle_ids)
+    try container.encodeIfPresent(chat_id, forKey: .chat_id)
+    try container.encode(message_count, forKey: .message_count)
+    try container.encodeIfPresent(error, forKey: .error)
+  }
 
   // Human-readable explanation suitable for showing in the Details disclosure.
   var humanExplanation: String {
@@ -768,6 +864,12 @@ struct ContextDiagnostic: Codable, Hashable {
       return "Found \(n) handle row\(n == 1 ? "" : "s") matching '\(canon)' but no chat contains them. (Self-messages and SMS-only handles sometimes look like this.)"
     case "empty_thread":
       return "Chat \(chat_id.map(String.init) ?? "?") was found but contains zero messages."
+    case "no_thread_match":
+      return "No matching WhatsApp thread was found for this recipient."
+    case "thread_empty":
+      return "The WhatsApp thread contains no cached messages."
+    case "not_found":
+      return "No cached WhatsApp thread context was found for this recipient."
     case "error":
       return "Lookup threw: \(error ?? "unknown error")"
     default:
