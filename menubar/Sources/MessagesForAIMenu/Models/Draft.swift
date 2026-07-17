@@ -752,6 +752,83 @@ struct ContextDiagnostic: Codable, Hashable {
   let message_count: Int
   let error: String?
 
+  private enum CodingKeys: String, CodingKey {
+    case status
+    case canonical_recipient
+    case matched_handle_ids
+    case chat_id
+    case message_count
+    case error
+  }
+
+  private static let compactWhatsAppStatuses: Set<String> = [
+    "no_thread_match",
+    "thread_empty",
+    "error"
+  ]
+
+  init(
+    status: String,
+    canonical_recipient: String?,
+    matched_handle_ids: [Int],
+    chat_id: Int?,
+    message_count: Int,
+    error: String?
+  ) {
+    self.status = status
+    self.canonical_recipient = canonical_recipient
+    self.matched_handle_ids = matched_handle_ids
+    self.chat_id = chat_id
+    self.message_count = message_count
+    self.error = error
+  }
+
+  init(from decoder: Decoder) throws {
+    let singleValue = try decoder.singleValueContainer()
+    if let compactStatus = try? singleValue.decode(String.self) {
+      self.init(
+        status: compactStatus,
+        canonical_recipient: nil,
+        matched_handle_ids: [],
+        chat_id: nil,
+        message_count: 0,
+        error: nil
+      )
+      return
+    }
+
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    self.init(
+      status: try container.decode(String.self, forKey: .status),
+      canonical_recipient: try container.decodeIfPresent(String.self, forKey: .canonical_recipient),
+      matched_handle_ids: try container.decode([Int].self, forKey: .matched_handle_ids),
+      chat_id: try container.decodeIfPresent(Int.self, forKey: .chat_id),
+      message_count: try container.decode(Int.self, forKey: .message_count),
+      error: try container.decodeIfPresent(String.self, forKey: .error)
+    )
+  }
+
+  func encode(to encoder: Encoder) throws {
+    if Self.compactWhatsAppStatuses.contains(status),
+       canonical_recipient == nil,
+       matched_handle_ids.isEmpty,
+       chat_id == nil,
+       message_count == 0,
+       error == nil {
+      var container = encoder.singleValueContainer()
+      try container.encode(status)
+      return
+    }
+
+    var container = encoder.container(keyedBy: CodingKeys.self)
+    try container.encode(status, forKey: .status)
+    try container.encodeIfPresent(canonical_recipient, forKey: .canonical_recipient)
+    try container.encode(matched_handle_ids, forKey: .matched_handle_ids)
+    try container.encodeIfPresent(chat_id, forKey: .chat_id)
+    try container.encode(message_count, forKey: .message_count)
+    try container.encodeIfPresent(error, forKey: .error)
+  }
+
   // Human-readable explanation suitable for showing in the Details disclosure.
   var humanExplanation: String {
     switch status {
@@ -768,6 +845,12 @@ struct ContextDiagnostic: Codable, Hashable {
       return "Found \(n) handle row\(n == 1 ? "" : "s") matching '\(canon)' but no chat contains them. (Self-messages and SMS-only handles sometimes look like this.)"
     case "empty_thread":
       return "Chat \(chat_id.map(String.init) ?? "?") was found but contains zero messages."
+    case "no_thread_match":
+      return "No matching WhatsApp thread was found for this recipient."
+    case "thread_empty":
+      return "The WhatsApp thread contains no cached messages."
+    case "not_found":
+      return "No cached WhatsApp thread context was found for this recipient."
     case "error":
       return "Lookup threw: \(error ?? "unknown error")"
     default:
