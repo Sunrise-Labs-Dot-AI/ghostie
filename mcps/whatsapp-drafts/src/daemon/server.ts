@@ -876,6 +876,17 @@ export async function deliverDraftParts(
     loadAttachment?: typeof loadVerifiedDraftAttachmentBytes;
   } = {},
 ): Promise<string> {
+  // Cross-device executor gate at the TRUE wire boundary (SUN-613).
+  //
+  // handleSendDraft already checks after its reload, but this is the function
+  // that actually calls Baileys, it is exported, and it is reached by the
+  // multipart resume path. Checking here as well means no caller can arrange to
+  // reach `sendText` / `sendMedia` for a draft this machine does not own.
+  // (Second-lane review, finding 2, whose suggested fix was to verify
+  // ownership immediately before every wire call.)
+  const executorBlock = executorRefusal(draft.relay_executor, localDeviceId());
+  if (executorBlock != null) throw new Error(executorBlock);
+
   const transportRoot = options.transportRoot ?? PATHS.root;
   const persist = options.update ?? updateDraft;
   const loadAttachment = options.loadAttachment ?? loadVerifiedDraftAttachmentBytes;

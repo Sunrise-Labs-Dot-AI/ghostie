@@ -59,9 +59,39 @@ These are real and the reviewer is right, but none can be closed before a relay 
 
 None. Every finding was either fixed or accepted with a named requirement.
 
-## Verification
+## Verification of the fixes
+
+The fixes were substantive, so they needed a verification pass rather than an assertion that they
+landed.
+
+A second Codex run was launched against the fixed tree to re-test its own findings. It went
+off-task, grepping the memory substrate under `~/Documents/sunrise-ai-os/` instead of reading the
+diff, and was cancelled. Rather than retry a third LLM opinion, the verification was made
+executable: each fixed finding now has a repro test that fails against the pre-fix behavior.
+
+The most important of these is `mcps/whatsapp-drafts/src/daemon/executor-gate.test.ts`, which
+asserts on the WIRE rather than on a return value. A stub connection records every `sendText` /
+`sendMedia` call, so "refused" means the transport was never touched:
+
+- a draft stamped for another Mac never reaches the transport
+- a malformed stamp never reaches the transport
+- a draft stamped for this Mac IS delivered (the gate must not break the ordinary path)
+- an unstamped draft IS delivered (legacy drafts keep working)
+
+That test also drove a strengthening of the finding-2 fix. `handleSendDraft` is not exported, but
+`deliverDraftParts` is, and it is the function that actually calls Baileys and is reached by the
+multipart resume path. The gate now runs there too, which is what the reviewer's own suggested fix
+asked for: verify ownership immediately before every wire call, not only after the reload.
+
+Repro coverage by finding: F2 `executor-gate.test.ts`; F4
+`testExecutorIsBoundIntoTheScheduleApprovalScope` + `testUnstampedDraftsKeepTheLegacyApprovalScope`;
+F6 `testPresentButMalformedStampIsRefused` (Swift) and "a non-string stamp FAILS CLOSED" +
+"a present but malformed stamp is PRESERVED" (TypeScript); F7/F8 the `device.json hardening` block
+covering permissive mode, symlink, wrong schema, and temp-file cleanup.
+
+## Test results
 
 - `cd menubar && rm -f .build/build.db && swift build && swift test` → 732 passed, 0 failed, 2 skipped
 - `mcps/imessage-drafts`: typecheck clean, `bun test` → 392 passed, 0 failed
-- `mcps/whatsapp-drafts`: typecheck clean, `bun test` → 258 passed, 0 failed
+- `mcps/whatsapp-drafts`: typecheck clean, `bun test` → 262 passed, 0 failed
 - `mcps/ghostie`: typecheck clean, `bun test` → 21 passed, 0 failed
