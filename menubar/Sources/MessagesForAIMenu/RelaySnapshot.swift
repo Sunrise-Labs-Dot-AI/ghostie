@@ -24,11 +24,12 @@ import CryptoKit
 ///    user themselves put there. That is the product, not a leak.
 ///
 /// On top of the structural guarantee, this projection does the identity hardening that IS
-/// structurally possible: a group is detected via `Draft.isIMessageGroupDraft` (not just the
-/// `imessage_group` struct, which an older writer can drop while the raw group binding survives in
-/// `to_handle`), so a group-shaped `to_handle` never leaks its guid or handles through the direct
-/// path; a context sender whose known "name" is actually handle-shaped is pseudonymised rather than
-/// shown; and group participant labels count handle-shaped or blank names rather than printing them.
+/// structurally possible: a group is detected via the structured target OR either canonical raw
+/// group binding in `to_handle` (which an older writer can leave behind after dropping the struct),
+/// so a group-shaped `to_handle` never leaks its guid or handles through the direct path; a context
+/// sender or group participant whose stored "name" is actually handle- or binding-shaped is
+/// pseudonymised or counted rather than printed; and all identity trimming is newline-safe so a
+/// whitespace-only "name" is treated as absent.
 ///
 /// Nothing here writes to disk or reads identity. `project(from:originDeviceID:)` is pure and takes
 /// the device id as a parameter. Storage, transport, the manifest, and the feature flag are phase 2.
@@ -121,14 +122,21 @@ enum RelayText {
     String(s.filter { !bidiControls.contains($0) })
   }
 
-  /// True when a string looks like a raw contact handle (phone or email) rather than a display
-  /// name, so a handle stuffed into a "name" field is not shown as if it were one.
+  /// True when a string looks like a raw contact handle (phone or email) or a group-binding string
+  /// rather than a display name, so an identifier stuffed into a "name" field is not shown as if it
+  /// were one.
   static func looksLikeHandle(_ s: String) -> Bool {
-    let t = s.trimmingCharacters(in: .whitespaces)
-    if t.contains("@") { return true }                 // email
-    let digits = t.filter { $0.isNumber }
-    // Mostly-digits with a plus/paren/dash shape: a phone number, not a name.
-    return digits.count >= 7 && Double(digits.count) / Double(max(t.count, 1)) > 0.5
+    let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+    if t.isEmpty { return false }
+    if t.contains("@") { return true }                              // email
+    if t.lowercased().contains("imessage-group") { return true }    // a group binding, never a name
+    // Strip common phone punctuation and separators, then judge digit density. A pipe-joined handle
+    // list (`+1555...|+1555...`) collapses to all digits and is caught here; a name like "Room 101"
+    // is not.
+    let stripped = t.filter { !"+()-. |;,".contains($0) }
+    guard !stripped.isEmpty else { return false }
+    let digits = stripped.filter { $0.isNumber }.count
+    return digits >= 7 && Double(digits) / Double(stripped.count) > 0.7
   }
 }
 
@@ -156,14 +164,20 @@ struct RelayRecipient: Codable, Equatable {
   enum CodingKeys: String, CodingKey { case kind, label }
 
   static func project(from draft: Draft) -> RelayRecipient {
-    // Detect a group the way the rest of the app does: the structured target OR a surviving raw
-    // group binding in to_handle. Using only `imessage_group != nil` would let a draft whose struct
-    // was dropped leak its guid/handles through the direct path (review finding 1).
-    if draft.isIMessageGroupDraft {
+    // Detect a group by the structured target OR a CANONICAL raw group binding in to_handle. The
+    // two canonical forms are colon-delimited (`imessage-group:<guid>`, `imessage-group-pending:
+    // <key>`); matching those exactly avoids both the leak (a struct-less binding reaching the
+    // direct path, finding 1) and the false positive (`imessage-groupie@example.com` mislabelled as
+    // a group, verify-round finding). Using only `imessage_group != nil` would miss the first; using
+    // the bare `imessage-group` prefix hits the second.
+    let isGroup = draft.imessage_group != nil
+      || draft.to_handle.hasPrefix("imessage-group:")
+      || draft.to_handle.hasPrefix("imessage-group-pending:")
+    if isGroup {
       let label = draft.imessage_group.map(safeGroupLabel) ?? "Group thread"
       return RelayRecipient(kind: .group, label: RelayText.stripBidiControls(label))
     }
-    let name = draft.to_handle_name?.trimmingCharacters(in: .whitespaces)
+    let name = draft.to_handle_name?.trimmingCharacters(in: .whitespacesAndNewlines)
     let label = (name?.isEmpty == false) ? name! : draft.to_handle
     return RelayRecipient(kind: .direct, label: RelayText.stripBidiControls(label))
   }
@@ -172,7 +186,7 @@ struct RelayRecipient: Codable, Equatable {
   /// handle-shaped or blank are counted, not printed.
   static func safeGroupLabel(_ group: IMessageGroupDraftTarget) -> String {
     let names = group.participant_names
-      .map { $0.trimmingCharacters(in: .whitespaces) }
+      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
       .filter { !$0.isEmpty && !RelayText.looksLikeHandle($0) }
     let total = max(group.participant_handles.count, names.count)
     let unnamed = max(total - names.count, 0)
@@ -206,7 +220,7 @@ struct RelayContextMessage: Codable, Equatable {
     let display: String
     if message.from_me {
       display = "you"
-    } else if let name = message.sender_name?.trimmingCharacters(in: .whitespaces),
+    } else if let name = message.sender_name?.trimmingCharacters(in: .whitespacesAndNewlines),
               !name.isEmpty, !RelayText.looksLikeHandle(name) {
       display = RelayText.stripBidiControls(name)
     } else {

@@ -144,6 +144,47 @@ final class RelaySnapshotTests: XCTestCase {
     XCTAssertEqual(projected.sender_display, "them")
   }
 
+  // MARK: - Residual cases the re-verification pass caught
+
+  func testBindingShapedNameIsTreatedAsAHandleNotPrinted() {
+    // A sender_name or participant name that is itself a group-binding / pipe-joined handle list
+    // must not print. `looksLikeHandle` catches the "imessage-group" substring and the all-digit
+    // pipe-joined case.
+    XCTAssertTrue(RelayText.looksLikeHandle("imessage-group-pending:+15559990001|+15559990002"))
+    XCTAssertTrue(RelayText.looksLikeHandle("+15559990001|+15559990002"))
+    let projected = RelayContextMessage.project(from: contextMessage(senderName: "imessage-group-pending:+15559990001|+15559990002"))
+    XCTAssertEqual(projected.sender_display, "them")
+  }
+
+  func testDirectRecipientWhoseHandleStartsWithImessageGroupIsNotMislabelledAsAGroup() {
+    // Only the COLON-delimited canonical bindings are groups. An email that merely begins with
+    // "imessage-group" is an ordinary 1:1 recipient and must show as itself, not "Group thread".
+    var d = draft(body: "x")
+    d = d.withToHandle("imessage-groupie@example.com", name: nil)
+    let recipient = RelayRecipient.project(from: d)
+    XCTAssertEqual(recipient.kind, .direct)
+    XCTAssertEqual(recipient.label, "imessage-groupie@example.com")
+  }
+
+  func testWhitespaceOnlyNamesAreTreatedAsAbsent() {
+    // Newline-only names must not print; trimming is newline-safe.
+    let group = IMessageGroupDraftTarget(
+      chat_guid: "iMessage;+;chat1",
+      participant_handles: ["+15559990001", "+15559990002"],
+      participant_names: ["\n\n", "  \t "]
+    )
+    XCTAssertEqual(RelayRecipient.safeGroupLabel(group), "Group thread (2 people)")
+
+    let ctx = RelayContextMessage.project(from: contextMessage(senderName: "\n \n"))
+    XCTAssertEqual(ctx.sender_display, "them")
+  }
+
+  func testAKeepsRealNamesWithNumbersReadable() {
+    // Guard against over-eager handle classification: a normal name with a small number is a name.
+    XCTAssertFalse(RelayText.looksLikeHandle("Room 101"))
+    XCTAssertFalse(RelayText.looksLikeHandle("Maya"))
+  }
+
   // MARK: - Bidi hardening on identity labels (finding 7)
 
   func testBidiControlsAreStrippedFromIdentityLabelsButBodyIsLeftToTheRenderer() {
