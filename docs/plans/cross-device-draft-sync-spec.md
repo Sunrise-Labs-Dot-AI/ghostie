@@ -12,15 +12,25 @@ approve a draft from an iPhone.
 
 ## Shape of the solution
 
-One always-on **hub** Mac (the M4) owns execution. Every other device is a **spoke** that can
-see the queue and approve, but never sends. Spokes reach the hub directly over Tailscale.
-The iPhone surface is a web page the hub serves; there is no iOS app.
+> **Scope note (2026-07-22):** this section and the two that follow it (executor gate, rollout
+> safety) were written for a design where a phone could authorise a Mac to send. James has since
+> chosen **read-only visibility**: every device sees one unified queue, and sending stays at the
+> Mac that staged the draft. Read the "SCOPE: read-only visibility" section further down as the
+> authoritative statement of what is being built. The material here is kept because its
+> reasoning (why not CloudKit, why the tailnet, the phase-0 executor gate) still holds, but where
+> it describes cross-Mac execution, remote approval, or single-homed hand-off, read-only supersedes
+> it.
 
-This is deliberately a single-writer system. The original design allowed either Mac to execute
-and therefore needed a distributed mutual-exclusion protocol (compare-and-set claims, a durable
-attempt journal, an `ambiguous` state, no-automatic-failover rules, and a 100,000-iteration race
-harness). Fixing the executor to one host deletes all of it: at-most-once follows from the
-per-host `SendLock` the code already has.
+One always-on **hub** Mac (the M4) serves the unified view. Every other device is a **spoke** that
+can see the queue but never sends; each Mac executes only its own locally-staged drafts. Spokes
+reach the hub directly over Tailscale. The iPhone surface is a web page the hub serves; there is no
+iOS app.
+
+Under read-only the system is single-executor by the simplest possible rule: the Mac that staged a
+draft is the Mac that sends it. The original CloudKit design allowed either Mac to execute and
+therefore needed a distributed mutual-exclusion protocol (compare-and-set claims, a durable attempt
+journal, an `ambiguous` state, no-automatic-failover rules, and a 100,000-iteration race harness);
+none of it is needed once execution never leaves the origin.
 
 ## Why not CloudKit
 
@@ -107,8 +117,15 @@ before the relay stamps its first draft.
 
 ### Phase-2 requirements inherited from the phase-0 review
 
+> **Mostly moot under read-only.** These requirements existed to make cross-Mac EXECUTION safe.
+> Read-only never transfers execution, so most dissolve: there is no assignment revision (nothing is
+> reassigned), no locked hand-off (nothing is handed off), and the mixed-version hazard largely goes
+> because no draft is ever stamped for a foreign machine, so an old executor only ever sees and sends
+> its own drafts normally. Requirement 4 (executor changes invalidate approvals) is retained in code
+> from phase 0 and is harmless. Kept here for the record and in case remote approval is revived.
+
 From the adversarial review of PR #12
-(`runs/reviews/2026-07-22-sun-613-phase-0-executor-gate.md`). P0 on phase 2, not aspirations.
+(`runs/reviews/2026-07-22-sun-613-phase-0-executor-gate.md`).
 
 1. **Rollout safety in a mixed-version fleet.** Written out in its own section below, because
    working it through changed what phase 2 builds.
@@ -130,7 +147,15 @@ From the adversarial review of PR #12
 
 ### Rollout safety in a mixed-version fleet
 
-**The hazard.** A Ghostie build that predates the executor gate does not know `relay_executor`.
+> **Largely dissolved under read-only.** The hazard below is a cross-Mac EXECUTION hazard: an old
+> build sending or un-routing a draft that a newer build routed to a different machine. Read-only
+> routes nothing, so a published snapshot is just a read-only copy an old build ignores, and the
+> real draft an old build executes is its own local one, exactly as today. The single-homing
+> mechanism is therefore not needed for correctness. The reasoning is kept because it is the thing
+> to re-read first if remote approval is ever revived.
+
+**The hazard (applies only to the deferred remote-approval scope).** A Ghostie build that predates
+the executor gate does not know `relay_executor`.
 That produces two failure modes, and the second is worse than the first:
 
   a. It **sends** a draft stamped for another Mac, because it has no gate.
@@ -196,83 +221,85 @@ stamp, and are deliberately out of scope. State it that way in any user-facing c
 
 ---
 
-## Device identity, pairing, and approval provenance
+## SCOPE: read-only visibility (decided 2026-07-22)
 
-Today `ApprovalAuthenticator` binds "a human approved this" to a per-install Keychain secret,
-HMAC'd over id + recipient + body + scope. A remote approval cannot mint that tag. The rule
-below keeps the guarantee rather than diluting it.
+**James chose read-only cross-device visibility over remote approval.** Every device sees one
+unified draft queue; sending stays at the Mac that staged the draft. Nothing a phone or a spoke
+sends over the wire can cause a message to go out.
 
-**Keys.** Each device holds an Ed25519 keypair. On Macs the private key lives in the login
-Keychain with `kSecAttrSynchronizable = false`, **local-only, never iCloud Keychain**. If these
-keys synced, an Apple ID compromise would grant send authority, which is exactly what this design
-must prevent. Add an explicit unit test asserting the attribute.
+This decision followed three consecutive BLOCK reviews, all on the same surface: the cryptographic
+authority that would let a phone authorise a Mac to send. The queue and the transport were never
+the hard part; proving remote send-authority was. Read-only deletes that surface entirely rather
+than continuing to harden it.
 
-**Pairing.** Out-of-band short-authentication-string ceremony: both devices display a 6-digit code
-derived from the two public keys, the human confirms they match, and only then is the peer
-enrolled. Device trust is never bootstrapped through the transport, because the transport is the
-channel an attacker would control.
+**What this removes, and it is most of the design:** signed remote approvals, the replay ledger,
+the 120-second TTL, revocation-of-send-authority, the SAS pairing ceremony as an authority
+bootstrap, the assignment-revision protocol, and the single-homed locked hand-off. Under read-only
+the origin Mac is always the executor of its own drafts, so ownership never transfers, so none of
+the machinery that made transfer safe needs to exist. The phase-0 executor gate stays as a backstop
+but is never actively used to route, because no draft is ever stamped for a foreign machine.
 
-**Approval flow.**
-
-1. The approving device signs `"ghostie-approve-v1" || draft_id || deliveryPayloadDigest ||
-   device_id || issued_at || nonce`.
-2. The hub verifies the signature against the enrolled public key, checks that `issued_at` is
-   within the 120-second TTL, and checks the nonce against a persistent replay ledger.
-3. The hub re-reads the local draft and confirms `deliveryPayloadDigest` still matches. A changed
-   draft returns `stale` and requires a fresh review.
-4. Only then does the hub call the **existing** `ApprovalAuthenticator.recordSessionApproval` /
-   `tag(for:)` path to mint the local tag, with the approving device id carried in the `scope`
-   component so the audit records who approved and a remote approval is distinguishable from a
-   local one.
-5. Everything downstream is untouched: payload comparison, attachment manifest verification,
-   `SendLock`, kill switch, daemon health checks, failure log, audit.
-
-The TTL exists for replay defence, not as the product mechanism. A spoke never queues a command
-for a sleeping hub, if the hub is unreachable the spoke says so and the approval does not happen.
+**What survives from the earlier design:** the CloudKit rejection and its reasoning, the tailnet as
+transport, the feature flag, and the phase-0 executor gate.
 
 ---
 
-## Transport and the iPhone surface
+## How read-only works
 
-**Hub listener.** The menubar binds an HTTPS listener on the Tailscale interface only, never
-`0.0.0.0`. This is the app's first inbound network surface; it is off unless the flag and the
-setting are both on, and it binds nothing when off. Being on the tailnet is *not* an
-authorization model: every request carries a device token, and every state-changing request
-carries the Ed25519 signature above.
+**Publish, do not hand off.** Each device writes a read-only snapshot of its own draft queue to a
+relay cache at `~/.messages-mcp/relay/published/`. Snapshots are copies for display: the real draft
+file never moves, so the origin Mac keeps executing it exactly as today and no old executor is ever
+confused by a relocated or re-stamped file. This is a strictly weaker operation than the hand-off
+the previous revision specified, and it is weaker on purpose.
 
-**Spoke Macs.** `DraftStore` already watches the drafts directories with
-`DispatchSourceFileSystemObject`, so the spoke pushes new and changed drafts to the hub on the
-existing change signal, and receives terminal states (sent, failed, discarded, expired) back.
+**Content that crosses the wire.** A snapshot carries what the reviewer needs to see: recipient
+label, body, thread context, staged time, and lifecycle state. It deliberately omits trusted
+attachment file paths and any local execution detail. Draft bodies are message content, so this is
+the point at which the product does transmit bodies between the user's own devices. The transport
+is Tailscale, which is WireGuard, so bodies are encrypted in transit by the tailnet itself; the app
+adds reader authentication on top so a non-paired device on the same tailnet cannot read the queue.
 
-**iPhone.** A responsive page served by the hub, added to the Home Screen as a PWA. The keypair is
-a non-extractable WebCrypto Ed25519 key in IndexedDB. Hold-to-send mirrors the existing
-`draftSafetyStates` two-step arm-then-fire so there is a keyboard and VoiceOver path, not
-pointer-only.
+**The hub serves the unified view.** The always-on Mac (the M4) binds an HTTPS listener on the
+Tailscale interface only, never `0.0.0.0`, off unless the flag and setting are both on. It merges
+every device's published snapshots into one queue and serves it to authenticated readers, including
+the phone's web page. It is a read surface: it exposes no endpoint that mutates a draft or triggers
+a send.
 
-Two honest weaknesses: a WebCrypto key in IndexedDB is weaker protection than the iOS Keychain or
-Secure Enclave, and Safari evicts site data after seven days of non-use unless the page is
-installed to the Home Screen, in which case re-pairing is occasionally required. Both are
-acceptable at n=1; neither would be acceptable in a shipped product.
+**Reader authentication, not send authority.** A device proves it is paired before it may read.
+Because the worst case of a compromised reader credential is disclosure of your own draft queue to
+another device you control, not an unwanted send, this is a materially lower bar than the blocked
+design carried. The exact credential (a paired-device keypair used for challenge-response, versus a
+simpler paired token) is an implementation choice settled in the phase-1 plan and its review, not
+here. Whatever it is, it grants read, never send.
 
-**Notification.** None in v1, open the page. If that proves annoying, the cheapest option is a
-Ghostie-to-self iMessage nudge from the hub using the send path that already exists.
+## The iPhone surface
 
----
+A responsive page the hub serves, added to the Home Screen. It renders the unified queue: who,
+what, thread context, which Mac will send it, and how fresh the view is. It has **no** hold-to-send
+and **no** approve control, because approval is not a thing the phone does in this scope. Where it
+helps, it offers a "this is waiting on the M4" affordance so you know to walk over, not a way to act
+from the phone.
+
+Honest weakness to keep in view if this ever grows into remote approval: a browser-stored key is
+weaker than the Secure Enclave, and Safari evicts site data after seven days of non-use unless the
+page is installed to the Home Screen. Both are fine for read-only at n=1.
 
 ## Containment
 
 - New `MFAFeatureFlag` case `deviceRelay`, `builtinDefault = false`.
-- New additive `"relay"` block in `~/.messages-mcp/settings.json` (schema v2 is already additive;
-  absence on read means disabled).
+- Additive `"relay"` block in `~/.messages-mcp/settings.json` (absence on read means disabled),
+  introduced by the first phase that actually reads it.
 - No entitlement change. No provisioning profile. No CloudKit container. No Xcode project. No App
   Store or TestFlight pipeline. No change to `SUFeedURL`, the bundle id, the codesign identifier,
   or the state directories.
-- With the flag off the listener never binds, no keys are generated, and `relay_executor` is never
-  written, so the shipped behavior for every other user is byte-identical to today.
-- Marketing copy is unaffected because nothing leaves the user's own devices. The
-  `CONTRIBUTING.md:21` sentence should still be corrected separately, it claims Ghostie "never
-  stores or transmits message bodies" while draft JSON already persists plaintext `body` and
-  `context_messages`, but that is a docs accuracy fix, not a gate on this work.
+- With the flag off the listener never binds, no keys or tokens are generated, nothing is published,
+  and shipped behavior for every other user is byte-identical to today.
+- `CONTRIBUTING.md:21` claims Ghostie "never stores or transmits message bodies." That was already
+  inaccurate (draft JSON persists plaintext `body` and `context_messages` on disk), and read-only
+  sync does transmit bodies between the user's own devices, so the sentence must be corrected to the
+  accurate promise: no message content reaches any Sunrise Labs server, and content stays within the
+  user's own paired devices. This is now a required change, not just a cleanup, and it is tracked by
+  the spawned task on `CONTRIBUTING.md`.
 
 ---
 
@@ -280,62 +307,58 @@ Ghostie-to-self iMessage nudge from the hub using the send path that already exi
 
 | Phase | Scope | Effort |
 |---|---|---|
-| 0 | `relay_executor` field, Swift + TS executor gate, `WRONG_EXECUTOR` error code, tests. **Merged, PR #12.** | 0.5 day |
-| 1 | Device identity, local-only Keychain keys with the synchronizable test, SAS pairing ceremony carrying `relay_protocol`, settings block, feature flag. | 1.25 days |
-| 2 | Hub listener on the tailnet, spoke push on the existing `DraftStore` watch, **single-homed locked hand-off** into the hub's drafts dir plus the spoke relay cache, assignment revision, exclusion rules, queue UI showing origin / executor / last-sync recency. | 2 days |
-| 3 | Mobile web review surface, WebCrypto keypair, hold-to-send, signed approval verified into the existing `ApprovalAuthenticator` mint. | 1.5 days |
-| 4 | Revocation, replay ledger persistence, audit entries, kill-switch integration, red-team pass. | 0.5 day |
+| 0 | `relay_executor` executor gate, `WRONG_EXECUTOR`. **Merged, PR #12.** Stays as a backstop. | 0.5 day |
+| 1 | `deviceRelay` feature flag, paired-device READ credential, settings block. Re-scoped from the blocked send-authority identity (PR #15 superseded). | ~1 day |
+| 2 | Hub read listener on the tailnet, each device publishes read-only snapshots on the existing `DraftStore` watch, unified merged queue, reader authentication. | ~1 day |
+| 3 | iPhone web page rendering the unified queue: who / what / which Mac sends it / freshness. No approve control. | ~0.75 day |
 
-Roughly 5.75 focused days, up from 5. The increase is the rollout-safety work: `relay_protocol` in
-the pairing record (phase 1), and the locked move plus relay cache replacing the simpler copy
-(phase 2). Phase 0 is merged and was independently valuable regardless of whether the rest proceeds.
+Roughly 2.75 focused days remaining after phase 0. Phase 4 (revocation, replay ledger, red-team of
+the approval path) is gone with the approval path. Phase 0 is merged and already fixed a real
+duplicate-send hole between the two Macs, so the safety win is banked regardless.
 
 ## Acceptance criteria
 
-- A draft staged on the spoke Mac appears on the hub and the iPhone with the same
-  `deliveryPayloadDigest`.
-- After hand-off, the draft file exists in exactly ONE machine's `~/.messages-mcp/drafts/`. The
-  spoke holds only a relay-cache entry, and the spoke's `get_draft` reports it as absent.
-- A device advertising a `relay_protocol` below the gate-supporting version cannot be enrolled into
-  relay mode, and the pairing UI says why.
-- Hand-off of a spoke-staged draft takes the per-draft send lock, and a hand-off attempted during
-  an in-flight send on that spoke is refused rather than interleaved.
-- A spoke Mac cannot send a relayed draft by any path: the Swift `DraftSender` refuses, and both
-  MCP send tools return `WRONG_EXECUTOR`, including with `require_approval` off.
-- A draft carrying `in_reply_to_thread_id`, `imessage_group`, `quoted_message_id`, or attachments
-  is never relayed for execution, and the UI names the required origin Mac.
-- An iPhone approval whose signature, TTL, nonce, or digest check fails never reaches
-  `DraftSender`.
-- A draft edited after approval returns `stale` and requires a fresh review.
-- A revoked device's approval is rejected.
-- The hub's minted approval tag records the approving device id in its scope.
-- Device private keys are not present in the iCloud Keychain (asserted by test).
-- With the flag off, no listener binds and no key material is generated.
-- The hub being asleep produces a visible "hub unreachable" state, never a delayed send.
+- A draft staged on the M1 appears in the unified queue on the M4 and the iPhone.
+- The real draft file never leaves its origin Mac's `~/.messages-mcp/drafts/`; only a read-only
+  snapshot is published. The origin Mac's `get_draft` still returns it.
+- The hub exposes no endpoint that mutates a draft or triggers a send. Confirmed by an inventory of
+  the served routes.
+- A device that is not paired cannot read the queue over the tailnet.
+- Every existing send path is unchanged: each Mac still executes only its own locally-staged drafts,
+  through the same guards as today.
+- With the flag off, no listener binds, no reader credential is generated, and nothing is published.
+- The hub being asleep produces a visible "queue unavailable" state; it never affects sending, which
+  is entirely local.
+- No trusted attachment file path or local execution detail appears in a published snapshot.
 
-## Non-goals
+## Non-goals (read-only scope)
 
-Syncing chat.db, the WhatsApp database, conversation history, or incoming messages. Syncing
-WhatsApp sessions, Messages permissions, Full Disk Access, API keys, or Keychain secrets. Full
-attachment replication. Cross-device concurrent editing. Executor selection or failover of any
-kind. Offline queueing of approvals. Push notifications. Android, web-outside-the-tailnet,
-cross-Apple-ID, or family sharing. Auto-send or remote approval of recurring automations.
-Multi-user support.
+Remote approval or remote send of any kind. Signed approvals, replay ledgers, revocation of send
+authority, the SAS authority ceremony, and cross-Mac execution hand-off, all removed with the
+approval surface. Also, as before: syncing chat.db, the WhatsApp database, conversation history, or
+incoming messages; syncing WhatsApp sessions, permissions, FDA, API keys, or Keychain secrets; full
+attachment replication; concurrent cross-device editing; push notifications; Android, web outside
+the tailnet, cross-Apple-ID, or family sharing; multi-user support.
+
+Remote approval is not rejected forever, only deferred. Read-only is a strict prefix of it: if it is
+wanted later, this work is the foundation and nothing here is wasted. That later step is where the
+Secure Enclave identity, the committed pairing ceremony, and the replay ledger from the blocked
+design come back, designed properly rather than under sunk-cost pressure.
 
 ## Dropped from the original spec, and why
 
-Compare-and-set claims, the losing-Mac refetch rule, the durable attempt journal, the `sending`
-no-takeover rule, the `ambiguous` state and its manual-inspection UX, and the 100,000-iteration
-race harness, all unnecessary once one host executes. Executor selection UI, replaced by a
-fixed per-transport rule. The native SwiftUI iPhone client, replaced by a served web surface.
-CloudKit, its entitlement, its provisioning profile, its container, its quota and retention
-questions, and the encrypted-record schema, replaced by direct device-to-device transport. The
-policy gate blocking implementation, the data never leaves the user's own devices, so there is
-nothing new to permit.
+The CloudKit design and everything under it (entitlement, provisioning profile, container, quota,
+retention, encrypted-record schema, compare-and-set claims, attempt journal, `ambiguous` state, the
+100k race harness) went when the executor was fixed to one host and the transport became the
+tailnet. The send-authority machinery (signed approvals, replay ledger, revocation, SAS authority
+ceremony, single-homed hand-off, assignment revision) went when the scope became read-only. What is
+left is deliberately small: publish snapshots, serve a read view, authenticate the reader.
 
 ## Open items
 
-- Confirm which Mac holds the linked WhatsApp session, and whether linking both is wanted.
-- Decide whether the hub should send a to-self nudge when drafts are waiting.
+- The exact reader credential (challenge-response keypair vs. paired token), settled in the phase-1
+  plan and its review.
+- Whether the hub should send a to-self iMessage nudge when drafts are waiting (uses the existing
+  local send path, so it stays within scope).
 - Decide whether spoke Macs should keep local hold-to-send for drafts they staged and own
   (attachment and reply drafts), or route everything through the hub queue view for consistency.
