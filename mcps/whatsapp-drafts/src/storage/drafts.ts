@@ -120,6 +120,16 @@ export interface Draft extends DraftContext {
   override_send: boolean | null;
   schedule_approved: boolean | null;
   schedule_approval_tag: string | null;
+  /** Cross-device relay (SUN-613): which machine may execute this draft, as a
+   *  `~/.messages-mcp/device.json` device id. Null on ordinary local drafts.
+   *  Additive optional field — schema_version stays 1; older readers ignore it
+   *  and the strict version gate still matches.
+   *
+   *  WhatsApp is inherently single-executor (the Baileys session lives in one
+   *  machine's session.db and is not portable), so v1 never routes a WhatsApp
+   *  draft to another Mac. The gate is defence in depth: if a stamp ever does
+   *  appear here, the send is refused rather than assumed benign. */
+  relay_executor: string | null;
 }
 
 export class DraftSchemaError extends Error {
@@ -195,6 +205,7 @@ export function stageDraft(input: StageInput): Draft {
     override_send: null,
     schedule_approved: null,
     schedule_approval_tag: null,
+    relay_executor: null,
   };
   try {
     writeFileSync(draftPath(id), JSON.stringify(draft, null, 2), { mode: 0o600 });
@@ -234,6 +245,15 @@ export function getDraft(id: string): Draft | null {
     override_send: typeof parsed.override_send === "boolean" ? parsed.override_send : null,
     schedule_approved: typeof parsed.schedule_approved === "boolean" ? parsed.schedule_approved : null,
     schedule_approval_tag: typeof parsed.schedule_approval_tag === "string" ? parsed.schedule_approval_tag : null,
+    // Only absent and explicit null collapse to "unrouted". A present but
+    // unusable value is preserved verbatim so `executorRefusal` can refuse it;
+    // normalizing malformed routing data to null would fail OPEN.
+    relay_executor:
+      parsed.relay_executor === undefined || parsed.relay_executor === null
+        ? null
+        : typeof parsed.relay_executor === "string"
+          ? parsed.relay_executor
+          : String(parsed.relay_executor),
   };
 }
 

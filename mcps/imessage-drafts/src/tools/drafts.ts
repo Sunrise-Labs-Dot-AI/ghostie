@@ -22,6 +22,7 @@ import {
   validateManagedDraftAttachmentSet,
   type RawAttachmentInput,
 } from "../../../shared/src/attachments.ts";
+import { executorRefusal, localDeviceId } from "../../../shared/src/device-id.ts";
 import { errorResult, jsonResult } from "./_result.ts";
 import { wrapBodyInPlace, wrapUntrusted } from "./_untrusted.ts";
 import { daemonBlockedMessage, isDaemonBlockedError } from "./_daemon-errors.ts";
@@ -428,6 +429,14 @@ export function registerDraftTools(server: McpServer): void {
 
         const draft = getDraft(args.draft_id);
         if (!draft) return errorResult(`draft not found: ${args.draft_id}`);
+        // Guardrail #0 (SUN-613): cross-device executor gate. Runs before the
+        // sent_at / audit / cap / approval ladder because a draft that belongs
+        // to another Mac is not this process's to reason about at all. Fails
+        // closed when the local device id is unreadable. Read inside the send
+        // lock, from the same file the menu bar re-reads, so the two gates
+        // cannot disagree about who owns the draft.
+        const refusal = executorRefusal(draft.relay_executor, localDeviceId());
+        if (refusal != null) return errorResult(refusal);
         if (draft.sent_at) {
           return errorResult(
             `draft ${args.draft_id} was already sent at ${draft.sent_at} via ${draft.send_service ?? "unknown"}; refusing duplicate send`

@@ -129,7 +129,10 @@ final class DraftStore: ObservableObject {
       // iMessage-only path (guarded above) — these are always nil here,
       // but carry them through so the round-trip stays lossless.
       quoted_message_id: existing.quoted_message_id,
-      quoted_preview: existing.quoted_preview
+      quoted_preview: existing.quoted_preview,
+      // Carry the relay stamp through every rewrite. Dropping it here would
+      // silently un-route the draft and let a second Mac execute it (SUN-613).
+      relay_executor: existing.relay_executor
     )
     try writeIMessageDraft(updated)
     refresh()
@@ -185,7 +188,10 @@ final class DraftStore: ObservableObject {
       approval_state: existing.approval_state,
       induced_by_unknown_contact: existing.induced_by_unknown_contact,
       quoted_message_id: existing.quoted_message_id,
-      quoted_preview: existing.quoted_preview
+      quoted_preview: existing.quoted_preview,
+      // Carry the relay stamp through every rewrite. Dropping it here would
+      // silently un-route the draft and let a second Mac execute it (SUN-613).
+      relay_executor: existing.relay_executor
     )
     // Setting schedule_approved/override_send, or changing an already-approved
     // schedule, is a trusted in-app action. Authenticate the resulting payload,
@@ -247,7 +253,10 @@ final class DraftStore: ObservableObject {
       approval_state: existing.approval_state,
       induced_by_unknown_contact: existing.induced_by_unknown_contact,
       quoted_message_id: existing.quoted_message_id,
-      quoted_preview: existing.quoted_preview
+      quoted_preview: existing.quoted_preview,
+      // Carry the relay stamp through every rewrite. Dropping it here would
+      // silently un-route the draft and let a second Mac execute it (SUN-613).
+      relay_executor: existing.relay_executor
     )
     if existing.schedule_approved == true {
       updated = Self.authenticatingScheduleApproval(updated)

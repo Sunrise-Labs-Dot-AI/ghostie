@@ -106,6 +106,13 @@ export interface Draft {
   // unapproved and is HELD for explicit in-app approval, never silently sent.
   schedule_approved: boolean | null;
   delivery_progress: DeliveryProgress;
+  // Cross-device relay (SUN-613): which machine may execute this draft, as a
+  // `device.json` device id. Null on every ordinary local draft, which keeps
+  // today's behavior — no stamp means no routing restriction. When set, THIS
+  // MCP refuses to send unless it matches the local device id: the menu bar's
+  // gate alone would still leave this process free to fire a draft that belongs
+  // to another Mac. See mcps/shared/src/device-id.ts.
+  relay_executor: string | null;
 }
 
 function ensureDir(): void {
@@ -181,6 +188,9 @@ export function stageDraft(args: StageDraftArgs): { draft: Draft; path: string }
       body_sent: false,
       ambiguous_part: null,
     },
+    // A newly staged draft is unrouted: the machine that staged it is the only
+    // one that knows about it until the relay stamps an executor (SUN-613).
+    relay_executor: null,
   };
   const path = draftPath(draft.id);
   try {
@@ -272,6 +282,19 @@ function normalizeDraft(raw: Partial<Draft>): Draft | null {
     override_send: raw.override_send ?? null,
     schedule_approved: raw.schedule_approved ?? null,
     delivery_progress: normalizeDeliveryProgress(raw.delivery_progress, attachments.length),
+    // Must be projected here or every normalize→write round-trip (markDraftSent,
+    // schedule edits) would silently strip the stamp and un-route the draft.
+    //
+    // Only absent and explicit null collapse to "unrouted". A present but
+    // unusable value (wrong type, empty, bad alphabet) is preserved verbatim so
+    // `executorRefusal` can refuse it. Normalizing malformed routing data to
+    // null here would fail OPEN — the file would look unrouted and send.
+    relay_executor:
+      raw.relay_executor === undefined || raw.relay_executor === null
+        ? null
+        : typeof raw.relay_executor === "string"
+          ? raw.relay_executor
+          : String(raw.relay_executor),
   };
 }
 

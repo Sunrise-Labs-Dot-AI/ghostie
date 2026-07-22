@@ -69,6 +69,7 @@ describe("_wrapDraftForResponse", () => {
       schedule_hold_reason: null,
       override_send: null,
       schedule_approved: null,
+      relay_executor: null,
       delivery_progress: { completed_attachment_count: 0, body_sent: false, ambiguous_part: null },
     };
     const wrapped = _wrapDraftForResponse(d);
@@ -96,6 +97,7 @@ describe("_wrapDraftForResponse", () => {
       schedule_hold_reason: null,
       override_send: null,
       schedule_approved: null,
+      relay_executor: null,
       delivery_progress: { completed_attachment_count: 0, body_sent: false, ambiguous_part: null },
     };
     expect(_wrapDraftForResponse(d)!.to_handle_name).toBeNull();
@@ -132,6 +134,7 @@ describe("_wrapDraftForResponse", () => {
       schedule_hold_reason: null,
       override_send: null,
       schedule_approved: null,
+      relay_executor: null,
       delivery_progress: { completed_attachment_count: 0, body_sent: false, ambiguous_part: null },
     };
     const wrapped = _wrapDraftForResponse(d);
@@ -164,6 +167,7 @@ describe("_wrapDraftForResponse", () => {
       schedule_hold_reason: null,
       override_send: null,
       schedule_approved: null,
+      relay_executor: null,
       delivery_progress: { completed_attachment_count: 0, body_sent: false, ambiguous_part: null },
     };
     const wrapped = _wrapDraftForResponse(d)!;
@@ -195,6 +199,7 @@ describe("_wrapDraftForResponse", () => {
       schedule_hold_reason: null,
       override_send: null,
       schedule_approved: null,
+      relay_executor: null,
       delivery_progress: { completed_attachment_count: 0, body_sent: false, ambiguous_part: null },
     };
     _wrapDraftForResponse(d);

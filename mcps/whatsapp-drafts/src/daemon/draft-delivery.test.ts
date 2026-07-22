@@ -47,6 +47,7 @@ function draftFixture(overrides: Partial<Draft> = {}): Draft {
     override_send: null,
     schedule_approved: null,
     schedule_approval_tag: null,
+    relay_executor: null,
     context_messages: [],
     context_diagnostic: null,
     ...overrides,
