@@ -110,11 +110,8 @@ before the relay stamps its first draft.
 From the adversarial review of PR #12
 (`runs/reviews/2026-07-22-sun-613-phase-0-executor-gate.md`). P0 on phase 2, not aspirations.
 
-1. **Do not stamp until every executor supports the gate.** An older menubar or MCP ignores
-   `relay_executor` and will send a stamped draft; worse, an older `normalizeDraft` projects
-   field-by-field and will *erase* the stamp on its next write, silently un-routing the draft.
-   Gate activation on a capability or minimum-version handshake with every paired device, and
-   refuse to enable the relay in a mixed-version fleet.
+1. **Rollout safety in a mixed-version fleet.** Written out in its own section below, because
+   working it through changed what phase 2 builds.
 2. **An assignment revision, atomically claimed.** A per-host advisory lock cannot serialize
    against another host or against the relay writer, so "read the stamp under the lock" is not a
    cross-host claim. Executor assignment must be immutable once a draft is executable, or carry a
@@ -130,6 +127,65 @@ From the adversarial review of PR #12
    (`Draft.scheduleApprovalScopeForDraft` binds the executor into the HMAC scope). Phase 2 must
    extend the same binding to the WhatsApp daemon's approved-digest, and phase 3's remote approvals
    must sign the executor and the assignment revision explicitly.
+
+### Rollout safety in a mixed-version fleet
+
+**The hazard.** A Ghostie build that predates the executor gate does not know `relay_executor`.
+That produces two failure modes, and the second is worse than the first:
+
+  a. It **sends** a draft stamped for another Mac, because it has no gate.
+  b. Its `normalizeDraft` projects field-by-field, so it **erases** the stamp on its next write
+     (`markDraftSent`, `updateScheduling`). The draft is then permanently unrouted, silently, and
+     every machine will send it from then on.
+
+**Why a capability handshake alone does not solve it.** The obvious fix is to have each device
+advertise a protocol version and refuse to stamp until all of them are new enough. That fails on
+the thing it most needs to catch: an executor that predates the announcement never announces. You
+cannot enumerate the old processes by asking them. It is absence of evidence, and the fleet has
+four executor processes per Mac (menubar, iMessage MCP, WhatsApp MCP, WhatsApp daemon), any of
+which a stale Claude config could still be launching from an old path.
+
+**Primary mechanism, therefore: single-home the draft file.** Ownership is expressed by *which
+machine's drafts directory holds the file*, not by a field inside it. A draft exists in exactly one
+`~/.messages-mcp/drafts/` at a time, and that machine is the executor. Hand-off is a **locked move**
+(take the per-draft `SendLock` on both ends, write the destination, then remove the source and
+leave a relay-cache entry behind for display), never a copy.
+
+Spokes render the queue from a relay cache at `~/.messages-mcp/relay/`, which no MCP scans and no
+executor reads. Old code cannot act on a file it never sees.
+
+That covers the cases as follows:
+
+| Case | Old executor on that machine | Covered by |
+|---|---|---|
+| Draft staged on the hub, executed on the hub | sees it, sends it, correctly | ownership is already right; stamp erasure is harmless |
+| Draft relayed to a spoke for review | never appears in the spoke's drafts dir | single-homing |
+| Draft staged on a spoke, executed on the hub | the window between staging and the move | the handshake, below |
+
+**The residual case, and the narrowed handshake.** Only one case still needs a version check: a
+draft staged by a spoke's own MCP, which therefore lands in that spoke's drafts directory before
+the relay can move it. Until the move completes, an old executor on that spoke can send it.
+
+So the handshake survives, but small and specific: each device publishes a `relay_protocol` integer
+in its pairing record during the phase-1 ceremony, and the hub refuses to **accept a spoke into
+relay mode at all** unless the spoke advertises a version that supports the gate. This is a check
+about the *device we are enrolling*, made at enrollment time, which is exactly the moment the
+information is available and trustworthy. It is not an attempt to poll for processes that cannot
+answer.
+
+Belt and braces for the same window: the relay moves a newly staged spoke draft under the per-draft
+send lock, so the move cannot interleave with an in-flight send on that spoke.
+
+**Accepted tradeoff.** After hand-off, the spoke's own Claude session loses `get_draft` visibility
+of a draft it staged: the file is gone from the directory its MCP reads, so the tool returns "not
+found". That is a real regression for the agent on the spoke, and it is the price of the property
+that old code cannot act on a file it cannot see. If it proves annoying, the fix is to teach the
+`ghostie` facade MCP to read the relay cache for read-only tools, which does not weaken the
+invariant because the facade exposes no send. Do not fix it by leaving the file in place.
+
+**Consequence for phase 1.** Device records must carry `relay_protocol` from the start, because
+enrollment is where it is checked. This is the one piece of the rollout work that lands in phase 1
+rather than phase 2.
 
 ### Scope of the invariant
 
@@ -224,19 +280,26 @@ Ghostie-to-self iMessage nudge from the hub using the send path that already exi
 
 | Phase | Scope | Effort |
 |---|---|---|
-| 0 | `relay_executor` field, Swift + TS executor gate, `WRONG_EXECUTOR` error code, tests. Lands standalone. | 0.5 day |
-| 1 | Device identity, local-only Keychain keys with the synchronizable test, SAS pairing ceremony, settings block, feature flag. | 1 day |
-| 2 | Hub listener on the tailnet, spoke push on the existing `DraftStore` watch, canonical hydration into the hub's drafts dir, exclusion rules, queue UI showing origin / executor / last-sync recency. | 1.5 days |
+| 0 | `relay_executor` field, Swift + TS executor gate, `WRONG_EXECUTOR` error code, tests. **Merged, PR #12.** | 0.5 day |
+| 1 | Device identity, local-only Keychain keys with the synchronizable test, SAS pairing ceremony carrying `relay_protocol`, settings block, feature flag. | 1.25 days |
+| 2 | Hub listener on the tailnet, spoke push on the existing `DraftStore` watch, **single-homed locked hand-off** into the hub's drafts dir plus the spoke relay cache, assignment revision, exclusion rules, queue UI showing origin / executor / last-sync recency. | 2 days |
 | 3 | Mobile web review surface, WebCrypto keypair, hold-to-send, signed approval verified into the existing `ApprovalAuthenticator` mint. | 1.5 days |
 | 4 | Revocation, replay ledger persistence, audit entries, kill-switch integration, red-team pass. | 0.5 day |
 
-Roughly 5 focused days. Phase 0 is independently valuable and should land first regardless of
-whether the rest proceeds.
+Roughly 5.75 focused days, up from 5. The increase is the rollout-safety work: `relay_protocol` in
+the pairing record (phase 1), and the locked move plus relay cache replacing the simpler copy
+(phase 2). Phase 0 is merged and was independently valuable regardless of whether the rest proceeds.
 
 ## Acceptance criteria
 
 - A draft staged on the spoke Mac appears on the hub and the iPhone with the same
   `deliveryPayloadDigest`.
+- After hand-off, the draft file exists in exactly ONE machine's `~/.messages-mcp/drafts/`. The
+  spoke holds only a relay-cache entry, and the spoke's `get_draft` reports it as absent.
+- A device advertising a `relay_protocol` below the gate-supporting version cannot be enrolled into
+  relay mode, and the pairing UI says why.
+- Hand-off of a spoke-staged draft takes the per-draft send lock, and a hand-off attempted during
+  an in-flight send on that spoke is refused rather than interleaved.
 - A spoke Mac cannot send a relayed draft by any path: the Swift `DraftSender` refuses, and both
   MCP send tools return `WRONG_EXECUTOR`, including with `require_approval` off.
 - A draft carrying `in_reply_to_thread_id`, `imessage_group`, `quoted_message_id`, or attachments
