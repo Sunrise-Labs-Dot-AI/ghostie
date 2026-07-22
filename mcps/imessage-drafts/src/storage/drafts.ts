@@ -284,9 +284,17 @@ function normalizeDraft(raw: Partial<Draft>): Draft | null {
     delivery_progress: normalizeDeliveryProgress(raw.delivery_progress, attachments.length),
     // Must be projected here or every normalize→write round-trip (markDraftSent,
     // schedule edits) would silently strip the stamp and un-route the draft.
-    relay_executor: typeof raw.relay_executor === "string" && raw.relay_executor.length > 0
-      ? raw.relay_executor
-      : null,
+    //
+    // Only absent and explicit null collapse to "unrouted". A present but
+    // unusable value (wrong type, empty, bad alphabet) is preserved verbatim so
+    // `executorRefusal` can refuse it. Normalizing malformed routing data to
+    // null here would fail OPEN — the file would look unrouted and send.
+    relay_executor:
+      raw.relay_executor === undefined || raw.relay_executor === null
+        ? null
+        : typeof raw.relay_executor === "string"
+          ? raw.relay_executor
+          : String(raw.relay_executor),
   };
 }
 

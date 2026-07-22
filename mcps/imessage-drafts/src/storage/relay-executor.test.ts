@@ -77,9 +77,27 @@ test("a legacy draft without the field reads as unrouted", () => {
   expect(getDraft("22222222-2222-4222-8222-222222222222")?.relay_executor).toBeNull();
 });
 
-test("an empty-string stamp normalizes to null", () => {
+test("a present but malformed stamp is PRESERVED, not normalized to null", () => {
+  // Normalizing corrupt routing data to null would make the draft look unrouted
+  // and therefore sendable by any Mac — fail open. Keep it so the gate refuses.
+  // (Second-lane review, finding 6.)
   seedStampedDraft("33333333-3333-4333-8333-333333333333", "");
-  expect(getDraft("33333333-3333-4333-8333-333333333333")?.relay_executor).toBeNull();
+  expect(getDraft("33333333-3333-4333-8333-333333333333")?.relay_executor).toBe("");
+});
+
+test("a non-string stamp is preserved as a string so the gate can refuse it", () => {
+  writeFileSync(
+    join(dir, "66666666-6666-4666-8666-666666666666.json"),
+    JSON.stringify({
+      id: "66666666-6666-4666-8666-666666666666",
+      to_handle: "+14155551234",
+      body: "hi",
+      staged_at: "2026-05-15T00:00:00Z",
+      relay_executor: 42,
+    }),
+    { mode: 0o600 },
+  );
+  expect(getDraft("66666666-6666-4666-8666-666666666666")?.relay_executor).toBe("42");
 });
 
 test("markDraftSent does not strip the stamp", () => {

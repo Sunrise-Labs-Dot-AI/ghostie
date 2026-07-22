@@ -34,11 +34,25 @@ final class ExecutorGateTests: XCTestCase {
     XCTAssertNil(draft.executorRefusal(localDeviceID: "device-aaaaaaaa"))
   }
 
-  func testEmptyStampIsTreatedAsUnstamped() {
-    // A whitespace-only value is a malformed writer, not an assignment to the
-    // empty device. Treat it as absent rather than refusing every send.
-    XCTAssertNil(makeDraft(relayExecutor: "").executorRefusal(localDeviceID: "device-aaaaaaaa"))
-    XCTAssertNil(makeDraft(relayExecutor: "   ").executorRefusal(localDeviceID: "device-aaaaaaaa"))
+  func testPresentButMalformedStampIsRefused() {
+    // Only an ABSENT key means "unrouted". A present-but-unusable value is
+    // corrupt routing data, and guessing that it means "anyone may send" is the
+    // fail-open direction. (Second-lane review, finding 6.)
+    XCTAssertNotNil(makeDraft(relayExecutor: "").executorRefusal(localDeviceID: "device-aaaaaaaa"))
+    XCTAssertNotNil(makeDraft(relayExecutor: "   ").executorRefusal(localDeviceID: "device-aaaaaaaa"))
+    XCTAssertNotNil(makeDraft(relayExecutor: "42").executorRefusal(localDeviceID: "device-aaaaaaaa"))
+    XCTAssertNotNil(makeDraft(relayExecutor: "has spaces").executorRefusal(localDeviceID: "device-aaaaaaaa"))
+    XCTAssertNotNil(
+      makeDraft(relayExecutor: String(repeating: "a", count: 65))
+        .executorRefusal(localDeviceID: "device-aaaaaaaa")
+    )
+  }
+
+  func testWhitespacePaddedStampStillMatches() {
+    // Tolerate a writer that padded the value; the identity is unchanged.
+    XCTAssertNil(
+      makeDraft(relayExecutor: " device-aaaaaaaa ").executorRefusal(localDeviceID: "device-aaaaaaaa")
+    )
   }
 
   func testMatchingStampIsAllowed() {
@@ -62,6 +76,34 @@ final class ExecutorGateTests: XCTestCase {
     // A corrupt device.json must not accidentally match a corrupt stamp.
     let draft = makeDraft(relayExecutor: "../../etc/passwd")
     XCTAssertNotNil(draft.executorRefusal(localDeviceID: "../../etc/passwd"))
+  }
+
+  // MARK: - An existing approval must not survive reassignment
+
+  func testExecutorIsBoundIntoTheScheduleApprovalScope() {
+    // The tag does not have to be FORGED to be abused: for a scheduled draft a
+    // valid one already exists. If the scope ignored the executor, the relay
+    // could assign a draft to Mac B, a stale writer could flip it back to A,
+    // and A's scheduler would still verify the old tag and auto-send without a
+    // new review. (Second-lane review, finding 4.)
+    let assignedToA = makeDraft(relayExecutor: "device-aaaaaaaa")
+    let assignedToB = makeDraft(relayExecutor: "device-bbbbbbbb")
+    XCTAssertNotEqual(
+      assignedToA.scheduleApprovalCanonicalMessage,
+      assignedToB.scheduleApprovalCanonicalMessage,
+      "reassigning the executor must invalidate an existing approval tag"
+    )
+  }
+
+  func testUnstampedDraftsKeepTheLegacyApprovalScope() {
+    // Back-compat, and the reason relay_executor stays OUT of the delivery
+    // digest: every approval tag minted before the relay existed must still
+    // verify, or upgrading strands pending scheduled drafts.
+    let unstamped = makeDraft(relayExecutor: nil)
+    XCTAssertEqual(
+      unstamped.scheduleApprovalScopeForDraft,
+      Draft.scheduleApprovalScope
+    )
   }
 
   // MARK: - Device identity

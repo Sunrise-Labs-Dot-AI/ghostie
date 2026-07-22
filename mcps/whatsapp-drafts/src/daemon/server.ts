@@ -62,6 +62,7 @@ import {
   validateManagedDraftAttachmentSet,
 } from "../../../shared/src/attachments.ts";
 import { draftPayloadDigest } from "../../../shared/src/draft-payload.ts";
+import { executorRefusal, localDeviceId } from "../../../shared/src/device-id.ts";
 
 // Per-connection inbound frame cap (#84). A single JSON-RPC frame is
 // newline-delimited and tiny in practice; anything past this without a
@@ -780,6 +781,17 @@ async function handleSendDraft(
   }
   if (draft == null) return err(id, RPC_ERR.DRAFT_NOT_FOUND, `no draft ${draftId}`);
   if (draft.sent_at != null) return err(id, RPC_ERR.INVALID_PARAMS, "draft already sent");
+
+  // Cross-device executor gate (SUN-613), at the wire boundary.
+  //
+  // The MCP tool checks this before calling us, but that check is not
+  // sufficient: this handler RELOADS the draft, and any permitted RPC peer can
+  // reach approveDraft + sendDraft without going through the guarded tool at
+  // all. This is the last gate before Baileys, and the digest check below
+  // deliberately does not cover `relay_executor`, so ownership has to be
+  // re-verified here explicitly. (Second-lane review, finding 2.)
+  const executorBlock = executorRefusal(draft.relay_executor, localDeviceId());
+  if (executorBlock != null) return err(id, RPC_ERR.INVALID_PARAMS, executorBlock);
 
   const currentDigest = payloadDigestForDraft(draft);
   if (!currentDigest.ok) return err(id, RPC_ERR.SEND_FAILED, currentDigest.error);

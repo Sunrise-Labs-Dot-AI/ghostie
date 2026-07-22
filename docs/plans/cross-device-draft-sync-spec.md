@@ -1,4 +1,4 @@
-# Ghostie cross-device draft sync — working spec
+# Ghostie cross-device draft sync, working spec
 
 Linear: SUN-613. Supersedes the CloudKit design in the original issue description.
 Adversarial review that produced this rewrite: [SUN-613-cross-device-sync.review.md](SUN-613-cross-device-sync.review.md).
@@ -29,7 +29,7 @@ install and at **every launch**; an invalid profile means the app does not launc
 fleet-wide dependency, and no runtime feature flag can gate an entitlement, a provisioning
 profile, or a production CloudKit container. For a feature with one user, the blast radius is
 wrong. The menubar is non-sandboxed hardened-runtime, so a local listener needs no new
-entitlement at all — the tailnet design ships zero change to
+entitlement at all, the tailnet design ships zero change to
 `menubar/scripts/messages-for-ai.entitlements`.
 
 Accepted cost: nothing here generalizes if cross-device sync is later sold as a product
@@ -72,8 +72,8 @@ processes. They interlock today only through the per-host advisory lock at
 by contract).
 
 The relay therefore does **not** invent a parallel state machine. It writes the canonical draft
-into the hub's own `~/.messages-mcp/drafts/<id>.json` — the same file both local executors
-already read under the same lock — plus one new field:
+into the hub's own `~/.messages-mcp/drafts/<id>.json`, the same file both local executors
+already read under the same lock, plus one new field:
 
 ```jsonc
 "relay_executor": "<device-id of the machine permitted to send this draft>"
@@ -81,19 +81,62 @@ already read under the same lock — plus one new field:
 
 Enforcement, on every send path:
 
-1. **Swift** — `DraftSender.send` refuses when `relay_executor` is present and does not equal the
+1. **Swift**, `DraftSender.send` refuses when `relay_executor` is present and does not equal the
    local device id. Fail-closed on an unreadable device id.
-2. **TypeScript** — `send_draft` and `send_whatsapp_draft` apply the same check and return a new
+2. **TypeScript**, `send_draft` and `send_whatsapp_draft` apply the same check and return a new
    error code `WRONG_EXECUTOR`, alongside the existing `PENDING_APPROVAL` family.
-3. **Spokes** — a spoke Mac stamps its local copy with the hub's device id, so the spoke's own
+3. **The WhatsApp daemon**, `handleSendDraft` re-checks at the wire boundary, after its own
+   reload. The MCP tool's check is not sufficient: the daemon reloads the draft, and any permitted
+   RPC peer can reach `approveDraft` + `sendDraft` without going through the guarded tool.
+4. **Spokes**, a spoke Mac stamps its local copy with the hub's device id, so the spoke's own
    Swift and TS paths both refuse. A spoke is structurally incapable of sending a relayed draft.
+
+The rule is identical in both languages, and the case table is the contract: absent or JSON `null`
+means unrouted; a present value that is the wrong type, empty, whitespace, or outside the device-id
+alphabet is REFUSED; an unreadable local device id is REFUSED. A divergence between the Swift and
+TypeScript gates is a duplicate send, so both sides carry the same table in a comment.
 
 Result: exactly one host may execute any given draft, and on that host the existing lock already
 provides at-most-once. The property is inherited from code that is already tested, not asserted
 by new consensus machinery.
 
 **This gate is worth landing on its own, before any networking.** It is a small, safe change that
-closes a real hole in today's two-Mac setup.
+makes at-most-once *achievable* across the two Macs. It does not by itself deliver it, see the
+requirements below, which the phase-0 second-lane review established and which phase 2 must satisfy
+before the relay stamps its first draft.
+
+### Phase-2 requirements inherited from the phase-0 review
+
+From the adversarial review of PR #12
+(`runs/reviews/2026-07-22-sun-613-phase-0-executor-gate.md`). P0 on phase 2, not aspirations.
+
+1. **Do not stamp until every executor supports the gate.** An older menubar or MCP ignores
+   `relay_executor` and will send a stamped draft; worse, an older `normalizeDraft` projects
+   field-by-field and will *erase* the stamp on its next write, silently un-routing the draft.
+   Gate activation on a capability or minimum-version handshake with every paired device, and
+   refuse to enable the relay in a mixed-version fleet.
+2. **An assignment revision, atomically claimed.** A per-host advisory lock cannot serialize
+   against another host or against the relay writer, so "read the stamp under the lock" is not a
+   cross-host claim. Executor assignment must be immutable once a draft is executable, or carry a
+   revision claimed compare-and-set and re-verified at the wire boundary immediately before each
+   `sendText` / `sendMedia` / AppleScript call.
+3. **Relay writes take the per-draft send lock.** Every draft mutation is read-modify-replace, so
+   copying `existing.relay_executor` preserves the value seen at the initial read, not one written
+   concurrently before the final rename. `DraftStore.updateScheduling` reading an unstamped draft,
+   the relay stamping it, then `updateScheduling` replacing the file with its stale `nil` would
+   silently un-route it. Relay writers must take the same lock, and tests must cover
+   stamp-vs-schedule, stamp-vs-approval, and stamp-vs-progress races, not only sequential rewrites.
+4. **Executor changes invalidate approvals.** Done in phase 0 for the scheduled path
+   (`Draft.scheduleApprovalScopeForDraft` binds the executor into the HMAC scope). Phase 2 must
+   extend the same binding to the WhatsApp daemon's approved-digest, and phase 3's remote approvals
+   must sign the executor and the assignment revision explicitly.
+
+### Scope of the invariant
+
+The invariant is **staged-draft execution**, not "every send." `DraftSender.sendDirect` and
+`sendDirectAttachment` are the inline composer, a human typing on that Mac, with no draft and no
+stamp, and are deliberately out of scope. State it that way in any user-facing copy, because
+"a spoke never sends" is false as written.
 
 ---
 
@@ -104,7 +147,7 @@ HMAC'd over id + recipient + body + scope. A remote approval cannot mint that ta
 below keeps the guarantee rather than diluting it.
 
 **Keys.** Each device holds an Ed25519 keypair. On Macs the private key lives in the login
-Keychain with `kSecAttrSynchronizable = false` — **local-only, never iCloud Keychain**. If these
+Keychain with `kSecAttrSynchronizable = false`, **local-only, never iCloud Keychain**. If these
 keys synced, an Apple ID compromise would grant send authority, which is exactly what this design
 must prevent. Add an explicit unit test asserting the attribute.
 
@@ -129,7 +172,7 @@ channel an attacker would control.
    `SendLock`, kill switch, daemon health checks, failure log, audit.
 
 The TTL exists for replay defence, not as the product mechanism. A spoke never queues a command
-for a sleeping hub — if the hub is unreachable the spoke says so and the approval does not happen.
+for a sleeping hub, if the hub is unreachable the spoke says so and the approval does not happen.
 
 ---
 
@@ -155,7 +198,7 @@ Secure Enclave, and Safari evicts site data after seven days of non-use unless t
 installed to the Home Screen, in which case re-pairing is occasionally required. Both are
 acceptable at n=1; neither would be acceptable in a shipped product.
 
-**Notification.** None in v1 — open the page. If that proves annoying, the cheapest option is a
+**Notification.** None in v1, open the page. If that proves annoying, the cheapest option is a
 Ghostie-to-self iMessage nudge from the hub using the send path that already exists.
 
 ---
@@ -171,9 +214,9 @@ Ghostie-to-self iMessage nudge from the hub using the send path that already exi
 - With the flag off the listener never binds, no keys are generated, and `relay_executor` is never
   written, so the shipped behavior for every other user is byte-identical to today.
 - Marketing copy is unaffected because nothing leaves the user's own devices. The
-  `CONTRIBUTING.md:21` sentence should still be corrected separately — it claims Ghostie "never
+  `CONTRIBUTING.md:21` sentence should still be corrected separately, it claims Ghostie "never
   stores or transmits message bodies" while draft JSON already persists plaintext `body` and
-  `context_messages` — but that is a docs accuracy fix, not a gate on this work.
+  `context_messages`, but that is a docs accuracy fix, not a gate on this work.
 
 ---
 
@@ -220,11 +263,11 @@ Multi-user support.
 
 Compare-and-set claims, the losing-Mac refetch rule, the durable attempt journal, the `sending`
 no-takeover rule, the `ambiguous` state and its manual-inspection UX, and the 100,000-iteration
-race harness — all unnecessary once one host executes. Executor selection UI — replaced by a
-fixed per-transport rule. The native SwiftUI iPhone client — replaced by a served web surface.
+race harness, all unnecessary once one host executes. Executor selection UI, replaced by a
+fixed per-transport rule. The native SwiftUI iPhone client, replaced by a served web surface.
 CloudKit, its entitlement, its provisioning profile, its container, its quota and retention
-questions, and the encrypted-record schema — replaced by direct device-to-device transport. The
-policy gate blocking implementation — the data never leaves the user's own devices, so there is
+questions, and the encrypted-record schema, replaced by direct device-to-device transport. The
+policy gate blocking implementation, the data never leaves the user's own devices, so there is
 nothing new to permit.
 
 ## Open items

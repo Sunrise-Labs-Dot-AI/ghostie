@@ -245,10 +245,15 @@ export function getDraft(id: string): Draft | null {
     override_send: typeof parsed.override_send === "boolean" ? parsed.override_send : null,
     schedule_approved: typeof parsed.schedule_approved === "boolean" ? parsed.schedule_approved : null,
     schedule_approval_tag: typeof parsed.schedule_approval_tag === "string" ? parsed.schedule_approval_tag : null,
+    // Only absent and explicit null collapse to "unrouted". A present but
+    // unusable value is preserved verbatim so `executorRefusal` can refuse it;
+    // normalizing malformed routing data to null would fail OPEN.
     relay_executor:
-      typeof parsed.relay_executor === "string" && parsed.relay_executor.length > 0
-        ? parsed.relay_executor
-        : null,
+      parsed.relay_executor === undefined || parsed.relay_executor === null
+        ? null
+        : typeof parsed.relay_executor === "string"
+          ? parsed.relay_executor
+          : String(parsed.relay_executor),
   };
 }
 

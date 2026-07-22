@@ -23,8 +23,22 @@
 // draft belongs to, never that anyone approved it — approval provenance stays
 // with the menu bar's Keychain-backed ApprovalAuthenticator.
 
-import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeSync } from "node:fs";
-import { homedir, hostname } from "node:os";
+import {
+  closeSync,
+  constants as fsConstants,
+  fstatSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  unlinkSync,
+  writeSync,
+  fsyncSync,
+  existsSync,
+} from "node:fs";
+import { homedir, hostname, userInfo } from "node:os";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -48,13 +62,45 @@ export function isValidDeviceId(value: unknown): value is string {
 
 let cached: string | null = null;
 
+/** Read the id through a verified descriptor rather than a path.
+ *
+ *  `device.json` decides which drafts this machine may send, so a local process
+ *  that can swap it for a symlink to attacker-controlled JSON could make this
+ *  Mac answer to another Mac's id and duplicate-send its drafts. Path-following
+ *  reads (`readFileSync`) walk that symlink happily. So: O_NOFOLLOW, then
+ *  fstat the descriptor we actually opened and require a regular file owned by
+ *  us with no group/other access. The parent is checked the same way, mirroring
+ *  the existing `ensureDir` symlink guard in the iMessage drafts storage.
+ *  (Second-lane review, finding 7.) */
 function readExisting(): string | null {
+  const root = stateRoot();
   try {
-    const raw = readFileSync(deviceFilePath(), "utf8");
-    const parsed = JSON.parse(raw) as { device_id?: unknown };
+    if (lstatSync(root).isSymbolicLink()) return null;
+  } catch {
+    return null; // missing parent: nothing to read, and creation will make it
+  }
+
+  let fd: number;
+  try {
+    fd = openSync(deviceFilePath(), fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  } catch {
+    return null;
+  }
+  try {
+    const st = fstatSync(fd);
+    if (!st.isFile()) return null;
+    if (st.uid !== userInfo().uid) return null;
+    if ((st.mode & 0o077) !== 0) return null; // group/other access → not ours to trust
+    const parsed = JSON.parse(readFileSync(fd, "utf8")) as {
+      device_id?: unknown;
+      schema_version?: unknown;
+    };
+    if (parsed.schema_version !== DEVICE_SCHEMA_VERSION) return null;
     return isValidDeviceId(parsed.device_id) ? parsed.device_id : null;
   } catch {
     return null;
+  } finally {
+    closeSync(fd);
   }
 }
 
@@ -86,39 +132,99 @@ export function localDeviceId(): string | null {
     2,
   );
 
-  // O_CREAT|O_EXCL so two processes racing on first launch cannot mint two ids
-  // for one machine: the loser's create throws EEXIST and it re-reads the
-  // winner's file. Matches DeviceIdentity.createIfAbsent on the Swift side.
+  // Write-then-publish rather than create-then-fill.
+  //
+  // `O_CREAT|O_EXCL` alone stops two successful creates, but it publishes the
+  // final path BEFORE the contents exist: a racing reader sees an empty file,
+  // and a crash mid-write leaves a permanently empty `device.json` that every
+  // future create refuses to replace, wedging stamped sends forever. So build a
+  // complete, fsynced private file first, then publish it with `link`, which is
+  // atomic and fails if the name already exists. The loser of the race unlinks
+  // its temp and reads the winner's file. (Second-lane review, finding 8.)
+  const finalPath = deviceFilePath();
+  const tempPath = join(root, `.device.json.${process.pid}.${randomUUID()}.tmp`);
+
   let fd: number;
   try {
-    fd = openSync(deviceFilePath(), "wx", 0o600);
+    fd = openSync(tempPath, "wx", 0o600);
   } catch {
+    return null;
+  }
+  try {
+    const payload = Buffer.from(body, "utf8");
+    let written = 0;
+    while (written < payload.length) {
+      // Short writes are legal; ignoring the byte count can publish a truncated
+      // identity that parses as valid-looking garbage.
+      const n = writeSync(fd, payload, written, payload.length - written);
+      if (n <= 0) throw new Error("short write");
+      written += n;
+    }
+    fsyncSync(fd);
+  } catch {
+    closeSync(fd);
+    rmSync(tempPath, { force: true });
+    return null;
+  }
+  closeSync(fd);
+
+  try {
+    linkSync(tempPath, finalPath);
+  } catch {
+    // Lost the race, or cannot publish. Either way the authority is whatever is
+    // on disk now.
+    rmSync(tempPath, { force: true });
     const raced = readExisting();
     if (raced != null) cached = raced;
     return raced;
   }
   try {
-    writeSync(fd, body);
+    unlinkSync(tempPath);
   } catch {
-    return null;
-  } finally {
-    closeSync(fd);
+    /* temp already gone; the published file is what matters */
   }
+
   cached = id;
   return cached;
 }
 
 /** Why this machine may not execute this draft, or null when it may.
  *
- *  One rule, shared by both MCPs and mirrored by `Draft.executorRefusal` in
- *  Swift:
- *    - no stamp             → allowed (every draft that exists today)
- *    - stamp, id unreadable → REFUSED, fail closed
- *    - stamp != local id    → REFUSED, belongs to another Mac
+ *  One rule, shared by both MCPs and mirrored EXACTLY by
+ *  `Draft.executorRefusal` in Swift. A divergence between the two is a
+ *  duplicate send, so the case table is written out explicitly:
+ *
+ *    absent / JSON null      → allowed. The legacy shape: every draft written
+ *                              before this field existed, and every draft the
+ *                              relay has not routed.
+ *    present but unusable    → REFUSED. Wrong JSON type, empty, whitespace, or
+ *                              outside the device-id alphabet. Routing data we
+ *                              cannot parse is a reason to stop, not to guess.
+ *    local id unreadable     → REFUSED. "I can't prove I own this" must never
+ *                              resolve to "so I'll send it".
+ *    stamp != local id       → REFUSED. Belongs to another Mac.
+ *    stamp == local id       → allowed.
+ *
+ *  The earlier version of this function coerced every non-string to "" and
+ *  treated that as unstamped, so `"relay_executor": 42` FAILED OPEN on both MCP
+ *  paths while Swift refused the same file. Second-lane review, finding 6.
  */
 export function executorRefusal(relayExecutor: unknown, local: string | null): string | null {
-  const stamped = typeof relayExecutor === "string" ? relayExecutor.trim() : "";
-  if (stamped.length === 0) return null;
+  if (relayExecutor === undefined || relayExecutor === null) return null;
+
+  if (typeof relayExecutor !== "string") {
+    return (
+      "WRONG_EXECUTOR: this draft's executor assignment is not a string, so it cannot be " +
+      "verified. Refusing the send rather than treating unparseable routing data as unrouted."
+    );
+  }
+  const stamped = relayExecutor.trim();
+  if (stamped.length === 0 || !isValidDeviceId(stamped)) {
+    return (
+      "WRONG_EXECUTOR: this draft's executor assignment is present but malformed, so it " +
+      "cannot be verified. Refusing the send rather than guessing which Mac owns it."
+    );
+  }
   if (local == null || !isValidDeviceId(local)) {
     return (
       "WRONG_EXECUTOR: this draft names an executor device, but this machine's device id " +

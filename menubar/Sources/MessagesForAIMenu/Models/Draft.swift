@@ -235,13 +235,33 @@ struct Draft: Codable, Identifiable, Equatable {
   /// Scope label bound into a scheduled draft's approval HMAC.
   static let scheduleApprovalScope = "schedule_approved"
 
+  /// Scope actually bound for THIS draft. Unstamped drafts use the bare label,
+  /// so every approval tag minted before the relay existed stays valid — that
+  /// back-compat is the whole reason `relay_executor` is not in
+  /// `deliveryPayloadDigest`.
+  ///
+  /// A STAMPED draft binds its executor here instead. Without this, a valid
+  /// approval survives an executor change, and the tag does not have to be
+  /// forged to be abused — it already exists. Concretely: the relay assigns a
+  /// scheduled draft to Mac B, a stale or hostile local writer flips
+  /// `relay_executor` back to A, A's scheduler still verifies the old tag and
+  /// auto-sends without a new review, and B may send too. Binding the executor
+  /// into the scope makes any reassignment invalidate the approval, which is
+  /// the fail-closed direction. (Second-lane review, finding 4.)
+  var scheduleApprovalScopeForDraft: String {
+    guard let raw = relay_executor else { return Self.scheduleApprovalScope }
+    let executor = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !executor.isEmpty else { return Self.scheduleApprovalScope }
+    return "\(Self.scheduleApprovalScope)|executor=\(executor)"
+  }
+
   /// Canonical message the schedule-approval tag must cover for THIS draft.
   var scheduleApprovalCanonicalMessage: String {
     ApprovalAuthenticator.canonicalMessage(
       id: id,
       recipient: approvalRecipientBinding,
       body: deliveryPayloadDigest,
-      scope: Self.scheduleApprovalScope
+      scope: scheduleApprovalScopeForDraft
     )
   }
 
@@ -359,10 +379,23 @@ struct Draft: Codable, Identifiable, Equatable {
   ///   - stamp, id unreadable → REFUSED, fail closed. "I cannot prove I am the
   ///     executor" must never resolve to "so I'll send it."
   ///   - stamp != local id   → REFUSED, this draft belongs to another Mac.
+  /// Case table, mirrored EXACTLY by `executorRefusal` in
+  /// `mcps/shared/src/device-id.ts`. A divergence between the two is a
+  /// duplicate send.
+  ///
+  ///   absent / JSON null   → allowed (every draft that exists today)
+  ///   present but unusable → REFUSED. Empty, whitespace, or outside the
+  ///     device-id alphabet. Routing data we cannot parse is a reason to stop,
+  ///     not to guess. (An earlier version trimmed-then-treated-as-unstamped,
+  ///     which failed OPEN on a whitespace stamp. Second-lane review, finding 6.)
+  ///   local id unreadable  → REFUSED, fail closed.
+  ///   stamp != local id    → REFUSED, belongs to another Mac.
   func executorRefusal(localDeviceID: String?) -> String? {
-    guard let executor = relay_executor?.trimmingCharacters(in: .whitespacesAndNewlines),
-          !executor.isEmpty
-    else { return nil }
+    guard let raw = relay_executor else { return nil }
+    let executor = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !executor.isEmpty, DeviceIdentity.isValidDeviceID(executor) else {
+      return "This draft's Mac assignment is unreadable, so Ghostie won't send it from here. Re-stage it."
+    }
     guard let localDeviceID, DeviceIdentity.isValidDeviceID(localDeviceID) else {
       return "Ghostie can't confirm which Mac this draft belongs to, so it won't send it from here."
     }
