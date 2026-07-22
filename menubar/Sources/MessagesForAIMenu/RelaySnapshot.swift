@@ -3,65 +3,68 @@ import CryptoKit
 
 /// The read-only projection of a `Draft` for cross-device visibility (SUN-613, read-only scope).
 ///
-/// This is the privacy core of the whole feature. A `Draft` is rich with things a REMOTE device
-/// must never see: local file paths, chat.db thread ids, group chat GUIDs, the phone numbers and
-/// message ids of OTHER people inside `context_messages`, reaction authors, schedule-approval tags,
-/// and send-authority fields. The safe way to project it is an **allowlist**: build a brand-new
-/// type that names exactly the fields a reviewer may see, so a field added to `Draft` later cannot
-/// leak by default. A denylist (copy everything, then delete some) fails open the moment someone
-/// adds a field, which is exactly what happens over a codebase's lifetime.
+/// ## What this guarantees, stated honestly
 ///
-/// Every projection type below is therefore hand-built, and its `CodingKeys` are the contract. The
-/// tests assert the exact encoded key set of each type, so this file cannot start emitting a new
-/// key without a test failing.
+/// An earlier version of this file claimed it could ensure "no third party's identity crosses the
+/// wire, no matter what the draft contains." That is impossible for a feature whose entire purpose
+/// is to show you a message you are about to send: a draft body is free text and can contain
+/// anyone's phone number, and you need to see the body to review it. A field-name allowlist bounds
+/// which FIELDS cross, not what a free-text field's VALUE contains.
+///
+/// So the real, defensible contract is two-tier:
+///
+///  - **Structural exclusion (guaranteed).** Local execution detail and stable third-party
+///    identifiers are excluded BY CONSTRUCTION, because this type never has a field to carry them:
+///    attachment file paths and hashes, `delivery_progress`, `in_reply_to_thread_id`, group
+///    `chat_guid` and raw participant handles, context `message_id`/`guid`, reaction authors,
+///    receipts, `schedule_approval_tag`, and `relay_executor`. The tests assert the exact encoded
+///    key set of every projection type, so none of these can appear even by accident.
+///  - **Content passthrough (acknowledged).** Message text (`body`, context bodies) and the
+///    recipient label are shown as the user composed or received them. They may contain PII the
+///    user themselves put there. That is the product, not a leak.
+///
+/// On top of the structural guarantee, this projection does the identity hardening that IS
+/// structurally possible: a group is detected via `Draft.isIMessageGroupDraft` (not just the
+/// `imessage_group` struct, which an older writer can drop while the raw group binding survives in
+/// `to_handle`), so a group-shaped `to_handle` never leaks its guid or handles through the direct
+/// path; a context sender whose known "name" is actually handle-shaped is pseudonymised rather than
+/// shown; and group participant labels count handle-shaped or blank names rather than printing them.
 ///
 /// Nothing here writes to disk or reads identity. `project(from:originDeviceID:)` is pure and takes
-/// the device id as a parameter, so no "pure" path ever calls `DeviceIdentity.localDeviceID()`
-/// (which can create a file). Storage, transport, the manifest, and the feature flag are phase 2.
+/// the device id as a parameter. Storage, transport, the manifest, and the feature flag are phase 2.
 ///
-/// ## Untrusted text
+/// ## Untrusted text and bidi
 ///
-/// Every textual field here (`body`, `RelayRecipient` labels, `RelayContextMessage.sender_display`
-/// and `.body`, `RelayQuotedPreview.body`) originates from message content or the local Contacts
-/// database and is attacker-influenceable. It is UNTRUSTED PLAIN TEXT. The phase-3 web client MUST
-/// render it via `textContent` (never `innerHTML`) under a strict CSP. `RelaySnapshot.textIsUntrusted`
-/// exists so that contract is visible in code and pinned by a test.
+/// Every textual field is UNTRUSTED. `body` and context bodies are message content and are carried
+/// verbatim; the phase-3 web client MUST render them via `textContent` under a strict CSP, and must
+/// bidi-isolate them, because `textContent` stops scripts but NOT Unicode direction overrides.
+/// Short IDENTITY labels (recipient label, `sender_display`), where a bidi spoof is most dangerous
+/// and the text is not content the user needs verbatim, have direction-control characters stripped
+/// here so a reversed phone number cannot masquerade as a different one.
 struct RelaySnapshot: Codable, Equatable {
-  /// Bumped only on a breaking shape change; phase 2's reader rejects unknown versions.
   let schema_version: Int
-  /// The draft id. A reviewer references it; it is not a secret.
   let snapshot_id: String
-  /// Which machine published this. Injected by the caller, never read here, so the projection does
-  /// no I/O.
   let origin_device_id: String
   let platform: Platform
   let recipient: RelayRecipient
-  /// Untrusted plain text.
+  /// Untrusted message content, carried verbatim (see the type doc). May contain PII.
   let body: String
   let context: [RelayContextMessage]
   let staged_at: String
   let lifecycle: RelayLifecycle
-  /// Whether the draft carries attachments. The files themselves stay on the origin Mac; only this
-  /// bool crosses, so a reviewer knows media is attached without the paths leaking.
   let has_attachments: Bool
-  /// Content hash of the already-redacted fields, for "did the displayed content change" only.
-  /// Deliberately NOT `deliveryPayloadDigest`: that carries a send-authority meaning this artifact
-  /// must never have.
+  let quoted: RelayQuotedPreview?
+  /// Content hash of the projected fields, for change detection only. NOT `deliveryPayloadDigest`.
   let snapshot_digest: String
 
   static let currentSchemaVersion = 1
-
-  /// Marks every textual field as untrusted plain text (see the type doc). A test asserts this is
-  /// true so the contract cannot be quietly dropped.
   static let textIsUntrusted = true
 
   enum CodingKeys: String, CodingKey {
     case schema_version, snapshot_id, origin_device_id, platform
-    case recipient, body, context, staged_at, lifecycle, has_attachments, snapshot_digest
+    case recipient, body, context, staged_at, lifecycle, has_attachments, quoted, snapshot_digest
   }
 
-  /// Pure projection. `originDeviceID` is injected so this function touches neither the filesystem
-  /// nor `DeviceIdentity`. Same input, same output.
   static func project(from draft: Draft, originDeviceID: String) -> RelaySnapshot {
     let snapshot = RelaySnapshot(
       schema_version: currentSchemaVersion,
@@ -74,10 +77,9 @@ struct RelaySnapshot: Codable, Equatable {
       staged_at: draft.staged_at,
       lifecycle: RelayLifecycle.of(draft),
       has_attachments: (draft.attachments?.isEmpty == false),
+      quoted: RelayQuotedPreview.project(from: draft),
       snapshot_digest: ""
     )
-    // Digest is computed over the projected fields, then folded in, so it hashes exactly what a
-    // reader would receive, nothing local.
     return snapshot.withDigest(snapshot.computeDigest())
   }
 
@@ -85,106 +87,128 @@ struct RelaySnapshot: Codable, Equatable {
     RelaySnapshot(
       schema_version: schema_version, snapshot_id: snapshot_id, origin_device_id: origin_device_id,
       platform: platform, recipient: recipient, body: body, context: context, staged_at: staged_at,
-      lifecycle: lifecycle, has_attachments: has_attachments, snapshot_digest: digest
+      lifecycle: lifecycle, has_attachments: has_attachments, quoted: quoted, snapshot_digest: digest
     )
   }
 
-  /// Length-prefixed join of the projected fields, matching the codebase's existing digest idiom
-  /// (`deliveryPayloadDigest`), so multi-byte text and delimiters cannot produce an ambiguous
-  /// representation.
+  /// Canonical, unambiguous digest input. Every component, at every level, is UTF-8 length-prefixed
+  /// (so `"Bob:hello"` and `"Bob","hello"` cannot collide), nil is a distinct marker rather than an
+  /// empty string, and `schema_version` is included so a shape bump changes the digest.
   private func computeDigest() -> String {
     var parts: [String] = [
-      "ghostie-relay-snapshot-v1", snapshot_id, origin_device_id, platform.rawValue,
-      recipient.digestComponent, body, staged_at, lifecycle.rawValue, has_attachments ? "1" : "0"
+      "ghostie-relay-snapshot-v1",
+      String(schema_version),
+      snapshot_id, origin_device_id, platform.rawValue,
+      recipient.digestComponent, body, staged_at, lifecycle.rawValue,
+      has_attachments ? "1" : "0",
+      quoted?.digestComponent ?? "\u{0}nil"
     ]
+    parts.append(String(context.count))
     for message in context { parts.append(message.digestComponent) }
     let canonical = parts.map { "\($0.utf8.count):\($0)" }.joined(separator: "|")
     return SHA256.hash(data: Data(canonical.utf8)).map { String(format: "%02x", $0) }.joined()
   }
 }
 
-/// Lifecycle a remote reviewer needs, projected from the several ways a `Draft` records state.
-enum RelayLifecycle: String, Codable, Equatable {
-  case pending, scheduled, held, sent, failed
+/// Shared identity-text hygiene for the projection.
+enum RelayText {
+  /// Unicode direction-control characters. Stripped from short identity labels so a right-to-left
+  /// override cannot visually reverse a phone number into a different-looking one.
+  static let bidiControls = Set<Character>(["\u{202A}", "\u{202B}", "\u{202C}", "\u{202D}",
+                                            "\u{202E}", "\u{2066}", "\u{2067}", "\u{2068}", "\u{2069}"])
 
+  static func stripBidiControls(_ s: String) -> String {
+    String(s.filter { !bidiControls.contains($0) })
+  }
+
+  /// True when a string looks like a raw contact handle (phone or email) rather than a display
+  /// name, so a handle stuffed into a "name" field is not shown as if it were one.
+  static func looksLikeHandle(_ s: String) -> Bool {
+    let t = s.trimmingCharacters(in: .whitespaces)
+    if t.contains("@") { return true }                 // email
+    let digits = t.filter { $0.isNumber }
+    // Mostly-digits with a plus/paren/dash shape: a phone number, not a name.
+    return digits.count >= 7 && Double(digits.count) / Double(max(t.count, 1)) > 0.5
+  }
+}
+
+enum RelayLifecycle: String, Codable, Equatable {
+  case pending, scheduled, held, sent
+
+  /// Uses the same predicates the rest of the app uses (`Draft.isSent` / `isHeld` / `isScheduled`),
+  /// with an explicit precedence, so a stale `schedule_hold_reason` on an unscheduled draft cannot
+  /// project as held. `.failed` is intentionally absent: `Draft` has no durable failed state to
+  /// project from, so advertising one would be a state the producer can never emit.
   static func of(_ draft: Draft) -> RelayLifecycle {
-    if draft.sent_at != nil { return .sent }
-    if draft.schedule_hold_reason != nil { return .held }
-    if draft.scheduled_send_at != nil { return .scheduled }
+    if draft.isSent { return .sent }
+    if draft.isHeld { return .held }        // isHeld already requires isScheduled
+    if draft.isScheduled { return .scheduled }
     return .pending
   }
 }
 
-/// Group-aware recipient projection. Never emits a raw group binding.
 struct RelayRecipient: Codable, Equatable {
   enum Kind: String, Codable, Equatable { case direct, group }
   let kind: Kind
-  /// Untrusted plain text: a contact name, a bare handle for an unknown 1:1 (the user's own
-  /// contact, intentional PII), or a people-count label for a group. NEVER a chat_guid or a list of
-  /// participant handles.
+  /// Untrusted identity label with bidi controls stripped. Never a chat_guid or a raw handle list.
   let label: String
 
   enum CodingKeys: String, CodingKey { case kind, label }
 
   static func project(from draft: Draft) -> RelayRecipient {
-    if let group = draft.imessage_group {
-      return RelayRecipient(kind: .group, label: safeGroupLabel(group))
+    // Detect a group the way the rest of the app does: the structured target OR a surviving raw
+    // group binding in to_handle. Using only `imessage_group != nil` would let a draft whose struct
+    // was dropped leak its guid/handles through the direct path (review finding 1).
+    if draft.isIMessageGroupDraft {
+      let label = draft.imessage_group.map(safeGroupLabel) ?? "Group thread"
+      return RelayRecipient(kind: .group, label: RelayText.stripBidiControls(label))
     }
-    // 1:1. Prefer the contact name; fall back to the handle, which identifies the user's own
-    // recipient and is intentional. Never a group binding, because imessage_group was nil.
-    let label = draft.to_handle_name?.isEmpty == false ? draft.to_handle_name! : draft.to_handle
-    return RelayRecipient(kind: .direct, label: label)
+    let name = draft.to_handle_name?.trimmingCharacters(in: .whitespaces)
+    let label = (name?.isEmpty == false) ? name! : draft.to_handle
+    return RelayRecipient(kind: .direct, label: RelayText.stripBidiControls(label))
   }
 
-  /// Group label that is safe to publish. `IMessageGroupDraftTarget.groupDisplayLabel` cannot be
-  /// reused: when no participant names are known it falls back to joining the raw participant
-  /// HANDLES (phone numbers of other people), which is finding 2. Here the no-names path emits a
-  /// people COUNT instead, and the guid is never touched.
+  /// Group label safe to publish. Never the guid, never a raw handle. Names that are themselves
+  /// handle-shaped or blank are counted, not printed.
   static func safeGroupLabel(_ group: IMessageGroupDraftTarget) -> String {
     let names = group.participant_names
-      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-      .filter { !$0.isEmpty }
+      .map { $0.trimmingCharacters(in: .whitespaces) }
+      .filter { !$0.isEmpty && !RelayText.looksLikeHandle($0) }
+    let total = max(group.participant_handles.count, names.count)
+    let unnamed = max(total - names.count, 0)
     if names.isEmpty {
-      let count = max(group.participant_handles.count, 1)
-      return "Group thread (\(count) \(count == 1 ? "person" : "people"))"
+      let n = max(total, 1)
+      return "Group thread (\(n) \(n == 1 ? "person" : "people"))"
     }
-    // If we know some names but fewer than the participant count, still count the unnamed rest
-    // rather than exposing their handles.
-    let unnamed = max(group.participant_handles.count - names.count, 0)
     let joined = names.count == 2 && unnamed == 0
       ? names.joined(separator: " & ")
       : names.joined(separator: ", ")
-    if unnamed > 0 {
-      return "Group thread with \(joined) and \(unnamed) more"
-    }
-    return "Group thread with \(joined)"
+    return unnamed > 0 ? "Group thread with \(joined) and \(unnamed) more" : "Group thread with \(joined)"
   }
 
   var digestComponent: String { "\(kind.rawValue):\(label)" }
 }
 
-/// A projected context message. Carries what a reviewer reads, and NOT the identity of the other
-/// person: no raw handle, no message id/guid, no reaction authors, no receipts, no attachments.
 struct RelayContextMessage: Codable, Equatable {
   let from_me: Bool
-  /// Untrusted plain text. The contact name if known, else a stable non-identifying pseudonym, so a
-  /// third party's phone number never crosses the wire.
+  /// Untrusted identity label, bidi-stripped. A known display name, else a pseudonym. Never a raw
+  /// handle, including the case where the stored "name" is itself handle-shaped.
   let sender_display: String
-  /// Untrusted plain text.
+  /// Untrusted message content, carried verbatim.
   let body: String
   let sent_at: String?
 
   enum CodingKeys: String, CodingKey { case from_me, sender_display, body, sent_at }
 
-  /// Pseudonym for an inbound sender whose name is not known locally. Never the raw handle.
   static let unknownSender = "them"
 
   static func project(from message: ContextMessage) -> RelayContextMessage {
     let display: String
     if message.from_me {
       display = "you"
-    } else if let name = message.sender_name, !name.isEmpty {
-      display = name
+    } else if let name = message.sender_name?.trimmingCharacters(in: .whitespaces),
+              !name.isEmpty, !RelayText.looksLikeHandle(name) {
+      display = RelayText.stripBidiControls(name)
     } else {
       display = unknownSender
     }
@@ -196,5 +220,25 @@ struct RelayContextMessage: Codable, Equatable {
     )
   }
 
-  var digestComponent: String { "\(from_me ? "me" : "them"):\(sender_display):\(body):\(sent_at ?? "")" }
+  /// Distinct nil marker for `sent_at` so "no timestamp" and "" do not collide in the digest.
+  var digestComponent: String {
+    "\(from_me ? "me" : "them")\u{1F}\(sender_display)\u{1F}\(body)\u{1F}\(sent_at ?? "\u{0}nil")"
+  }
+}
+
+/// The message a reply-draft quotes, projected for the "replying to..." callout. Carries only
+/// whether it was from the user and its text, never the quoted message's id.
+struct RelayQuotedPreview: Codable, Equatable {
+  let from_me: Bool
+  /// Untrusted message content, carried verbatim.
+  let body: String
+
+  enum CodingKeys: String, CodingKey { case from_me, body }
+
+  static func project(from draft: Draft) -> RelayQuotedPreview? {
+    guard let preview = draft.quoted_preview else { return nil }
+    return RelayQuotedPreview(from_me: preview.from_me, body: preview.body ?? "")
+  }
+
+  var digestComponent: String { "\(from_me ? "me" : "them")\u{1F}\(body)" }
 }
