@@ -15,7 +15,8 @@ Inherits the repo root AGENTS.md. The SwiftUI menu bar app (SwiftPM, macOS 14+):
 ## Don't
 
 - Never add an auto-send path: the scheduled-send surface only fires drafts explicitly approved in the GUI, and fails closed.
-- Never surface raw message bodies; sanitize names/free-text into LLM prompts (see `BirthdayReviewPrompt.sanitize`).
+- Never put message bodies, recipients, contact identifiers, or API keys into analytics events, telemetry, or logs. Displaying bodies in the app's own transcript and draft-review UI is the product; exporting them is not.
+- Generated handoff prompts carry metadata only (name, relationship, date), never message bodies, and names / free text are sanitized before they reach a prompt (see `BirthdayReviewPrompt.sanitize`).
 - Don't trust the build exit code over the `Build complete!` line plus green tests.
 
 ## Canonical doc

@@ -33,6 +33,25 @@ malicious, those privileges become its privileges. The trust boundary
 is "I trust this .app the way I trust software I write myself" — not
 "I trust this .app because of some sandbox."
 
+## Data boundary
+
+Ghostie is not metadata-only, and does not claim to be. Message bodies
+are read and stored locally where the product needs them: staged drafts
+persist their `body` plus a `context_messages` snapshot under
+`~/.messages-mcp/drafts/`, the WhatsApp daemon keeps a local message
+store at `~/.whatsapp-mcp/messages.db`, and the MCP read tools hand
+bodies to whichever assistant the user has configured. That last hop is
+the product, and it is governed by the user's own MCP client, not by us.
+
+The invariant is where that content is NOT allowed to go: no message
+body, recipient, contact identifier, prompt, draft, or API key reaches
+product analytics, telemetry, logs, or any Sunrise Labs-operated
+service. Sunrise Labs does not operate a server that receives message
+history from the core app. Enforcement points are the analytics
+allowlist (see "What we do about it" and "Configuration knobs"), the
+SHA-256 hashing of body content in the send audit log, and the
+content-free daemon logs.
+
 ## Threat model
 
 ### In scope
