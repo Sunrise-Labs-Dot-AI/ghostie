@@ -111,6 +111,15 @@ enum DraftSender {
       )
     }
 
+    // SUN-613: cross-device executor gate, fast path. A draft stamped with
+    // another Mac's `relay_executor` does not belong to this process. Checked
+    // here for a quick, clear refusal; re-checked authoritatively against the
+    // ON-DISK draft under the send lock below, because this `draft` is the
+    // snapshot the UI captured and the stamp may have changed since.
+    if let refusal = draft.executorRefusal(localDeviceID: DeviceIdentity.localDeviceID()) {
+      return SendResult(ok: false, service: nil, error: refusal, durationMs: 0)
+    }
+
     // #88: take the cross-process send lock (the SAME lockfile the MCP servers
     // use, ~/.messages-mcp/locks/<draft-id>.lock) BEFORE either platform path,
     // so a menu-bar hold-to-fire and an MCP send of the SAME draft can't both
@@ -157,6 +166,13 @@ enum DraftSender {
           durationMs: 0
         )
       }
+      // SUN-613: authoritative executor check, against the file rather than the
+      // snapshot. `relay_executor` is intentionally outside the delivery digest
+      // (it is routing, not delivery semantics), so the guard above does NOT
+      // cover it — this is the check that actually holds.
+      if let refusal = current.executorRefusal(localDeviceID: DeviceIdentity.localDeviceID()) {
+        return SendResult(ok: false, service: nil, error: refusal, durationMs: 0)
+      }
       if let ambiguous = current.delivery_progress?.ambiguous_part {
         return SendResult(
           ok: false,
@@ -177,6 +193,16 @@ enum DraftSender {
         Self.persistIMessageSentAt(draftId: draft.id, service: result.service ?? "iMessage")
       }
     case .whatsapp:
+      // SUN-613: same authoritative executor check as the iMessage branch. The
+      // daemon compares the delivery digest, but `relay_executor` is outside
+      // that digest by design, so the routing decision has to be re-read here
+      // under the lock. A missing file is not a licence to send.
+      guard let currentWhatsApp = Self.readWhatsAppDraft(draftId: draft.id) else {
+        return SendResult(ok: false, service: nil, error: "The staged draft is no longer available.", durationMs: 0)
+      }
+      if let refusal = currentWhatsApp.executorRefusal(localDeviceID: DeviceIdentity.localDeviceID()) {
+        return SendResult(ok: false, service: nil, error: refusal, durationMs: 0)
+      }
       // The daemon compares this digest to its current on-disk draft before it
       // records the approval, then checks it again immediately before sending.
       result = await sendWhatsApp(draft: draft)
@@ -583,6 +609,20 @@ enum DraftSender {
   static func readIMessageDraft(draftId: String) -> Draft? {
     guard isSafeDraftID(draftId) else { return nil }
     guard let data = try? Data(contentsOf: iMessageDraftURL(draftId: draftId)) else { return nil }
+    return try? JSONDecoder().decode(Draft.self, from: data)
+  }
+
+  static func whatsAppDraftURL(draftId: String) -> URL {
+    AppStoragePaths.homeDirectory
+      .appendingPathComponent(".whatsapp-mcp/drafts", isDirectory: true)
+      .appendingPathComponent("\(draftId).json")
+  }
+
+  /// WhatsApp counterpart to `readIMessageDraft`. Added for the SUN-613 executor
+  /// check, which has to read the file rather than trust the reviewed snapshot.
+  static func readWhatsAppDraft(draftId: String) -> Draft? {
+    guard isSafeDraftID(draftId) else { return nil }
+    guard let data = try? Data(contentsOf: whatsAppDraftURL(draftId: draftId)) else { return nil }
     return try? JSONDecoder().decode(Draft.self, from: data)
   }
 

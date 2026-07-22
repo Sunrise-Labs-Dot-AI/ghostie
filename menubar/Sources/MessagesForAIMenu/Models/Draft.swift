@@ -127,6 +127,27 @@ struct Draft: Codable, Identifiable, Equatable {
   /// callout. nil when the draft isn't a reply. Absent on iMessage drafts.
   let quoted_preview: QuotedPreview?
 
+  // ── Cross-device relay (SUN-613) — additive, Optional ──────────────────────
+  /// Which machine is permitted to execute this draft, as a `DeviceIdentity`
+  /// device id. Absent on every ordinary local draft, which keeps today's
+  /// behavior exactly: no stamp means no routing restriction.
+  ///
+  /// When present, EVERY send path refuses unless it matches the local device
+  /// id — the Swift `DraftSender` here, and the `send_draft` /
+  /// `send_whatsapp_draft` MCP tools on the TypeScript side. That is the point:
+  /// each Mac runs two independent senders, so a gate that only covered this
+  /// process would still leave the other Mac's MCP free to fire the same draft.
+  ///
+  /// Deliberately NOT part of `deliveryPayloadDigest`. It is routing metadata,
+  /// not delivery semantics: it changes WHICH MACHINE sends, never WHO receives
+  /// WHAT. Binding it into the digest would invalidate every already-minted
+  /// schedule-approval tag on upgrade (holding pending scheduled drafts for
+  /// re-approval) while adding no protection against the actual threat — a
+  /// local process that rewrites this field still cannot forge an approval, and
+  /// `DraftSender` re-reads the draft under the send lock so the routing check
+  /// runs against on-disk state rather than a reviewed snapshot.
+  let relay_executor: String?
+
   init(
     id: String,
     to_handle: String,
@@ -152,7 +173,12 @@ struct Draft: Codable, Identifiable, Equatable {
     approval_state: ApprovalState?,
     induced_by_unknown_contact: Bool?,
     quoted_message_id: String?,
-    quoted_preview: QuotedPreview?
+    quoted_preview: QuotedPreview?,
+    // Defaulted so the 14 existing call sites keep compiling unchanged. Every
+    // site that ROUND-TRIPS an existing draft passes it explicitly — dropping it
+    // silently on a rewrite would erase the executor stamp and reopen the
+    // duplicate-send hole this field exists to close.
+    relay_executor: String? = nil
   ) {
     self.id = id
     self.to_handle = to_handle
@@ -179,6 +205,7 @@ struct Draft: Codable, Identifiable, Equatable {
     self.induced_by_unknown_contact = induced_by_unknown_contact
     self.quoted_message_id = quoted_message_id
     self.quoted_preview = quoted_preview
+    self.relay_executor = relay_executor
   }
 
   /// Effective transport. Returns the stored `platform` if present, or
@@ -322,6 +349,29 @@ struct Draft: Codable, Identifiable, Equatable {
     return nil
   }
 
+  /// Why this machine may not execute this draft, or nil when it may.
+  ///
+  /// Pure so both the fast pre-lock check and the authoritative under-lock
+  /// re-check in `DraftSender` share one rule, and so the three cases below can
+  /// be pinned by tests without touching the filesystem.
+  ///
+  ///   - no stamp            → allowed (every draft that exists today)
+  ///   - stamp, id unreadable → REFUSED, fail closed. "I cannot prove I am the
+  ///     executor" must never resolve to "so I'll send it."
+  ///   - stamp != local id   → REFUSED, this draft belongs to another Mac.
+  func executorRefusal(localDeviceID: String?) -> String? {
+    guard let executor = relay_executor?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !executor.isEmpty
+    else { return nil }
+    guard let localDeviceID, DeviceIdentity.isValidDeviceID(localDeviceID) else {
+      return "Ghostie can't confirm which Mac this draft belongs to, so it won't send it from here."
+    }
+    guard executor == localDeviceID else {
+      return "This draft sends from another Mac. Approve it there, or on your phone, and that Mac will deliver it."
+    }
+    return nil
+  }
+
   /// Copy used when a trusted GUI action authenticates the current payload.
   /// The approval tag is not part of `deliveryPayloadDigest`.
   func replacingScheduleApprovalTag(_ tag: String?) -> Draft {
@@ -350,7 +400,8 @@ struct Draft: Codable, Identifiable, Equatable {
       approval_state: approval_state,
       induced_by_unknown_contact: induced_by_unknown_contact,
       quoted_message_id: quoted_message_id,
-      quoted_preview: quoted_preview
+      quoted_preview: quoted_preview,
+      relay_executor: relay_executor
     )
   }
 

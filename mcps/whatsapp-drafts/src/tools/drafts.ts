@@ -30,6 +30,7 @@ import {
   type ManagedDraftAttachment,
   type RawAttachmentInput,
 } from "../../../shared/src/attachments.ts";
+import { executorRefusal, localDeviceId } from "../../../shared/src/device-id.ts";
 import { draftPayloadDigest } from "../../../shared/src/draft-payload.ts";
 import { errorResult, jsonResult } from "./_result.ts";
 import { wrapBodyInPlace, wrapUntrusted } from "./_untrusted.ts";
@@ -83,6 +84,9 @@ export interface DraftRpc {
   }>;
   context_diagnostic: null | "no_thread_match" | "thread_empty" | "error";
   induced_by_unknown_contact: boolean;
+  /** Cross-device relay (SUN-613). Absent/null on ordinary drafts; when set,
+   *  only the named device may send. See mcps/shared/src/device-id.ts. */
+  relay_executor?: string | null;
   quoted_message_id: string | null;
   quoted_preview: {
     message_id: string;
@@ -309,6 +313,20 @@ export function registerDraftTools(server: McpServer) {
         );
       }
       try {
+        // Guardrail #0 (SUN-613): cross-device executor gate, before the
+        // approval ladder. WhatsApp is inherently single-executor (the Baileys
+        // session is not portable), so this is defence in depth rather than the
+        // load-bearing case — but a stamp naming another Mac must refuse here
+        // too, or "no draft sends from the wrong machine by ANY path" is false.
+        // Fails closed on an unreadable device id and on a daemon error.
+        try {
+          const { draft } = await callDaemon<{ draft: DraftRpc }>("getDraft", parsed.data);
+          const refusal = executorRefusal(draft.relay_executor, localDeviceId());
+          if (refusal != null) return errorResult(refusal);
+        } catch (e) {
+          return mapDaemonError(e);
+        }
+
         // Read settings on THIS side too so we can pre-approve when
         // require_approval is OFF. (The daemon also reads settings inside
         // sendDraft for the rate-limit checks.)
