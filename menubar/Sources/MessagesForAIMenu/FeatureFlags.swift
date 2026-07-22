@@ -11,6 +11,7 @@ enum MFAFeatureFlag: String, CaseIterable {
   case aiUsage = "ai-usage"
   case draftSafetyStates = "draft-safety-states"
   case transcriptSnapFix = "transcript-snap-fix"
+  case deviceRelay = "device-relay"
 
   var builtinDefault: Bool {
     switch self {
@@ -32,6 +33,7 @@ enum MFAFeatureFlag: String, CaseIterable {
     case .aiUsage: return "AI Usage & Costs"
     case .draftSafetyStates: return "Draft safety states"
     case .transcriptSnapFix: return "Transcript snap fix"
+    case .deviceRelay: return "Cross-device relay"
     }
   }
 
@@ -49,6 +51,8 @@ enum MFAFeatureFlag: String, CaseIterable {
       return "AI Usage & Costs: a metadata-only ledger of your bring-your-own-key AI spend by feature, monthly budget caps, and model-downgrade suggestions. Shown only when a BYOK key is set. Off ships it hidden while it bakes."
     case .draftSafetyStates:
       return "Reversible discard (the Delete button collapses to a 3s Undo strip before it actually discards), a keyboard/VoiceOver-driveable hold-to-send (two-step arm→fire that still honors the hold), and plain-language send-failure copy on the approval bubble. Off keeps today's immediate discard + pointer-only send + raw error text."
+    case .deviceRelay:
+      return "Cross-device draft relay between your Macs and your phone (SUN-613). Off ships it inert: no listener binds, no device keys are generated, and drafts behave exactly as they do today. Personal-scale and unfinished, keep it off unless you are working on it."
     case .transcriptSnapFix:
       return "Rebuilds transcript auto-scroll: one scroll per new message — always on your own send, and on an incoming message only when you're already at the bottom — instead of the multi-pass snap that jumped after a send. Off keeps today's snap."
     }
