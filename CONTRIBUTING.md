@@ -18,7 +18,7 @@ python3 scripts/check-no-real-pii.py
 
 ## Privacy posture
 
-Ghostie is metadata-only: it never stores or transmits message bodies. Analytics, birthday, and voice features emit counts, dates, and aggregates only. Keep it that way. See `SECURITY.md` for the full threat model.
+Message content stays on the user's own devices. Ghostie reads and stores bodies locally where the product needs them (drafts, thread context, the WhatsApp message store), but no message body, recipient, contact identifier, prompt, draft, or API key may reach product analytics, telemetry, logs, or any Sunrise Labs-operated service. Features that read bodies locally (analytics, birthday, voice) emit counts, dates, and aggregates only. Keep it that way. See `SECURITY.md` for the full threat model.
 
 ## Building and testing
 
