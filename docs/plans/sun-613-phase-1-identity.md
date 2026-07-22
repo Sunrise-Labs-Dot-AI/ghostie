@@ -38,8 +38,28 @@ key override is a production key-injection backdoor rather than a test seam.
 
 ## What gets built now
 
-**A. `RelayDeviceIdentity`.** Ed25519 signing keypair via `Curve25519.Signing.PrivateKey`, stored
-in the **data-protection keychain**.
+**A. `RelayDeviceIdentity`.** Secure Enclave P-256 signing key. **This replaces the Ed25519 in
+the Keychain the previous revision specified.** The change was forced by measurement, not taste:
+
+  - The data-protection keychain, the only macOS keychain that honors `kSecAttrAccessible`, returns
+    `errSecMissingEntitlement` (-34018) without a keychain-access-group entitlement, which needs a
+    provisioning profile, which is the fleet-wide launch dependency this design exists to avoid.
+  - The legacy file-based keychain accepts the write and then reports `synchronizable = nil` and
+    `accessible = nil` on readback. The attributes are not recorded, so "never syncs, never leaves
+    this Mac" could be asserted but never verified. An unverifiable guarantee is not one, and this
+    key is a send-authority boundary.
+  - Measured on this hardware: `SecureEnclave.isAvailable == true`, create/sign/verify works in an
+    unsigned binary with no entitlement, and the 284-byte blob restores to an identical public key.
+
+  The enclave key is non-extractable, so it also dissolves the finding about bundled MCP binaries
+  sharing the menu bar's keychain access: there is no raw key for them to read. P-256 is
+  additionally the curve WebCrypto supports most universally, so phase 3's phone client gets easier.
+
+  Accepted cost: requires Apple silicon or T2. Both target Macs qualify. Hardware without an
+  enclave refuses to enroll with a clear message rather than silently downgrading to an extractable
+  key.
+
+  Superseded detail from the previous revision:
 
   - `kSecUseDataProtectionKeychain: true` on **every** add, read, update, and delete. Without it
     the accessibility class is silently not applied on macOS.
@@ -60,9 +80,10 @@ in the **data-protection keychain**.
   - **No environment-variable override.** Tests inject through a `RelayKeyStore` protocol; the
     production type is the only Keychain-backed implementation.
 
-**B. Settings.** Additive `"relay"` block in `SettingsStore`:
-`{"enabled": false, "role": "spoke", "hub_device_id": null}`. Absence reads as disabled, matching
-every other additive block in the v2 schema.
+**B. Settings: deferred to phase 2.** The `"relay"` block would be written and never read until
+phase 2 introduces the first consumer, and unread persisted state rots. The feature flag alone
+gates everything that exists in phase 1. Scope call made during implementation, recorded here
+rather than silently dropped.
 
 **C. Feature flag.** `MFAFeatureFlag.deviceRelay = "device-relay"`, `builtinDefault = false`.
 

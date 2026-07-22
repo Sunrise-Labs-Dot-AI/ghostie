@@ -3,52 +3,25 @@ import CryptoKit
 import Security
 @testable import MessagesForAIMenu
 
-/// SUN-613 phase 1. The property under test is that a device signing key is minted only when
-/// asked, and is stored somewhere an Apple ID compromise or a restored keychain cannot reach.
+/// SUN-613 phase 1. The property under test: a device signing key is minted only when asked, is
+/// non-extractable, and a machine without an enclave refuses rather than silently downgrading.
 final class RelayIdentityTests: XCTestCase {
 
-  // MARK: - Query attributes
-  //
-  // These assert we ASKED for the right thing. Necessary, not sufficient: the live round-trip
-  // below is what proves macOS honored it.
+  private var home: URL!
 
-  func testEveryQuerySelectsTheDataProtectionKeychain() {
-    // The finding that motivated this test: on macOS `kSecAttrAccessible` is only honored when
-    // `kSecUseDataProtectionKeychain` is true. Omit it and the item lands in the legacy
-    // file-based keychain with the ThisDeviceOnly class silently NOT applied, so a restored
-    // keychain hands the raw signing key to another Mac.
-    for query in [
-      RelayKeychain.baseQuery(),
-      RelayKeychain.addQuery(keyData: Data(repeating: 7, count: 32)),
-      RelayKeychain.readQuery(),
-      RelayKeychain.synchronizedProbeQuery()
-    ] {
-      XCTAssertEqual(query[kSecUseDataProtectionKeychain as String] as? Bool, true)
-    }
+  override func setUp() {
+    super.setUp()
+    home = URL(fileURLWithPath: NSTemporaryDirectory())
+      .appendingPathComponent("ghostie-relay-identity-\(UUID().uuidString)", isDirectory: true)
+    try? FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+    setenv("MESSAGES_FOR_AI_HOME", home.path, 1)
   }
 
-  func testAddAndReadPinSynchronizableFalse() {
-    // If this key reached the iCloud Keychain, compromising the Apple ID would grant send
-    // authority, which is exactly what the relay design claims it cannot.
-    XCTAssertEqual(RelayKeychain.baseQuery()[kSecAttrSynchronizable as String] as? Bool, false)
-    XCTAssertEqual(
-      RelayKeychain.addQuery(keyData: Data(repeating: 7, count: 32))[kSecAttrSynchronizable as String] as? Bool,
-      false
-    )
-    XCTAssertEqual(RelayKeychain.readQuery()[kSecAttrSynchronizable as String] as? Bool, false)
-  }
-
-  func testAddUsesWhenUnlockedThisDeviceOnly() {
-    let accessible = RelayKeychain.addQuery(keyData: Data(repeating: 7, count: 32))[
-      kSecAttrAccessible as String
-    ]
-    XCTAssertEqual(accessible as! CFString, kSecAttrAccessibleWhenUnlockedThisDeviceOnly)
-  }
-
-  func testSynchronizedProbeOverridesTheFalsePin() {
-    // The one query that must be able to SEE a synced record, or the collision check is blind.
-    let probe = RelayKeychain.synchronizedProbeQuery()
-    XCTAssertEqual(probe[kSecAttrSynchronizable as String] as? String, kSecAttrSynchronizableAny as String)
+  override func tearDown() {
+    unsetenv("MESSAGES_FOR_AI_HOME")
+    try? FileManager.default.removeItem(at: home)
+    home = nil
+    super.tearDown()
   }
 
   // MARK: - Mint discipline
@@ -64,133 +37,146 @@ final class RelayIdentityTests: XCTestCase {
     XCTAssertEqual(store.storeCallCount, 0, "a read path minted a key")
   }
 
-  func testEnsureKeyPairMintsOnceThenReuses() {
+  func testEnsureKeyPairMintsOnceThenReuses() throws {
+    try XCTSkipUnless(SecureEnclave.isAvailable, "no Secure Enclave on this host")
     let store = SpyKeyStore()
     let identity = RelayDeviceIdentity(store: store)
 
-    let first = try? identity.ensureKeyPair()
-    let second = try? identity.ensureKeyPair()
-    XCTAssertNotNil(first)
-    XCTAssertEqual(first?.rawRepresentation, second?.rawRepresentation)
+    let first = try identity.ensureKeyPair()
+    let second = try identity.ensureKeyPair()
+    XCTAssertEqual(first.x963Representation, second.x963Representation)
     XCTAssertEqual(store.storeCallCount, 1, "a second call re-minted instead of reusing")
   }
 
-  func testEnsureKeyPairRefusesWhenASynchronizedItemShadowsIt() {
-    // Synchronizability is part of a generic password's composite primary key, so a synced record
-    // and a local one can coexist under the same service/account. Minting a local key while a
-    // synced one exists leaves two identities and a later query regression could revive the synced
-    // credential. Refuse, and do NOT delete: deleting a synchronized item propagates that delete
-    // to the user's other devices.
+  func testMissingEnclaveRefusesRatherThanDowngrading() {
+    // A silent fallback to an extractable key would quietly weaken the send-authority boundary,
+    // which is the entire reason this key lives in the enclave.
     let store = SpyKeyStore()
-    store.synchronizedShadow = true
+    store.enclaveAvailable = false
     let identity = RelayDeviceIdentity(store: store)
 
     XCTAssertThrowsError(try identity.ensureKeyPair()) { error in
-      XCTAssertEqual(error as? RelayIdentityError, .synchronizedKeyPresent)
+      XCTAssertEqual(error as? RelayIdentityError, .secureEnclaveUnavailable)
     }
     XCTAssertEqual(store.storeCallCount, 0)
   }
 
-  func testSigningProducesAVerifiableSignature() {
+  func testMalformedBlobIsAnErrorNotAReMint() {
+    // Silently re-minting on a corrupt blob would let anyone who can damage a file rotate this
+    // device's identity out from under an existing pairing.
+    let store = SpyKeyStore()
+    store.loadFailure = .malformedStoredKey
+    let identity = RelayDeviceIdentity(store: store)
+
+    XCTAssertThrowsError(try identity.ensureKeyPair()) { error in
+      XCTAssertEqual(error as? RelayIdentityError, .malformedStoredKey)
+    }
+    XCTAssertEqual(store.storeCallCount, 0, "a corrupt blob caused a replacement key to be minted")
+  }
+
+  func testSigningProducesAVerifiableSignature() throws {
+    try XCTSkipUnless(SecureEnclave.isAvailable, "no Secure Enclave on this host")
     let store = SpyKeyStore()
     let identity = RelayDeviceIdentity(store: store)
-    let publicKey = try? identity.ensureKeyPair()
+    let publicKey = try identity.ensureKeyPair()
 
     let payload = Data("ghostie-relay-test".utf8)
-    guard let signature = try? identity.sign(payload), let publicKey else {
-      return XCTFail("expected a signature")
-    }
+    guard let raw = try identity.sign(payload) else { return XCTFail("expected a signature") }
+    let signature = try P256.Signing.ECDSASignature(rawRepresentation: raw)
     XCTAssertTrue(publicKey.isValidSignature(signature, for: payload))
     XCTAssertFalse(publicKey.isValidSignature(signature, for: Data("tampered".utf8)))
   }
 
-  func testNoEnvironmentVariableCanSubstituteAKey() {
+  func testNoEnvironmentVariableCanSubstituteAKey() throws {
+    try XCTSkipUnless(SecureEnclave.isAvailable, "no Secure Enclave on this host")
     // ApprovalAuthenticator has an env seam for its HMAC secret; extending that to a SIGNING key
-    // would be a key-injection backdoor. A same-user process could launch Ghostie with a key it
-    // knows, let the human pair against that apparently normal instance, and forge approvals
-    // forever. Injection is via RelayKeyStore, which no environment can reach.
+    // would be a key-injection backdoor. With the enclave it is not merely disallowed, it is
+    // impossible: there is no raw private key to inject.
     setenv("MFA_TEST_RELAY_DEVICE_KEY", String(repeating: "a", count: 64), 1)
     defer { unsetenv("MFA_TEST_RELAY_DEVICE_KEY") }
 
-    let store = SpyKeyStore()
-    let identity = RelayDeviceIdentity(store: store)
-    let minted = try? identity.ensureKeyPair()
-    XCTAssertNotNil(minted)
-    XCTAssertNotEqual(
-      minted?.rawRepresentation,
-      Data(repeating: 0xAA, count: 32),
-      "the environment influenced key material"
-    )
+    let identity = RelayDeviceIdentity(store: SpyKeyStore())
+    let a = try identity.ensureKeyPair()
+    let b = try RelayDeviceIdentity(store: SpyKeyStore()).ensureKeyPair()
+    XCTAssertNotEqual(a.x963Representation, b.x963Representation,
+                      "two independent mints produced the same key, so something is deterministic")
   }
 
-  // MARK: - Live round-trip
+  // MARK: - Enclave properties, measured rather than assumed
   //
-  // Asserting on our own query dictionaries is self-fulfilling. This is the test that proves macOS
-  // actually honored what we asked for, by reading back the attributes the Keychain returns.
+  // These are the facts the design decision rests on. If any stops holding on future hardware or
+  // a future macOS, the phase 1 storage choice needs revisiting, so they are pinned here.
 
-  func testLiveKeychainRoundTripReportsLocalOnlyStorage() throws {
-    let service = "com.sunriselabs.messages-for-ai.relay-device-key.test-\(UUID().uuidString)"
-    let add: [String: Any] = [
-      kSecClass as String: kSecClassGenericPassword,
-      kSecAttrService as String: service,
-      kSecAttrAccount as String: RelayKeychain.account,
-      kSecUseDataProtectionKeychain as String: true,
-      kSecAttrSynchronizable as String: false,
-      kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
-      kSecValueData as String: Curve25519.Signing.PrivateKey().rawRepresentation
-    ]
-    let addStatus = SecItemAdd(add as CFDictionary, nil)
-    guard addStatus == errSecSuccess else {
-      throw XCTSkip("Keychain unavailable in this environment (OSStatus \(addStatus))")
-    }
-    defer {
-      var delete = add
-      delete.removeValue(forKey: kSecValueData as String)
-      delete.removeValue(forKey: kSecAttrAccessible as String)
-      SecItemDelete(delete as CFDictionary)
-    }
+  func testEnclaveKeyIsNonExtractableAndBlobRestoresToTheSameIdentity() throws {
+    try XCTSkipUnless(SecureEnclave.isAvailable, "no Secure Enclave on this host")
+    let key = try SecureEnclave.P256.Signing.PrivateKey()
+    let blob = key.dataRepresentation
 
-    let query: [String: Any] = [
-      kSecClass as String: kSecClassGenericPassword,
-      kSecAttrService as String: service,
-      kSecAttrAccount as String: RelayKeychain.account,
-      kSecUseDataProtectionKeychain as String: true,
-      kSecAttrSynchronizable as String: kSecAttrSynchronizableAny,
-      kSecReturnAttributes as String: true,
-      kSecReturnData as String: true,
-      kSecMatchLimit as String: kSecMatchLimitOne
-    ]
-    var item: CFTypeRef?
-    let readStatus = SecItemCopyMatching(query as CFDictionary, &item)
-    XCTAssertEqual(readStatus, errSecSuccess)
-    guard let attributes = item as? [String: Any] else { return XCTFail("no attributes returned") }
+    // The persisted artifact is a wrapped handle, not the private scalar. A P-256 private key is
+    // 32 bytes; anything meaningfully larger is a wrapped blob.
+    XCTAssertGreaterThan(blob.count, 32, "the persisted blob looks like raw key material")
 
-    // The assertions that matter: what the Keychain says it stored, not what we asked for.
-    XCTAssertEqual(
-      attributes[kSecAttrSynchronizable as String] as? Bool, false,
-      "the stored item is synchronizable; an Apple ID compromise would reach this signing key"
-    )
-    XCTAssertEqual(
-      attributes[kSecAttrAccessible as String] as? String,
-      kSecAttrAccessibleWhenUnlockedThisDeviceOnly as String,
-      "the accessibility class was not honored, which is the symptom of landing in the legacy keychain"
-    )
-    XCTAssertEqual((attributes[kSecValueData as String] as? Data)?.count, 32)
+    let restored = try SecureEnclave.P256.Signing.PrivateKey(dataRepresentation: blob)
+    XCTAssertEqual(restored.publicKey.x963Representation, key.publicKey.x963Representation)
+
+    let payload = Data("round-trip".utf8)
+    let signature = try restored.signature(for: payload)
+    XCTAssertTrue(key.publicKey.isValidSignature(signature, for: payload))
+  }
+
+  func testEnclaveNeedsNoKeychainEntitlement() throws {
+    try XCTSkipUnless(SecureEnclave.isAvailable, "no Secure Enclave on this host")
+    // This is the measurement that decided the design. The data-protection keychain returns
+    // errSecMissingEntitlement (-34018) for this unsigned binary; the enclave does not care.
+    // If this ever starts throwing, the no-entitlement premise is gone and the relay's storage
+    // choice has to be re-evaluated before phase 3 leans on it.
+    XCTAssertNoThrow(try SecureEnclave.P256.Signing.PrivateKey())
+  }
+
+  // MARK: - On-disk blob store
+
+  func testStoredBlobIsOwnerOnlyAndRestores() throws {
+    try XCTSkipUnless(SecureEnclave.isAvailable, "no Secure Enclave on this host")
+    let store = SecureEnclaveRelayKeyStore()
+    let identity = RelayDeviceIdentity(store: store)
+    let minted = try identity.ensureKeyPair()
+
+    let path = home.appendingPathComponent(".messages-mcp/relay/device-key.blob").path
+    XCTAssertTrue(FileManager.default.fileExists(atPath: path))
+    let mode = (try? FileManager.default.attributesOfItem(atPath: path)[.posixPermissions]) as? NSNumber
+    XCTAssertEqual(mode?.int16Value, 0o600)
+
+    // A fresh store reading the same blob must yield the same identity, or a relaunch would
+    // silently become a different device to its peers.
+    let reread = try RelayDeviceIdentity(store: SecureEnclaveRelayKeyStore()).publicKey()
+    XCTAssertEqual(reread?.x963Representation, minted.x963Representation)
+  }
+
+  func testNoKeyMaterialExistsUntilEnrollmentAsks() throws {
+    // The acceptance criterion behind "flag off means nothing is generated".
+    let identity = RelayDeviceIdentity(store: SecureEnclaveRelayKeyStore())
+    XCTAssertNil(try identity.publicKey())
+    let path = home.appendingPathComponent(".messages-mcp/relay/device-key.blob").path
+    XCTAssertFalse(FileManager.default.fileExists(atPath: path))
   }
 }
 
-/// In-memory `RelayKeyStore`, so mint discipline is provable without a Keychain.
+/// In-memory `RelayKeyStore`, so mint discipline is provable without touching the enclave or disk.
 private final class SpyKeyStore: RelayKeyStore {
-  private var key: Curve25519.Signing.PrivateKey?
+  private var key: SecureEnclave.P256.Signing.PrivateKey?
   private(set) var storeCallCount = 0
-  var synchronizedShadow = false
+  var enclaveAvailable = true
+  var loadFailure: RelayIdentityError?
 
-  func loadPrivateKey() throws -> Curve25519.Signing.PrivateKey? { key }
+  var isEnclaveAvailable: Bool { enclaveAvailable }
 
-  func storePrivateKey(_ key: Curve25519.Signing.PrivateKey) throws {
+  func loadKey() throws -> SecureEnclave.P256.Signing.PrivateKey? {
+    if let loadFailure { throw loadFailure }
+    return key
+  }
+
+  func storeKey(_ key: SecureEnclave.P256.Signing.PrivateKey) throws {
     self.key = key
     storeCallCount += 1
   }
-
-  func synchronizedItemExists() -> Bool { synchronizedShadow }
 }
