@@ -279,4 +279,106 @@ final class DraftSenderTests: XCTestCase {
       quoted_preview: nil
     )
   }
+
+  // MARK: - Partial-delivery reconciliation (issue #9)
+
+  /// The reconciled verdict must survive the round trip to disk and back, since
+  /// the UI reads it from the reloaded draft rather than from the sender.
+  @MainActor
+  func testPersistDeliveryFailureRoundTrips() throws {
+    let store = DraftStore(homeOverride: tmpHome)
+    let draft = try store.createIMessageDraft(
+      toHandle: "+12155550121", toHandleName: "Ryan", body: "hi"
+    )
+    let url = tmpHome
+      .appendingPathComponent(".messages-mcp/drafts", isDirectory: true)
+      .appendingPathComponent("\(draft.id).json")
+
+    XCTAssertNil(try XCTUnwrap(reload(url)).delivery_failure, "a fresh draft is not reconciled")
+
+    XCTAssertTrue(DraftSender.persistIMessageDeliveryFailure(
+      draftId: draft.id, failedPartCount: 5, dispatchedPartCount: 9
+    ))
+
+    let reloaded = try XCTUnwrap(reload(url))
+    XCTAssertEqual(reloaded.delivery_failure?.failed_part_count, 5)
+    XCTAssertEqual(reloaded.delivery_failure?.dispatched_part_count, 9)
+    XCTAssertNotNil(reloaded.delivery_failure?.reconciled_at)
+    XCTAssertEqual(reloaded.body, "hi", "other fields must survive the in-place rewrite")
+  }
+
+  /// A draft that predates reconciliation has no `delivery_failure` key at all;
+  /// decoding must treat that as "nothing known", not fail.
+  func testLegacyDraftDecodesWithoutDeliveryFailure() throws {
+    let json = """
+    {"id":"legacy","to_handle":"+12155550121","body":"hi",
+     "staged_at":"2026-07-16T00:00:00Z","sent_at":null,"send_service":null}
+    """
+    let decoded = try JSONDecoder().decode(Draft.self, from: Data(json.utf8))
+    XCTAssertNil(decoded.delivery_failure)
+  }
+
+  /// Reconciliation counts chat.db rows by handle, which is only sound for a
+  /// 1:1 thread. Group targets must opt out rather than under-report.
+  func testOnlyDirectThreadsAreReconcilable() {
+    let direct = mediaDraft(attachments: [], body: "hi")
+    XCTAssertTrue(DraftSender.isReconcilableIMessageTarget(direct))
+
+    let groupHandle = Draft(
+      id: "g", to_handle: "imessage-group:abc", to_handle_name: nil, body: "hi",
+      attachments: nil, delivery_progress: nil, in_reply_to_thread_id: nil,
+      staged_at: "2026-07-16T00:00:00Z", sent_at: nil, send_service: nil,
+      source: nil, context_messages: nil, context_diagnostic: nil,
+      scheduled_send_at: nil, schedule_hold_reason: nil, override_send: nil,
+      schedule_approved: nil, schedule_approval_tag: nil, schema_version: nil,
+      platform: .imessage, approval_state: nil, induced_by_unknown_contact: nil,
+      quoted_message_id: nil, quoted_preview: nil
+    )
+    XCTAssertFalse(DraftSender.isReconcilableIMessageTarget(groupHandle))
+
+    let chatGUIDTarget = Draft(
+      id: "c", to_handle: "iMessage;+;chat123456", to_handle_name: nil, body: "hi",
+      attachments: nil, delivery_progress: nil, in_reply_to_thread_id: nil,
+      staged_at: "2026-07-16T00:00:00Z", sent_at: nil, send_service: nil,
+      source: nil, context_messages: nil, context_diagnostic: nil,
+      scheduled_send_at: nil, schedule_hold_reason: nil, override_send: nil,
+      schedule_approved: nil, schedule_approval_tag: nil, schema_version: nil,
+      platform: .imessage, approval_state: nil, induced_by_unknown_contact: nil,
+      quoted_message_id: nil, quoted_preview: nil
+    )
+    XCTAssertFalse(DraftSender.isReconcilableIMessageTarget(chatGUIDTarget))
+
+    let whatsapp = Draft(
+      id: "w", to_handle: "12025550001@s.whatsapp.net", to_handle_name: nil, body: "hi",
+      attachments: nil, delivery_progress: nil, in_reply_to_thread_id: nil,
+      staged_at: "2026-07-16T00:00:00Z", sent_at: nil, send_service: nil,
+      source: nil, context_messages: nil, context_diagnostic: nil,
+      scheduled_send_at: nil, schedule_hold_reason: nil, override_send: nil,
+      schedule_approved: nil, schedule_approval_tag: nil, schema_version: nil,
+      platform: .whatsapp, approval_state: nil, induced_by_unknown_contact: nil,
+      quoted_message_id: nil, quoted_preview: nil
+    )
+    XCTAssertFalse(DraftSender.isReconcilableIMessageTarget(whatsapp))
+  }
+
+  /// A resumed send replays only the pending parts, so the reconciler's
+  /// expectation has to come from the plan, not the manifest. If it used the
+  /// full manifest it would wait for rows that this run never produced.
+  func testResumedRunExpectsOnlyPendingParts() {
+    let attachments = (0..<8).map { attachment(assetID: "a\($0)", filename: "p\($0).png") }
+    let fresh = mediaDraft(attachments: attachments, body: "hi")
+    XCTAssertEqual(DraftSender.pendingIMessageParts(for: fresh).count, 9, "8 photos + body")
+
+    let resumed = mediaDraft(
+      attachments: attachments,
+      body: "hi",
+      progress: DraftDeliveryProgress(
+        completed_attachment_count: 3, body_sent: false, ambiguous_part: nil
+      )
+    )
+    XCTAssertEqual(
+      DraftSender.pendingIMessageParts(for: resumed).count, 6,
+      "5 remaining photos + body — the reconciler must not expect all 9 rows"
+    )
+  }
 }

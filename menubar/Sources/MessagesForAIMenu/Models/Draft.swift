@@ -30,6 +30,22 @@ struct DraftDeliveryProgress: Codable, Equatable {
   let ambiguous_part: String?
 }
 
+/// Post-send reconciliation verdict, written AFTER `sent_at` once chat.db
+/// reveals what actually happened on the wire. Messages accepting an enqueue is
+/// not delivery: a throttled attachment upload is rejected asynchronously
+/// (`message.error != 0`) long after osascript returned ok, so a send can look
+/// completely clean and still have dropped most of its photos. Absent on drafts
+/// that were never reconciled and on runs where every part landed.
+struct DraftDeliveryFailure: Codable, Equatable {
+  /// Parts from the reconciled run that chat.db reported as errored.
+  let failed_part_count: Int
+  /// Parts actually dispatched by that run. NOT the whole manifest: a resumed
+  /// send replays only what was still pending, so this is the honest
+  /// denominator for "N of M didn't send".
+  let dispatched_part_count: Int
+  let reconciled_at: String
+}
+
 // Mirrors the on-disk JSON written by either MCP server's stage_draft
 // tool:
 //   - iMessage: `~/.messages-mcp/drafts/{uuid}.json`,
@@ -61,6 +77,10 @@ struct Draft: Codable, Identifiable, Equatable {
   /// Durable checkpoint for a multipart delivery. Absent on drafts that have
   /// never begun delivery and on legacy text-only drafts.
   let delivery_progress: DraftDeliveryProgress?
+  /// What chat.db said actually happened after the send returned. Set only when
+  /// reconciliation found errored parts, so a non-nil value always means
+  /// "something the user thought was sent did not arrive".
+  let delivery_failure: DraftDeliveryFailure?
   let in_reply_to_thread_id: Int?
   let staged_at: String
   let sent_at: String?
@@ -135,6 +155,7 @@ struct Draft: Codable, Identifiable, Equatable {
     body: String,
     attachments: [DraftAttachment]? = nil,
     delivery_progress: DraftDeliveryProgress? = nil,
+    delivery_failure: DraftDeliveryFailure? = nil,
     in_reply_to_thread_id: Int?,
     staged_at: String,
     sent_at: String?,
@@ -161,6 +182,7 @@ struct Draft: Codable, Identifiable, Equatable {
     self.body = body
     self.attachments = attachments
     self.delivery_progress = delivery_progress
+    self.delivery_failure = delivery_failure
     self.in_reply_to_thread_id = in_reply_to_thread_id
     self.staged_at = staged_at
     self.sent_at = sent_at
@@ -333,6 +355,7 @@ struct Draft: Codable, Identifiable, Equatable {
       body: body,
       attachments: attachments,
       delivery_progress: delivery_progress,
+      delivery_failure: delivery_failure,
       in_reply_to_thread_id: in_reply_to_thread_id,
       staged_at: staged_at,
       sent_at: sent_at,
