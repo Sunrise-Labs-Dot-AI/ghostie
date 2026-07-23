@@ -166,22 +166,25 @@ struct RelayRecipient: Codable, Equatable {
   enum CodingKeys: String, CodingKey { case kind, label }
 
   static func project(from draft: Draft) -> RelayRecipient {
-    // Detect a group by the structured target OR a CANONICAL raw group binding in to_handle. The
-    // two canonical forms are colon-delimited (`imessage-group:<guid>`, `imessage-group-pending:
-    // <key>`); matching those exactly avoids both the leak (a struct-less binding reaching the
-    // direct path, finding 1) and the false positive (`imessage-groupie@example.com` mislabelled as
-    // a group, verify-round finding). Using only `imessage_group != nil` would miss the first; using
-    // the bare `imessage-group` prefix hits the second.
+    // Normalize `to_handle` (strip bidi + trim) BEFORE any decision or emission. The invariant that
+    // keeps this safe: any string we both classify AND bidi-strip before emitting must be normalized
+    // first, or the classifier sees a different string than what ships. A bidi char in the group
+    // prefix (`imessage\u{202E}-group:...`) would otherwise fail `hasPrefix`, be treated as direct,
+    // then be bidi-stripped into the label, leaking the chat_guid (final-verify finding).
+    let handle = RelayText.stripBidiControls(draft.to_handle).trimmingCharacters(in: .whitespacesAndNewlines)
+
+    // Group by the structured target OR a CANONICAL colon-delimited binding. Matching the exact
+    // colon forms avoids both the struct-less-binding leak and the `imessage-groupie@example.com`
+    // false positive.
     let isGroup = draft.imessage_group != nil
-      || draft.to_handle.hasPrefix("imessage-group:")
-      || draft.to_handle.hasPrefix("imessage-group-pending:")
+      || handle.hasPrefix("imessage-group:")
+      || handle.hasPrefix("imessage-group-pending:")
     if isGroup {
       let label = draft.imessage_group.map(safeGroupLabel) ?? "Group thread"
       return RelayRecipient(kind: .group, label: RelayText.stripBidiControls(label))
     }
-    let name = draft.to_handle_name?.trimmingCharacters(in: .whitespacesAndNewlines)
-    let label = (name?.isEmpty == false) ? name! : draft.to_handle
-    return RelayRecipient(kind: .direct, label: RelayText.stripBidiControls(label))
+    let name = RelayText.stripBidiControls(draft.to_handle_name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    return RelayRecipient(kind: .direct, label: name.isEmpty ? handle : name)
   }
 
   /// Group label safe to publish. Never the guid, never a raw handle. Names that are themselves

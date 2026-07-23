@@ -109,6 +109,26 @@ final class RelaySnapshotTests: XCTestCase {
     }
   }
 
+  func testBidiObfuscatedGroupBindingInToHandleDoesNotLeakViaTheDirectLabel() {
+    // The structural leak the final verify found: a bidi char in the group prefix would fail the
+    // hasPrefix check, be treated as direct, then be bidi-stripped into recipient.label, exposing
+    // the chat_guid. Normalizing to_handle before classification closes it.
+    let rlo = "\u{202E}"
+    for handle in [
+      "imessage\(rlo)-group:iMessage;+;chat999000",
+      "imessage-group\(rlo):iMessage;+;chat999000",
+      "imessage-group-pending\(rlo):+15559990001|+15559990002"
+    ] {
+      var d = draft(body: "x")
+      d = d.withToHandle(handle, name: nil)
+      let recipient = RelayRecipient.project(from: d)
+      XCTAssertEqual(recipient.kind, .group, "was not classified as a group: \(handle)")
+      XCTAssertEqual(recipient.label, "Group thread")
+      XCTAssertFalse(recipient.label.contains("chat999000"))
+      XCTAssertFalse(recipient.label.contains("+1555"))
+    }
+  }
+
   func testUnnamedGroupProjectsToACount() {
     let group = IMessageGroupDraftTarget(
       chat_guid: "iMessage;+;chat999000",
