@@ -39,9 +39,10 @@ import CryptoKit
 /// Every textual field is UNTRUSTED. `body` and context bodies are message content and are carried
 /// verbatim; the phase-3 web client MUST render them via `textContent` under a strict CSP, and must
 /// bidi-isolate them, because `textContent` stops scripts but NOT Unicode direction overrides.
-/// Short IDENTITY labels (recipient label, `sender_display`), where a bidi spoof is most dangerous
-/// and the text is not content the user needs verbatim, have direction-control characters stripped
-/// here so a reversed phone number cannot masquerade as a different one.
+/// Short IDENTITY labels (recipient label, `sender_display`), where an invisible-character spoof is
+/// most dangerous and the text is not content the user needs verbatim, have ALL invisible
+/// format/control scalars stripped here (by Unicode category, see `sanitizeIdentity`) so a hidden
+/// character cannot make a classifier see a different string than what ships.
 struct RelaySnapshot: Codable, Equatable {
   let schema_version: Int
   let snapshot_id: String
@@ -113,22 +114,34 @@ struct RelaySnapshot: Codable, Equatable {
 
 /// Shared identity-text hygiene for the projection.
 enum RelayText {
-  /// Unicode direction-control characters. Stripped from short identity labels so a right-to-left
-  /// override cannot visually reverse a phone number into a different-looking one.
-  static let bidiControls = Set<Character>(["\u{202A}", "\u{202B}", "\u{202C}", "\u{202D}",
-                                            "\u{202E}", "\u{2066}", "\u{2067}", "\u{2068}", "\u{2069}"])
-
-  static func stripBidiControls(_ s: String) -> String {
-    String(s.filter { !bidiControls.contains($0) })
+  /// Strip every invisible formatting/control scalar from a short IDENTITY label, by Unicode
+  /// CATEGORY rather than a hand-listed set.
+  ///
+  /// A hand-listed denylist of "dangerous" characters is whack-a-mole: successive reviews found the
+  /// bidi overrides (202x), then the isolates (206x), then the left-to-right MARK (200E), and there
+  /// are more (200F, 061C, the zero-widths 200B-200D, the BOM FEFF). All of them share one property:
+  /// they are invisible, and they can make a classifier's `hasPrefix`/digit-density check see a
+  /// different string than what is emitted, so a `chat_guid` or a phone number rides out inside an
+  /// "allowed" label. Removing everything in the control (Cc), format (Cf), and default-ignorable
+  /// categories is complete by construction: there is no invisible scalar left to smuggle. This is
+  /// applied ONLY to identity labels, never to message bodies (which are content, carried verbatim).
+  static func sanitizeIdentity(_ s: String) -> String {
+    String(String.UnicodeScalarView(s.unicodeScalars.filter { scalar in
+      if scalar.properties.isDefaultIgnorableCodePoint { return false }
+      switch scalar.properties.generalCategory {
+      case .control, .format: return false
+      default: return true
+      }
+    }))
   }
 
   /// True when a string looks like a raw contact handle (phone or email) or a group-binding string
   /// rather than a display name, so an identifier stuffed into a "name" field is not shown as if it
   /// were one.
   static func looksLikeHandle(_ s: String) -> Bool {
-    // Strip bidi controls first as defence in depth, so this predicate is correct even if a caller
-    // forgets to normalize before calling it.
-    let t = stripBidiControls(s).trimmingCharacters(in: .whitespacesAndNewlines)
+    // Sanitize (strip invisible format/control scalars) first as defence in depth, so this
+    // predicate is correct even if a caller forgets to normalize before calling it.
+    let t = sanitizeIdentity(s).trimmingCharacters(in: .whitespacesAndNewlines)
     if t.isEmpty { return false }
     if t.contains("@") { return true }                              // email
     if t.lowercased().contains("imessage-group") { return true }    // a group binding, never a name
@@ -171,7 +184,7 @@ struct RelayRecipient: Codable, Equatable {
     // first, or the classifier sees a different string than what ships. A bidi char in the group
     // prefix (`imessage\u{202E}-group:...`) would otherwise fail `hasPrefix`, be treated as direct,
     // then be bidi-stripped into the label, leaking the chat_guid (final-verify finding).
-    let handle = RelayText.stripBidiControls(draft.to_handle).trimmingCharacters(in: .whitespacesAndNewlines)
+    let handle = RelayText.sanitizeIdentity(draft.to_handle).trimmingCharacters(in: .whitespacesAndNewlines)
 
     // Group by the structured target OR a CANONICAL colon-delimited binding. Matching the exact
     // colon forms avoids both the struct-less-binding leak and the `imessage-groupie@example.com`
@@ -181,9 +194,9 @@ struct RelayRecipient: Codable, Equatable {
       || handle.hasPrefix("imessage-group-pending:")
     if isGroup {
       let label = draft.imessage_group.map(safeGroupLabel) ?? "Group thread"
-      return RelayRecipient(kind: .group, label: RelayText.stripBidiControls(label))
+      return RelayRecipient(kind: .group, label: RelayText.sanitizeIdentity(label))
     }
-    let name = RelayText.stripBidiControls(draft.to_handle_name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    let name = RelayText.sanitizeIdentity(draft.to_handle_name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
     return RelayRecipient(kind: .direct, label: name.isEmpty ? handle : name)
   }
 
@@ -193,7 +206,7 @@ struct RelayRecipient: Codable, Equatable {
     // Normalize (strip bidi controls) BEFORE classifying, so a binding string with interspersed
     // direction controls cannot evade `looksLikeHandle` and then print (final-verify finding).
     let names = group.participant_names
-      .map { RelayText.stripBidiControls($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+      .map { RelayText.sanitizeIdentity($0).trimmingCharacters(in: .whitespacesAndNewlines) }
       .filter { !$0.isEmpty && !RelayText.looksLikeHandle($0) }
     let total = max(group.participant_handles.count, names.count)
     let unnamed = max(total - names.count, 0)
@@ -228,7 +241,7 @@ struct RelayContextMessage: Codable, Equatable {
     // Normalize (strip bidi controls) BEFORE classifying, so bidi controls cannot hide a
     // handle/binding shape from `looksLikeHandle` and then print (final-verify finding).
     let clean = message.sender_name
-      .map { RelayText.stripBidiControls($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+      .map { RelayText.sanitizeIdentity($0).trimmingCharacters(in: .whitespacesAndNewlines) }
     if message.from_me {
       display = "you"
     } else if let name = clean, !name.isEmpty, !RelayText.looksLikeHandle(name) {

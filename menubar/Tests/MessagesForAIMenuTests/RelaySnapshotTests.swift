@@ -129,6 +129,20 @@ final class RelaySnapshotTests: XCTestCase {
     }
   }
 
+  func testInvisibleCharactersOfEveryFamilyCannotHideAGroupBinding() {
+    // The category-based sanitizer must catch the whole class, not a hand-list. One case per family
+    // the reviews walked through: LTR override, LTR mark, RTL mark, isolate, zero-width space,
+    // zero-width joiner, and the BOM.
+    for invisible in ["\u{202D}", "\u{200E}", "\u{200F}", "\u{2066}", "\u{200B}", "\u{200D}", "\u{FEFF}", "\u{061C}"] {
+      var d = draft(body: "x")
+      d = d.withToHandle("imessage-group:iMessage;+;chat999000".replacingOccurrences(of: "-group", with: "\(invisible)-group"), name: nil)
+      let recipient = RelayRecipient.project(from: d)
+      XCTAssertEqual(recipient.kind, .group, "invisible \(String(format: "U+%04X", invisible.unicodeScalars.first!.value)) evaded group detection")
+      XCTAssertFalse(recipient.label.contains("chat999000"),
+                     "invisible \(String(format: "U+%04X", invisible.unicodeScalars.first!.value)) leaked the guid")
+    }
+  }
+
   func testUnnamedGroupProjectsToACount() {
     let group = IMessageGroupDraftTarget(
       chat_guid: "iMessage;+;chat999000",
