@@ -26,14 +26,22 @@ struct DraftRefreshSnapshot: Sendable, Equatable {
   let complete: Bool
   /// Files that could not be read or decoded this pass. Non-zero implies `complete == false`.
   let skippedCount: Int
+  /// Which source directories this pass actually scanned. The set can change during a process's
+  /// life (the WhatsApp daemon may create its drafts directory after launch), and a pass that
+  /// scanned a different set than the previous one is not comparable to it, so the change itself
+  /// forces `complete == false` for that pass.
+  let scannedSources: Set<String>
   /// Monotonic within one process lifetime. Meaningless across restarts, which is why the relay
   /// envelope also carries a per-process server instance id.
   let generation: UInt64
   /// When this state was OBSERVED, not when it was later served.
   let observedAt: Date
 
+  /// Pre-refresh state. **`complete` is false**, deliberately: before any scan has run we know
+  /// nothing, and a reader that treats absence as deletion must never act on this. Fail closed.
   static let empty = DraftRefreshSnapshot(
-    drafts: [], complete: true, skippedCount: 0, generation: 0, observedAt: .distantPast
+    drafts: [], complete: false, skippedCount: 0, scannedSources: [],
+    generation: 0, observedAt: .distantPast
   )
 }
 
@@ -685,29 +693,36 @@ final class DraftStore: ObservableObject {
     imessageDir: URL,
     whatsappDir: URL,
     whatsappEnabled: Bool
-  ) -> (drafts: [Draft], error: String?, skipped: Int) {
+  ) -> (drafts: [Draft], error: String?, skipped: Int, sources: Set<String>) {
     var errors: [String] = []
     var skipped = 0
     var parsed: [Draft] = []
+    var sources: Set<String> = ["imessage"]
     parsed.append(contentsOf: loadDir(imessageDir, errors: &errors, skipped: &skipped))
     if whatsappEnabled {
+      sources.insert("whatsapp")
       parsed.append(contentsOf: loadDir(whatsappDir, errors: &errors, skipped: &skipped))
     }
     // Newest staged first; sent drafts trail behind. Both platforms
     // share the same `staged_at` ISO-8601 timestamp shape so the
     // string-comparison sort is total-order-correct across platforms.
     parsed.sort { $0.staged_at > $1.staged_at }
-    return (parsed, errors.isEmpty ? nil : errors.joined(separator: "; "), skipped)
+    return (parsed, errors.isEmpty ? nil : errors.joined(separator: "; "), skipped, sources)
   }
 
-  private func applyRefresh(_ result: (drafts: [Draft], error: String?, skipped: Int)) {
+  private func applyRefresh(_ result: (drafts: [Draft], error: String?, skipped: Int, sources: Set<String>)) {
     refreshGeneration &+= 1
+    // A pass that scanned a different set of sources than the previous pass is not comparable to
+    // it: the WhatsApp daemon can create its drafts directory after launch, so a queue that "gained"
+    // a source is not evidence that anything was deleted. Force incomplete for that pass.
+    let sourceSetChanged = refreshGeneration > 1 && result.sources != refreshSnapshot.scannedSources
     // Publish the atomic snapshot FIRST, so a relay observer never sees a new list paired with a
-    // stale completeness. `complete` requires both: no directory error, and no skipped file.
+    // stale completeness. `complete` needs: no directory error, no skipped file, stable source set.
     self.refreshSnapshot = DraftRefreshSnapshot(
       drafts: result.drafts,
-      complete: result.error == nil && result.skipped == 0,
+      complete: result.error == nil && result.skipped == 0 && !sourceSetChanged,
       skippedCount: result.skipped,
+      scannedSources: result.sources,
       generation: refreshGeneration,
       observedAt: Date()
     )

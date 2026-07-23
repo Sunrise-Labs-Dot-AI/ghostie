@@ -40,6 +40,44 @@ which also lets the server store only a HASH of it rather than the raw key the H
 Phase 3 benefits too: MagicDNS gives a real `https://` origin, so the PWA gets a secure context with
 no mixed-content or cross-origin preflight problem.
 
+## Round-4 review: three fixes, then build
+
+The fourth review confirmed two claims genuinely hold (interface provenance, and the hand-rolled
+MAC/nonce/clock, are gone; Tailscale does terminate HTTPS in `tailscaled`). Three findings remain and
+are fixed below rather than taken to a fifth design round, since the reviewer supplied the exact
+shape of each fix.
+
+**R4-1 (CRITICAL): Tailscale authenticates the NODE, not the Ghostie process.** `tailscaled`
+terminates TLS then proxies plain HTTP to `127.0.0.1:<port>`, so local malware that squats that port
+first receives the bearer token and can serve a forged queue.
+
+  - The read half is a non-escalation: that process can already read `~/.messages-mcp/drafts/`.
+  - The forgery half is real: a forged `complete: true` empty queue would be trusted by 2b and the
+    phone. Under read-only it cannot cause a send, but it can mislead.
+  - **Fix: two secrets at pairing.** A `token` that IS sent (authorizes the read) and a `verify_key`
+    that is NEVER sent. Every response carries `HMAC-SHA256(verify_key, body)` in a header, and the
+    reader rejects an unverified body. Malware that harvests the token still cannot forge a response,
+    because it never sees `verify_key`. This is response integrity only, so it needs no nonce, clock
+    window, or canonicalization: the reader is verifying data it already asked for.
+
+**R4-2 (CRITICAL): completeness needs a fail-closed initial state and a stable source set.**
+`DraftRefreshSnapshot.empty` currently claims `complete: true` before any refresh has run, and
+`whatsappEnabled` is decided at init while the daemon may create that directory later, so the source
+set can change mid-life. Fix: the pre-refresh state is `complete: false`; the snapshot records which
+directories were scanned; and a source set that changes between scans forces `complete: false` for
+that pass.
+
+**R4-3 (CRITICAL): revocation must be linearizable with authentication.** Fix: one `actor` owns the
+reader records, the live-connection registry, and revocation. Authenticate, register the connection
+under its `keyid`, revoke, and cancel all happen inside that actor, so a request cannot authenticate
+against a record that is being revoked concurrently.
+
+**R4-4 / R4-5 (WARNING), accepted as stated:** Tailscale identity headers are NOT process
+authentication (a direct loopback caller can forge them), so they are used for nothing; and
+`serve status --json` verification must check the exact expected shape (HTTPS frontend, expected
+hostname and port, exact `http://127.0.0.1:<port>` target, **Funnel disabled**) rather than merely
+"something is served".
+
 ## Data plane: pull, not push (unchanged)
 
 Each device serves its own queue; the hub fetches and aggregates (2b). No endpoint anywhere accepts

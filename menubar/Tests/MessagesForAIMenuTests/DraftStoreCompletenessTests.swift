@@ -103,6 +103,35 @@ final class DraftStoreCompletenessTests: XCTestCase {
     XCTAssertEqual(store.refreshSnapshot.drafts.count, 1)
   }
 
+  func testPreRefreshStateIsIncompleteNotComplete() {
+    // Fail closed: the pre-refresh state must never claim to be an authoritative listing, or a
+    // reader that treats absence as deletion could act on "we have not looked yet". (R4-2.)
+    //
+    // Note this is asserted on the STATE, not on a constructed store: `DraftStore.init` calls
+    // `refresh()`, so a live store has legitimately scanned by the time you can observe it.
+    XCTAssertFalse(DraftRefreshSnapshot.empty.complete)
+    XCTAssertEqual(DraftRefreshSnapshot.empty.generation, 0)
+    XCTAssertTrue(DraftRefreshSnapshot.empty.scannedSources.isEmpty)
+  }
+
+  func testASourceSetChangeForcesIncompleteForThatPass() throws {
+    // The WhatsApp daemon can create its drafts dir after launch. A pass that scanned a different
+    // source set than the previous one is not comparable to it, so it must not be authoritative.
+    try writeDraft(id: "11111111-1111-4111-8111-111111111111")
+    let store = DraftStore()
+    store.refresh()
+    XCTAssertTrue(store.refreshSnapshot.complete)
+    XCTAssertEqual(store.refreshSnapshot.scannedSources, ["imessage"])
+
+    // WhatsApp drafts dir appears; the store picks it up on a later refresh.
+    try FileManager.default.createDirectory(
+      at: home.appendingPathComponent(".whatsapp-mcp/drafts", isDirectory: true),
+      withIntermediateDirectories: true)
+    let store2 = DraftStore()
+    store2.refresh()
+    XCTAssertEqual(store2.refreshSnapshot.scannedSources, ["imessage", "whatsapp"])
+  }
+
   func testGenerationIsMonotonicAndObservedAtIsSet() throws {
     try writeDraft(id: "11111111-1111-4111-8111-111111111111")
     let store = DraftStore()
