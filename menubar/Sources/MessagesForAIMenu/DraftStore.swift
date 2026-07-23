@@ -12,10 +12,39 @@ import Darwin
 /// `~/.whatsapp-mcp/drafts/` does not exist, the menubar starts iMessage-only.
 /// Global compose may create it later when the user explicitly stages a
 /// WhatsApp draft, then installs the watcher on demand.
+/// One refresh's result, published as a single value.
+///
+/// `drafts` and `lastRefreshError` are separate `@Published` properties, so an observer can
+/// interleave and pair a new draft list with the PREVIOUS error state. That is harmless for the UI
+/// but not for the cross-device relay (SUN-613), where a reader treats an absent draft as deleted:
+/// pairing a truncated list with a stale "no error" would look like a deletion. This struct carries
+/// the list and its own completeness together, in one assignment, so they can never be mismatched.
+struct DraftRefreshSnapshot: Sendable, Equatable {
+  let drafts: [Draft]
+  /// True only when directory enumeration succeeded AND every eligible file parsed. A relay may
+  /// treat absence as deletion ONLY when this is true.
+  let complete: Bool
+  /// Files that could not be read or decoded this pass. Non-zero implies `complete == false`.
+  let skippedCount: Int
+  /// Monotonic within one process lifetime. Meaningless across restarts, which is why the relay
+  /// envelope also carries a per-process server instance id.
+  let generation: UInt64
+  /// When this state was OBSERVED, not when it was later served.
+  let observedAt: Date
+
+  static let empty = DraftRefreshSnapshot(
+    drafts: [], complete: true, skippedCount: 0, generation: 0, observedAt: .distantPast
+  )
+}
+
 @MainActor
 final class DraftStore: ObservableObject {
   @Published private(set) var drafts: [Draft] = []
   @Published private(set) var lastRefreshError: String?
+  /// Atomic view of the last refresh: list + completeness + generation, always mutually consistent.
+  /// The relay reads ONLY this.
+  @Published private(set) var refreshSnapshot: DraftRefreshSnapshot = .empty
+  private var refreshGeneration: UInt64 = 0
 
   private let imessageDir: URL
   private let whatsappDir: URL
@@ -656,26 +685,48 @@ final class DraftStore: ObservableObject {
     imessageDir: URL,
     whatsappDir: URL,
     whatsappEnabled: Bool
-  ) -> (drafts: [Draft], error: String?) {
+  ) -> (drafts: [Draft], error: String?, skipped: Int) {
     var errors: [String] = []
+    var skipped = 0
     var parsed: [Draft] = []
-    parsed.append(contentsOf: loadDir(imessageDir, errors: &errors))
+    parsed.append(contentsOf: loadDir(imessageDir, errors: &errors, skipped: &skipped))
     if whatsappEnabled {
-      parsed.append(contentsOf: loadDir(whatsappDir, errors: &errors))
+      parsed.append(contentsOf: loadDir(whatsappDir, errors: &errors, skipped: &skipped))
     }
     // Newest staged first; sent drafts trail behind. Both platforms
     // share the same `staged_at` ISO-8601 timestamp shape so the
     // string-comparison sort is total-order-correct across platforms.
     parsed.sort { $0.staged_at > $1.staged_at }
-    return (parsed, errors.isEmpty ? nil : errors.joined(separator: "; "))
+    return (parsed, errors.isEmpty ? nil : errors.joined(separator: "; "), skipped)
   }
 
-  private func applyRefresh(_ result: (drafts: [Draft], error: String?)) {
+  private func applyRefresh(_ result: (drafts: [Draft], error: String?, skipped: Int)) {
+    refreshGeneration &+= 1
+    // Publish the atomic snapshot FIRST, so a relay observer never sees a new list paired with a
+    // stale completeness. `complete` requires both: no directory error, and no skipped file.
+    self.refreshSnapshot = DraftRefreshSnapshot(
+      drafts: result.drafts,
+      complete: result.error == nil && result.skipped == 0,
+      skippedCount: result.skipped,
+      generation: refreshGeneration,
+      observedAt: Date()
+    )
     self.drafts = result.drafts
     self.lastRefreshError = result.error
   }
 
-  private nonisolated static func loadDir(_ dir: URL, errors: inout [String]) -> [Draft] {
+  /// Read + decode all `*.json` files in one directory.
+  ///
+  /// `skipped` counts files that could not be read or decoded. This matters beyond diagnostics: the
+  /// cross-device relay (SUN-613) must be able to say whether a listing is COMPLETE, because a
+  /// remote reader treats an absent draft as deleted. Silently dropping an unreadable file while
+  /// reporting no error would make one malformed draft look like a deletion on another device, so a
+  /// per-file failure is counted here rather than swallowed.
+  private nonisolated static func loadDir(
+    _ dir: URL,
+    errors: inout [String],
+    skipped: inout Int
+  ) -> [Draft] {
     let urls: [URL]
     do {
       urls = try FileManager.default.contentsOfDirectory(
@@ -685,15 +736,23 @@ final class DraftStore: ObservableObject {
       )
     } catch {
       errors.append("\(dir.lastPathComponent): \(error.localizedDescription)")
+      // Enumeration failed, so this directory contributed an unknown number of drafts. Count it so
+      // the empty result cannot read as an authoritative "no drafts here".
+      skipped += 1
       return []
     }
     let decoder = JSONDecoder()
-    return urls
-      .filter { $0.pathExtension == "json" }
-      .compactMap { url in
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? decoder.decode(Draft.self, from: data)
+    var out: [Draft] = []
+    for url in urls where url.pathExtension == "json" {
+      guard let data = try? Data(contentsOf: url),
+            let draft = try? decoder.decode(Draft.self, from: data)
+      else {
+        skipped += 1
+        continue
       }
+      out.append(draft)
+    }
+    return out
   }
 
   private static func isoString(_ date: Date) -> String {
