@@ -186,14 +186,23 @@ struct RelayRecipient: Codable, Equatable {
     // then be bidi-stripped into the label, leaking the chat_guid (final-verify finding).
     let handle = RelayText.sanitizeIdentity(draft.to_handle).trimmingCharacters(in: .whitespacesAndNewlines)
 
-    // Group by the structured target OR a CANONICAL colon-delimited binding. Matching the exact
-    // colon forms avoids both the struct-less-binding leak and the `imessage-groupie@example.com`
-    // false positive.
+    // Group detection is transport-aware. iMessage: the structured target OR a canonical
+    // colon-delimited binding. WhatsApp: a JID ending in `@g.us`, the stable group-thread id and the
+    // WhatsApp equivalent of `chat_guid` (`@lid` is a privacy-group address, likewise not a person).
+    // Matching the iMessage colon forms exactly avoids the `imessage-groupie@example.com` false
+    // positive; a WhatsApp 1:1 JID ends `@s.whatsapp.net` and is not caught here. Missing the
+    // WhatsApp case would emit the raw group JID as a "direct" label, a structural leak.
     let isGroup = draft.imessage_group != nil
       || handle.hasPrefix("imessage-group:")
       || handle.hasPrefix("imessage-group-pending:")
+      || handle.hasSuffix("@g.us")
+      || handle.hasSuffix("@lid")
     if isGroup {
-      let label = draft.imessage_group.map(safeGroupLabel) ?? "Group thread"
+      // Prefer the iMessage participant label; then a WhatsApp group subject resolved into
+      // to_handle_name; then a generic label. Never the raw JID or binding.
+      let name = RelayText.sanitizeIdentity(draft.to_handle_name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+      let label = draft.imessage_group.map(safeGroupLabel)
+        ?? (name.isEmpty || RelayText.looksLikeHandle(name) ? "Group thread" : name)
       return RelayRecipient(kind: .group, label: RelayText.sanitizeIdentity(label))
     }
     let name = RelayText.sanitizeIdentity(draft.to_handle_name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)

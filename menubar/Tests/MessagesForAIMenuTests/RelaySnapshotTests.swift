@@ -143,6 +143,33 @@ final class RelaySnapshotTests: XCTestCase {
     }
   }
 
+  func testWhatsAppGroupJIDNeverLeaksAsADirectLabel() {
+    // WhatsApp groups have no imessage_group struct; the group id is a JID ending @g.us (or @lid).
+    // Without transport-aware detection it would ship as a "direct" label, leaking the group id,
+    // the WhatsApp equivalent of chat_guid.
+    for (jid, name, expected) in [
+      ("120363011112223334@g.us", nil, "Group thread"),
+      ("120363011112223334@g.us", "Family", "Family"),
+      ("998877@lid", nil, "Group thread")
+    ] as [(String, String?, String)] {
+      var d = draft(body: "x")
+      d = d.withToHandle(jid, name: name)
+      let recipient = RelayRecipient.project(from: d)
+      XCTAssertEqual(recipient.kind, .group, "WhatsApp group not detected: \(jid)")
+      XCTAssertEqual(recipient.label, expected)
+      XCTAssertFalse(recipient.label.contains("@g.us"))
+      XCTAssertFalse(recipient.label.contains("120363011112223334"))
+    }
+  }
+
+  func testWhatsAppOneToOneJIDIsStillDirect() {
+    var d = draft(body: "x")
+    d = d.withToHandle("15551234567@s.whatsapp.net", name: "Sam")
+    let recipient = RelayRecipient.project(from: d)
+    XCTAssertEqual(recipient.kind, .direct)
+    XCTAssertEqual(recipient.label, "Sam")
+  }
+
   func testUnnamedGroupProjectsToACount() {
     let group = IMessageGroupDraftTarget(
       chat_guid: "iMessage;+;chat999000",
