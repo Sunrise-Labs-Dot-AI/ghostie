@@ -179,6 +179,25 @@ final class RelaySnapshotTests: XCTestCase {
     XCTAssertEqual(ctx.sender_display, "them")
   }
 
+  func testBidiObfuscatedBindingNameIsStillSuppressed() {
+    // A binding string with an interspersed direction-control char must not evade classification by
+    // hiding the "imessage-group" substring. Normalization runs before looksLikeHandle.
+    let rlo = "\u{202E}"
+    let obfuscated = "imessage\(rlo)-group-pending:+15559990001|+15559990002"
+    XCTAssertTrue(RelayText.looksLikeHandle(obfuscated))
+    let ctx = RelayContextMessage.project(from: contextMessage(senderName: obfuscated))
+    XCTAssertEqual(ctx.sender_display, "them")
+
+    let group = IMessageGroupDraftTarget(
+      chat_guid: "iMessage;+;chat1",
+      participant_handles: ["+15559990001", "+15559990002"],
+      participant_names: [obfuscated, "Maya"]
+    )
+    let label = RelayRecipient.safeGroupLabel(group)
+    XCTAssertEqual(label, "Group thread with Maya and 1 more")
+    XCTAssertFalse(label.contains("+1555"))
+  }
+
   func testAKeepsRealNamesWithNumbersReadable() {
     // Guard against over-eager handle classification: a normal name with a small number is a name.
     XCTAssertFalse(RelayText.looksLikeHandle("Room 101"))

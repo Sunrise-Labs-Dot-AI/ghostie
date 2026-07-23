@@ -126,7 +126,9 @@ enum RelayText {
   /// rather than a display name, so an identifier stuffed into a "name" field is not shown as if it
   /// were one.
   static func looksLikeHandle(_ s: String) -> Bool {
-    let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+    // Strip bidi controls first as defence in depth, so this predicate is correct even if a caller
+    // forgets to normalize before calling it.
+    let t = stripBidiControls(s).trimmingCharacters(in: .whitespacesAndNewlines)
     if t.isEmpty { return false }
     if t.contains("@") { return true }                              // email
     if t.lowercased().contains("imessage-group") { return true }    // a group binding, never a name
@@ -185,8 +187,10 @@ struct RelayRecipient: Codable, Equatable {
   /// Group label safe to publish. Never the guid, never a raw handle. Names that are themselves
   /// handle-shaped or blank are counted, not printed.
   static func safeGroupLabel(_ group: IMessageGroupDraftTarget) -> String {
+    // Normalize (strip bidi controls) BEFORE classifying, so a binding string with interspersed
+    // direction controls cannot evade `looksLikeHandle` and then print (final-verify finding).
     let names = group.participant_names
-      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .map { RelayText.stripBidiControls($0).trimmingCharacters(in: .whitespacesAndNewlines) }
       .filter { !$0.isEmpty && !RelayText.looksLikeHandle($0) }
     let total = max(group.participant_handles.count, names.count)
     let unnamed = max(total - names.count, 0)
@@ -218,11 +222,14 @@ struct RelayContextMessage: Codable, Equatable {
 
   static func project(from message: ContextMessage) -> RelayContextMessage {
     let display: String
+    // Normalize (strip bidi controls) BEFORE classifying, so bidi controls cannot hide a
+    // handle/binding shape from `looksLikeHandle` and then print (final-verify finding).
+    let clean = message.sender_name
+      .map { RelayText.stripBidiControls($0).trimmingCharacters(in: .whitespacesAndNewlines) }
     if message.from_me {
       display = "you"
-    } else if let name = message.sender_name?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !name.isEmpty, !RelayText.looksLikeHandle(name) {
-      display = RelayText.stripBidiControls(name)
+    } else if let name = clean, !name.isEmpty, !RelayText.looksLikeHandle(name) {
+      display = name
     } else {
       display = unknownSender
     }
