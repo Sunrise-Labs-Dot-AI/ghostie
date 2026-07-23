@@ -7610,10 +7610,19 @@ private struct SentDraftRow: View {
   let draft: Draft
   @Environment(\.colorScheme) private var colorScheme
 
+  /// Parts this send lost after Messages had already accepted them. Non-nil
+  /// only when post-send reconciliation actually found errored rows.
+  private var failure: DraftDeliveryFailure? {
+    guard let failure = draft.delivery_failure, failure.failed_part_count > 0 else { return nil }
+    return failure
+  }
+
   var body: some View {
     HStack(alignment: .top, spacing: 10) {
-      Image(systemName: "checkmark.circle.fill")
-        .foregroundStyle(.green)
+      // A partly-delivered send must not wear the same green check as one that
+      // fully landed — that check was the visible half of issue #9.
+      Image(systemName: failure == nil ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+        .foregroundStyle(failure == nil ? AnyShapeStyle(.green) : AnyShapeStyle(.orange))
         .padding(.top, 1)
       VStack(alignment: .leading, spacing: 3) {
         HStack(spacing: 6) {
@@ -7642,6 +7651,14 @@ private struct SentDraftRow: View {
           .truncationMode(.tail)
           .fixedSize(horizontal: false, vertical: true)
           .frame(maxWidth: .infinity, alignment: .leading)
+        if let failure {
+          Text(PartialDeliveryCopy.summary(failure))
+            .font(.caption2)
+            .foregroundStyle(.orange)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .help("Messages accepted these but never delivered them. Open the conversation to check, then restage anything missing.")
+        }
       }
     }
     .padding(12)
@@ -7661,5 +7678,18 @@ private struct SentDraftRow: View {
     f.dateStyle = .medium
     f.timeStyle = .short
     return "Sent \(f.string(from: date))"
+  }
+}
+
+/// Copy for a send that only partly landed. Split out from the (private) row so
+/// the wording is testable without widening the view's visibility.
+enum PartialDeliveryCopy {
+  /// Plain count, no jargon: the user needs to know how much of what they
+  /// approved actually arrived. Clamps so a corrupt record can't read "5 of 2".
+  static func summary(_ failure: DraftDeliveryFailure) -> String {
+    let failed = failure.failed_part_count
+    let total = max(failure.dispatched_part_count, failed)
+    let noun = failed == 1 ? "part" : "parts"
+    return "\(failed) of \(total) \(noun) didn't send. Check Messages."
   }
 }

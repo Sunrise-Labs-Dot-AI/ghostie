@@ -67,6 +67,28 @@ extension Notification.Name {
 enum DraftSender {
   private static let timeoutSeconds: TimeInterval = 20
 
+  /// Gap held between successive attachment uploads within one send run.
+  ///
+  /// Messages accepts an attachment enqueue immediately and uploads it in the
+  /// background, so a multipart draft fires its transfers as fast as osascript
+  /// returns. That burst is what trips Apple's per-sender attachment throttle:
+  /// the send behind issue #9 pushed 3 photos in ~3s and had its next 5
+  /// rejected (`message.error = 25`, `is_sent = 0`), while a send of the same
+  /// 8 photos paced over ~15s delivered every one. Pacing the uploads keeps a
+  /// draft under the trigger instead of racing it. Settable so tests don't
+  /// actually sleep.
+  static var interAttachmentPacingSeconds: TimeInterval = 1.5
+
+  /// What one pass through the multipart loop actually put on the wire. The
+  /// reconciler needs both: `startedAt` because `sent_at` is only persisted
+  /// after the whole loop finishes (using it as the chat.db window would
+  /// exclude every attachment row), and `dispatchedParts` because a resumed
+  /// send replays only the parts still pending, not the full manifest.
+  struct IMessageSendRun: Equatable {
+    let startedAt: Date
+    let dispatchedParts: Int
+  }
+
   /// Fire-and-forget broadcast that a send succeeded, carrying the thread key so
   /// observers don't re-derive it. Safe to call from any thread (the send path
   /// resumes off the main actor); observers hop to their own queue.
@@ -181,7 +203,11 @@ enum DraftSender {
           durationMs: 0
         )
       }
-      result = await sendIMessageDraft(current)
+      // Stamp the window BEFORE the first part goes out: `sent_at` below is
+      // written only after the whole loop finishes, so it sits after every
+      // attachment row and would hide them all from reconciliation.
+      var run = IMessageSendRun(startedAt: Date(), dispatchedParts: 0)
+      result = await sendIMessageDraft(current, run: &run)
       // #88 (round 2): persist `sent_at` to the draft JSON on disk BEFORE the
       // `defer` releases the lock. The MCP's duplicate-send guard reads `sent_at`
       // from that file inside ITS lock; if we released the lock first and only the
@@ -191,6 +217,9 @@ enum DraftSender {
       // is idempotent — it no-ops when `sent_at` is already on disk.
       if result.ok {
         Self.persistIMessageSentAt(draftId: draft.id, service: result.service ?? "iMessage")
+        // Ordered after the sent_at write so the two draft-JSON mutations can't
+        // interleave and clobber each other.
+        Self.reconcileDraftDeliveryInBackground(draft: current, run: run)
       }
     case .whatsapp:
       // SUN-613: same authoritative executor check as the iMessage branch. The
@@ -295,7 +324,10 @@ enum DraftSender {
   /// first, then text. Every wire operation is bracketed by durable progress.
   /// A crash or ambiguous transport failure leaves an `ambiguous_part` marker,
   /// which blocks an ordinary retry instead of risking a duplicate.
-  private static func sendIMessageDraft(_ draft: Draft) async -> SendResult {
+  private static func sendIMessageDraft(
+    _ draft: Draft,
+    run: inout IMessageSendRun
+  ) async -> SendResult {
     typealias SendAttachment = (DraftAttachment) async -> SendResult
     typealias SendBody = (String) async -> SendResult
 
@@ -392,6 +424,10 @@ enum DraftSender {
     var totalDuration = 0
     var lastService: String?
     let parts = pendingIMessageParts(for: draft)
+    // Counts only what THIS run puts on the wire, so the reconciler's chat.db
+    // expectation matches a resumed send as well as a first attempt.
+    var dispatchedParts = 0
+    var attachmentsDispatched = 0
 
     for part in parts {
       guard persistIMessageDeliveryProgress(
@@ -411,6 +447,17 @@ enum DraftSender {
       let wireResult: SendResult
       switch part {
       case .attachment(let index, let attachment):
+        // Hold the pacing gap before every attachment after the first one THIS
+        // run puts on the wire. Not before the first (nothing to pace against,
+        // and a resumed send already waited out the gap between runs) and never
+        // before the body, which is a cheap text send. The `ambiguous_part`
+        // marker for this part is already persisted, so a crash mid-gap leaves
+        // the same safe state as a crash mid-send.
+        if attachmentsDispatched > 0, interAttachmentPacingSeconds > 0 {
+          try? await Task.sleep(
+            nanoseconds: UInt64(interAttachmentPacingSeconds * 1_000_000_000)
+          )
+        }
         let prepared: PreparedIMessageAttachment
         do {
           prepared = try prepareIMessageAttachment(attachment, draftId: draft.id)
@@ -436,13 +483,17 @@ enum DraftSender {
           asset_id: attachment.asset_id,
           sha256: attachment.sha256
         )
+        attachmentsDispatched += 1
+        dispatchedParts += 1
         wireResult = await sendAttachment(sendCopy)
         cleanupIMessageAttachment(prepared)
         if wireResult.ok { completed = index + 1 }
       case .body(let body):
+        dispatchedParts += 1
         wireResult = await sendBody(body)
         if wireResult.ok { bodySent = true }
       }
+      run = IMessageSendRun(startedAt: run.startedAt, dispatchedParts: dispatchedParts)
       totalDuration += wireResult.durationMs
       guard wireResult.ok else {
         return SendResult(
@@ -663,6 +714,28 @@ enum DraftSender {
         "completed_attachment_count": max(0, completedAttachmentCount),
         "body_sent": bodySent,
         "ambiguous_part": ambiguousValue
+      ]
+      return true
+    }
+  }
+
+  /// Record the reconciled truth on the draft. Runs after the send lock is
+  /// released, so it uses the same atomic read-modify-write as every other
+  /// draft mutation and touches only its own key. Counts only — no bodies.
+  @discardableResult
+  static func persistIMessageDeliveryFailure(
+    draftId: String,
+    failedPartCount: Int,
+    dispatchedPartCount: Int,
+    now: Date = Date()
+  ) -> Bool {
+    mutateIMessageDraftJSON(draftId: draftId) { obj in
+      let formatter = ISO8601DateFormatter()
+      formatter.formatOptions = [.withInternetDateTime]
+      obj["delivery_failure"] = [
+        "failed_part_count": max(0, failedPartCount),
+        "dispatched_part_count": max(0, dispatchedPartCount),
+        "reconciled_at": formatter.string(from: now)
       ]
       return true
     }
@@ -1331,6 +1404,64 @@ enum DraftSender {
         error: "chat.db error=\(outcome.error) service=\(outcome.service ?? "?") delivered=\(outcome.isDelivered)",
         durationMs: 0,
         source: "\(source)-confirm"
+      )
+    }
+  }
+
+  /// Whether a draft's delivery can be reconciled against chat.db by handle.
+  ///
+  /// Reconciliation matches outbound rows via `message.handle_id`, which points
+  /// at the other party in a 1:1 thread no matter whether we addressed it by
+  /// buddy or by chat GUID. In a real multi-party group the rows hang off the
+  /// chat rather than a single handle, so counting by handle would silently
+  /// under-report; those are left unreconciled rather than reported wrong.
+  static func isReconcilableIMessageTarget(_ draft: Draft) -> Bool {
+    guard draft.effectivePlatform == .imessage else { return false }
+    guard draft.imessage_group == nil else { return false }
+    guard !draft.to_handle.hasPrefix("imessage-group") else { return false }
+    guard groupChatGUID(from: draft.to_handle) == nil else { return false }
+    // A ";" only appears in a chat GUID ("iMessage;+;chat123…"), never in a
+    // plain phone number or email. Such a target addresses a chat, so its rows
+    // may not hang off one handle.
+    guard !draft.to_handle.contains(";") else { return false }
+    // Anything we can't canonicalize can't be matched against chat.db handles.
+    guard ContactAvatarStore.canonicalKey(draft.to_handle) != nil else { return false }
+    return true
+  }
+
+  /// Post-send truth check for a multipart draft. The send loop can only see
+  /// what Messages *accepted*; the throttle rejection that dropped 5 of 8
+  /// photos in issue #9 landed in chat.db seconds later, as `message.error`,
+  /// long after every osascript call had returned ok and the draft had been
+  /// marked sent. Read chat.db back and, when parts errored, record it both to
+  /// the failure log and onto the draft so the success is no longer a lie.
+  /// Detached and read-only: it never changes the result the user just saw and
+  /// can never re-send anything.
+  private static func reconcileDraftDeliveryInBackground(draft: Draft, run: IMessageSendRun) {
+    guard isReconcilableIMessageTarget(draft) else { return }
+    guard run.dispatchedParts > 0 else { return }
+    let handle = draft.to_handle
+    let draftId = draft.id
+    Task.detached(priority: .utility) {
+      guard let outcome = await IMessageDeliveryConfirmer().reconcileOutbound(
+        handle: handle,
+        since: run.startedAt,
+        expected: run.dispatchedParts
+      ) else { return }
+      guard outcome.failed > 0 else { return }
+      SendFailureLog.record(
+        platform: "imessage",
+        handle: handle,
+        route: "partial-delivery",
+        error: "\(outcome.failed) of \(run.dispatchedParts) parts errored "
+          + "(chat.db error != 0; \(outcome.observed) rows observed)",
+        durationMs: 0,
+        source: "swift-draft-reconcile"
+      )
+      _ = persistIMessageDeliveryFailure(
+        draftId: draftId,
+        failedPartCount: outcome.failed,
+        dispatchedPartCount: run.dispatchedParts
       )
     }
   }

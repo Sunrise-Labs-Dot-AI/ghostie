@@ -992,4 +992,39 @@ final class DraftsPaneTests: XCTestCase {
     """
     return try JSONDecoder().decode(Draft.self, from: Data(json.utf8))
   }
+
+  // MARK: - Partial-delivery copy (issue #9)
+
+  /// The number the user reads has to be the honest one: failures over what the
+  /// run actually dispatched, pluralized, and free of internal vocabulary.
+  func testPartialDeliverySummaryCopy() {
+    XCTAssertEqual(
+      PartialDeliveryCopy.summary(
+        DraftDeliveryFailure(
+          failed_part_count: 5, dispatched_part_count: 9, reconciled_at: "2026-07-17T00:00:00Z"
+        )
+      ),
+      "5 of 9 parts didn't send. Check Messages."
+    )
+    XCTAssertEqual(
+      PartialDeliveryCopy.summary(
+        DraftDeliveryFailure(
+          failed_part_count: 1, dispatched_part_count: 3, reconciled_at: "2026-07-17T00:00:00Z"
+        )
+      ),
+      "1 of 3 part didn't send. Check Messages."
+    )
+  }
+
+  /// A corrupt record must never render "5 of 2".
+  func testPartialDeliverySummaryClampsInconsistentCounts() {
+    XCTAssertEqual(
+      PartialDeliveryCopy.summary(
+        DraftDeliveryFailure(
+          failed_part_count: 5, dispatched_part_count: 2, reconciled_at: "2026-07-17T00:00:00Z"
+        )
+      ),
+      "5 of 5 parts didn't send. Check Messages."
+    )
+  }
 }
