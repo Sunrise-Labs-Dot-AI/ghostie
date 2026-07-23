@@ -162,6 +162,16 @@ final class RelaySnapshotTests: XCTestCase {
     }
   }
 
+  func testDirectRecipientNameThatIsHandleShapedFallsBackToTheActualHandle() {
+    // Uniformity: a handle-shaped to_handle_name must be suppressed just like a handle-shaped
+    // context-sender or participant name, falling back to the real recipient handle.
+    var d = draft(body: "x")
+    d = d.withToHandle("+14155550100", name: "+14155550200")
+    let recipient = RelayRecipient.project(from: d)
+    XCTAssertEqual(recipient.kind, .direct)
+    XCTAssertEqual(recipient.label, "+14155550100", "showed a stray number from the name field")
+  }
+
   func testWhatsAppOneToOneJIDIsStillDirect() {
     var d = draft(body: "x")
     d = d.withToHandle("15551234567@s.whatsapp.net", name: "Sam")

@@ -205,8 +205,12 @@ struct RelayRecipient: Codable, Equatable {
         ?? (name.isEmpty || RelayText.looksLikeHandle(name) ? "Group thread" : name)
       return RelayRecipient(kind: .group, label: RelayText.sanitizeIdentity(label))
     }
+    // Same handle-suppression as every other name path (context senders, group participants): if
+    // the resolved "name" is itself handle-shaped, fall back to the actual recipient handle rather
+    // than showing a stray number as the label. Keeps identity handling uniform across all labels.
     let name = RelayText.sanitizeIdentity(draft.to_handle_name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-    return RelayRecipient(kind: .direct, label: name.isEmpty ? handle : name)
+    let showName = !name.isEmpty && !RelayText.looksLikeHandle(name)
+    return RelayRecipient(kind: .direct, label: showName ? name : handle)
   }
 
   /// Group label safe to publish. Never the guid, never a raw handle. Names that are themselves
