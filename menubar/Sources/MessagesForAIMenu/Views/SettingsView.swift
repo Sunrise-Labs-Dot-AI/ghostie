@@ -35,6 +35,11 @@ struct SettingsView: View {
   /// Toggled by Option-clicking the console sidebar's version string.
   @AppStorage("developerModeEnabled") private var developerModeEnabled = false
   @State private var showAdvancedStatus = false
+  // WhatsApp disconnect / re-authenticate.
+  @State private var confirmDisconnect = false
+  @State private var isResetting = false
+  @State private var resetNote: String?
+  @State private var resetFailed = false
 
   private let checks = HealthChecks()
 
@@ -206,14 +211,20 @@ struct SettingsView: View {
 
         if settings.whatsappEnabled, whatsappDaemon.needsUserAttention {
           Button {
-            if whatsappDaemon.baileysState == "logged_out" {
-              openWindow(id: WindowID.whatsappPairing)
+            // A parked daemon is running on purpose, so start() is a no-op and
+            // the old "Restart WhatsApp" here did visibly nothing. Anything
+            // that needs a re-pair routes to the confirmed disconnect flow.
+            if whatsappDaemon.needsReconnect {
+              confirmDisconnect = true
             } else {
               whatsappDaemon.start()
             }
             statusRefreshTick += 1
           } label: {
-            Label(whatsappDaemon.baileysState == "logged_out" ? "Reconnect WhatsApp" : "Restart WhatsApp", systemImage: "arrow.clockwise")
+            Label(
+              whatsappDaemon.needsReconnect ? "Reconnect WhatsApp" : "Restart WhatsApp",
+              systemImage: "arrow.clockwise"
+            )
           }
           .dsButton(.primary, size: .small)
         }
@@ -275,6 +286,17 @@ struct SettingsView: View {
   }
 
   private var whatsappRepairDetail: String {
+    if let recovery = whatsappDaemon.recoveryState {
+      switch recovery.reason {
+      case .sessionUnreadable:
+        return "The saved WhatsApp login can't be read anymore. Reconnect to scan a new QR code."
+      case .loggedOut:
+        return "Logged out. Reconnect WhatsApp to restore access."
+      }
+    }
+    if whatsappDaemon.baileysState == "session_unreadable" {
+      return "The saved WhatsApp login can't be read anymore. Reconnect to scan a new QR code."
+    }
     if whatsappDaemon.baileysState == "logged_out" {
       return "Logged out. Reconnect WhatsApp to restore access."
     }
@@ -917,34 +939,78 @@ struct SettingsView: View {
       VStack(alignment: .leading, spacing: 10) {
         connectionRow
         // "Require approval to send" moved to Advanced → AI sending approval.
-        // Only show a pairing action when one is actually needed:
-        //  - "Connect WhatsApp…" if the user has never paired
-        //  - "Reconnect WhatsApp…" if the daemon reports logged_out
-        // When WhatsApp is healthy (paired + Baileys connected/connecting/
-        // reconnecting) the button is clutter, so hide it. A manual
-        // re-pair path can move into an overflow menu later.
-        if shouldShowPairingButton {
-          Button {
-            openWindow(id: WindowID.whatsappPairing)
-          } label: {
-            HStack(spacing: 6) {
-              Image(systemName: Platform.whatsapp.sfSymbol)
-              Text(isWhatsAppPaired ? "Reconnect WhatsApp…" : "Connect WhatsApp…")
+        HStack(spacing: 8) {
+          if shouldShowPairingButton {
+            Button {
+              openWindow(id: WindowID.whatsappPairing)
+            } label: {
+              HStack(spacing: 6) {
+                Image(systemName: Platform.whatsapp.sfSymbol)
+                Text(isWhatsAppPaired ? "Reconnect WhatsApp…" : "Connect WhatsApp…")
+              }
             }
+            .dsButton(.primary, size: .small)
           }
-          .dsButton(.secondary, size: .small)
+          // Always available once a session exists — NOT gated on the daemon
+          // looking unhealthy. The failure this recovers from (credentials that
+          // no longer decrypt) leaves a session file on disk and no live
+          // baileysState, so every "is something wrong?" heuristic reads clean
+          // and the old UI hid its only escape hatch precisely when it was
+          // needed. If there is a link to revoke, offer to revoke it.
+          if isWhatsAppPaired {
+            Button("Disconnect…") { confirmDisconnect = true }
+              .dsButton(.secondary, size: .small)
+              .disabled(isResetting)
+          }
+          if isResetting {
+            ProgressView().controlSize(.small)
+          }
+        }
+        if let note = resetNote {
+          Text(note)
+            .font(DS.Font.settingsCaption)
+            .foregroundStyle(resetFailed ? DS.Color.red : DS.Color.ink3(colorScheme))
+            .fixedSize(horizontal: false, vertical: true)
         }
       }
     }
+    .alert("Disconnect WhatsApp?", isPresented: $confirmDisconnect) {
+      Button("Cancel", role: .cancel) {}
+      Button("Disconnect", role: .destructive) { Task { await runDisconnect() } }
+    } message: {
+      Text(
+        "This unlinks this Mac from WhatsApp and deletes the stored login, so you'll scan a "
+        + "new QR code to reconnect. Your cached message history, drafts, and settings are kept.\n\n"
+        + "Ghostie stays linked on your phone until you remove it from WhatsApp → Settings → "
+        + "Linked Devices."
+      )
+    }
   }
 
-  /// True when the pairing action is meaningful — either first-time
-  /// pair (no session) or recovery from a remote unlink (daemon reports
-  /// logged_out). Healthy paired sessions hide the button.
+  /// True when the pairing action is meaningful — first-time pair, or a
+  /// recovery the daemon has flagged. A healthy paired session hides it (the
+  /// Disconnect button above stays available regardless).
   private var shouldShowPairingButton: Bool {
     if !isWhatsAppPaired { return true }
-    if whatsappDaemon.baileysState == "logged_out" { return true }
-    return false
+    return whatsappDaemon.needsReconnect
+  }
+
+  /// Revoke the link, then send the user straight to a fresh QR.
+  @MainActor
+  private func runDisconnect() async {
+    isResetting = true
+    resetNote = nil
+    defer { isResetting = false }
+
+    switch await WhatsAppSessionReset.perform(daemon: whatsappDaemon) {
+    case .viaDaemon, .viaLocalWipe:
+      resetFailed = false
+      resetNote = "Disconnected. Scan the QR code to reconnect."
+      openWindow(id: WindowID.whatsappPairing)
+    case .failed(let message):
+      resetFailed = true
+      resetNote = message
+    }
   }
 
   /// Single-line status row — replaces the previous "Daemon running
@@ -966,6 +1032,9 @@ struct SettingsView: View {
   }
 
   private var connectionColor: Color {
+    // A parked daemon outranks everything below: the process may well be
+    // "running", but it is deliberately not connected and needs the user.
+    if whatsappDaemon.recoveryState != nil { return .red }
     // When the daemon's up AND we've polled its Baileys state, prefer
     // the finer-grained color. Otherwise fall back to coarse process-
     // level signals.
@@ -973,7 +1042,7 @@ struct SettingsView: View {
       switch bs {
       case "connected":               return .green
       case "connecting", "reconnecting": return .orange
-      case "logged_out":              return .red
+      case "logged_out", "session_unreadable": return .red
       default:                        return .gray
       }
     }
@@ -986,17 +1055,28 @@ struct SettingsView: View {
   }
 
   private var connectionLabel: String {
+    // Parked beats every other signal. Without this, the case that started all
+    // of this — daemon down, session file present, no Baileys state — fell
+    // through to "Connecting…" and sat there forever, telling the user to wait
+    // for something that was never going to happen.
+    if let recovery = whatsappDaemon.recoveryState {
+      switch recovery.reason {
+      case .sessionUnreadable: return "Sign-in expired — Reconnect WhatsApp"
+      case .loggedOut:         return "Logged out — Reconnect WhatsApp"
+      }
+    }
     // When we have a live Baileys state, that's the source of truth.
     // The daemon process being up doesn't mean WhatsApp is reachable:
     // it can be reconnecting after a network blip or waiting in
     // logged_out after a remote unlink.
     if case .running = whatsappDaemon.status, let bs = whatsappDaemon.baileysState {
       switch bs {
-      case "connecting":    return isWhatsAppPaired ? "Connecting…" : "Waiting to pair…"
-      case "connected":     return "Connected"
-      case "reconnecting":  return "Reconnecting…"
-      case "logged_out":    return "Logged out — Reconnect WhatsApp"
-      default:              return bs
+      case "connecting":        return isWhatsAppPaired ? "Connecting…" : "Waiting to pair…"
+      case "connected":         return "Connected"
+      case "reconnecting":      return "Reconnecting…"
+      case "logged_out":        return "Logged out — Reconnect WhatsApp"
+      case "session_unreadable": return "Sign-in expired — Reconnect WhatsApp"
+      default:                  return bs
       }
     }
     switch whatsappDaemon.status {
@@ -1861,12 +1941,23 @@ extension IMessageDaemonController.Status {
 
 extension WhatsAppDaemonController {
   var needsUserAttention: Bool {
-    if baileysState == "logged_out" { return true }
+    // The sentinel is authoritative and, unlike baileysState, is still readable
+    // when the daemon isn't answering — which is exactly when attention is due.
+    if recoveryState != nil { return true }
+    if baileysState == "logged_out" || baileysState == "session_unreadable" { return true }
     switch status {
     case .crashLooping, .stopped:
       return true
     case .idle, .starting, .running, .backingOff:
       return false
     }
+  }
+
+  /// True when the only way forward is revoking the link and pairing again.
+  /// Restarting cannot fix these: the daemon is parked on purpose, so `start()`
+  /// is a no-op and the old "Restart WhatsApp" affordance did nothing.
+  var needsReconnect: Bool {
+    if recoveryState != nil { return true }
+    return baileysState == "logged_out" || baileysState == "session_unreadable"
   }
 }

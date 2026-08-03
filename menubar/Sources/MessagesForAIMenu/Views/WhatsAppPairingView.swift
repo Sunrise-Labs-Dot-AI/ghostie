@@ -48,6 +48,9 @@ struct WhatsAppPairingView: View {
   @State private var qrExpiresAt: Date = .distantPast
   /// True while the unlinkAndReset confirmation alert is shown.
   @State private var confirmReset: Bool = false
+  /// Why the daemon is parked, when it is. Drives the recovery copy so a
+  /// credential that stopped decrypting isn't described as a remote unlink.
+  @State private var recoveryReason: WhatsAppRecoveryReason = .loggedOut
   /// Drives the countdown bar's progress fill. Refreshed by a SwiftUI
   /// timer publisher — see `body`.
   @State private var now: Date = Date()
@@ -88,9 +91,11 @@ struct WhatsAppPairingView: View {
     .padding(20)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .onAppear {
-      if WhatsAppQRSession.loggedOutSentinelExists {
-        // Remote logout recovery is its own flow (wipe + re-pair) and
-        // keeps its existing UX — no Ready gate.
+      if let recovery = WhatsAppRecoveryState.current() {
+        // The daemon is parked and will never emit a QR until the session is
+        // wiped, so the Ready gate + subscribe path would just hang. Recovery
+        // first; the QR flow resumes once the reset lands.
+        recoveryReason = recovery.reason
         phase = .loggedOutRecovery
       } else {
         // Don't start the daemon or request a QR yet. Show the Ready gate
@@ -349,10 +354,10 @@ struct WhatsAppPairingView: View {
       Image(systemName: "exclamationmark.triangle.fill")
         .font(.system(size: 40))
         .foregroundStyle(DS.Color.amber(colorScheme))
-      Text("Disconnected")
+      Text(recoveryReason == .sessionUnreadable ? "Sign-in expired" : "Disconnected")
         .font(DS.Font.settingsTitle)
         .foregroundStyle(DS.Color.ink(colorScheme))
-      Text("WhatsApp logged this device out remotely (or the daemon hit a logged_out signal). To re-pair, the local session credential must be wiped first.")
+      Text(recoveryCopy)
         .font(DS.Font.settingsCaption)
         .foregroundStyle(DS.Color.ink3(colorScheme))
         .multilineTextAlignment(.center)
@@ -364,6 +369,19 @@ struct WhatsAppPairingView: View {
     }
     .padding()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
+  }
+
+  private var recoveryCopy: String {
+    switch recoveryReason {
+    case .sessionUnreadable:
+      return "The saved WhatsApp login on this Mac can't be read anymore, so it has to be "
+        + "replaced. Reconnecting clears it and gets you a fresh QR code. Your cached message "
+        + "history and drafts are kept."
+    case .loggedOut:
+      return "WhatsApp unlinked this Mac (usually from your phone's Linked Devices list). "
+        + "To pair again, the saved login has to be cleared first. Your cached message history "
+        + "and drafts are kept."
+    }
   }
 
   private func errorView(_ message: String) -> some View {
@@ -435,13 +453,16 @@ struct WhatsAppPairingView: View {
   }
 
   private func runUnlinkAndReset() async {
-    do {
-      try await WhatsAppRPCClient.unlinkAndReset()
-      // Daemon clears the sentinel + deletes session.db. Transition
-      // back to subscribing — the .task(id:) modifier will fire again.
+    // Goes through WhatsAppSessionReset, not the bare RPC: this view is most
+    // often opened when the daemon ISN'T answering, and the RPC-only version
+    // simply reported "Reconnect failed" with no way forward.
+    switch await WhatsAppSessionReset.perform(daemon: whatsappDaemon) {
+    case .viaDaemon, .viaLocalWipe:
+      // Session wiped and the daemon is coming back up. Re-enter the QR flow;
+      // the .task(id:) modifier fires again on the phase change.
       phase = .subscribing
-    } catch {
-      phase = .error("Reconnect failed: \(error.localizedDescription)")
+    case .failed(let message):
+      phase = .error(message)
     }
   }
 

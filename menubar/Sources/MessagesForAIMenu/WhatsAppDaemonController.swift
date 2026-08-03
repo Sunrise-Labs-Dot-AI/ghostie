@@ -42,6 +42,15 @@ final class WhatsAppDaemonController: ObservableObject {
   /// "connected" | "reconnecting" | "logged_out".
   @Published private(set) var baileysState: String?
 
+  /// Why the daemon is parked awaiting a reset, or nil when it isn't.
+  ///
+  /// Read from the on-disk sentinel rather than inferred from `baileysState`,
+  /// because the state that most needs surfacing is the one where the daemon
+  /// isn't answering RPCs at all — a poll-derived signal is exactly nil then.
+  /// Every recovery entry point (Settings row, repair card, attention banner,
+  /// pairing window) reads this one property so they can't disagree.
+  @Published private(set) var recoveryState: WhatsAppRecoveryState?
+
   /// Tunables — exposed for tests / future settings UI but never written.
   private let maxConsecutiveCrashes = 5
   private let stableRunSeconds: TimeInterval = 30   // resets crash counter
@@ -212,6 +221,9 @@ final class WhatsAppDaemonController: ObservableObject {
   }
 
   private func refreshBaileysState() async {
+    // Cheap, and valid whether or not the daemon is answering — the sentinel is
+    // the only recovery signal available when it isn't.
+    refreshRecoveryState()
     guard case .running = status else { return }
     do {
       let s = try await WhatsAppRPCClient.getConnectionStatus()
@@ -221,6 +233,38 @@ final class WhatsAppDaemonController: ObservableObject {
       // window after the daemon re-spawns where the socket isn't quite
       // ready. The next tick recovers.
     }
+  }
+
+  /// Re-read the recovery sentinel. Called on every poll tick and immediately
+  /// after a reset so the UI doesn't lag a poll interval behind the fix.
+  func refreshRecoveryState() {
+    recoveryState = WhatsAppRecoveryState.current()
+  }
+
+  /// Stop the daemon and return true only once nothing is left holding
+  /// `~/.whatsapp-mcp/session.db` open.
+  ///
+  /// `stop()` alone isn't sufficient for the reset path. It returns after its
+  /// own child exits, but an ORPHAN from a previous menu-bar process (a dev
+  /// `pkill`, a force-quit — macOS doesn't reap children) can still be running
+  /// and holding the WAL. The reset needs a positive "nothing is writing to
+  /// that database", not "the process I happen to track is gone".
+  func stopAndConfirmDead() async -> Bool {
+    await stop()
+    // Terminate whatever holds the PID lock, then confirm it released it.
+    reapStaleDaemonIfNeeded()
+
+    if let proc = process, proc.isRunning { return false }
+
+    let pidFile = FileManager.default.homeDirectoryForCurrentUser
+      .appendingPathComponent(".whatsapp-mcp/daemon.pid")
+    guard let raw = try? String(contentsOf: pidFile, encoding: .utf8) else {
+      return true  // no lock file → nothing claims ownership
+    }
+    let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let pid = pid_t(trimmed), pid > 0 else { return true }
+    // kill(pid, 0) succeeds only while the process is alive.
+    return kill(pid, 0) != 0
   }
 
   // MARK: - Internal: launch + monitor
