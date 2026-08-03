@@ -28,7 +28,7 @@ import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
 import { PATHS } from "../paths.ts";
-import { wrap, unwrap } from "./crypto.ts";
+import { isCiphertextAuthError, wrap, unwrap } from "./crypto.ts";
 import { DEFAULT_BODY_CAP_BYTES, sanitizeIncomingBody, truncateToBytes } from "../tools/_untrusted.ts";
 
 const SCHEMA_SQL = `
@@ -280,10 +280,19 @@ function encryptDescriptor(bytes: Uint8Array | null | undefined): Buffer | null 
   return wrap(Buffer.from(bytes).toString("base64"));
 }
 
-/** Decrypt a stored media descriptor blob back to its raw proto bytes. */
+/** Decrypt a stored media descriptor blob back to its raw proto bytes.
+ *  A descriptor written under a lost master key degrades to null, which
+ *  `getMediaDescriptor` already turns into a clean "no downloadable media"
+ *  error for that one attachment. A Keychain outage still propagates. */
 function decryptDescriptor(blob: Buffer | null): Uint8Array | null {
   if (blob == null) return null;
-  return new Uint8Array(Buffer.from(unwrap(blob), "base64"));
+  try {
+    return new Uint8Array(Buffer.from(unwrap(blob), "base64"));
+  } catch (e) {
+    if (!isCiphertextAuthError(e)) throw e;
+    _undecryptableOnRead += 1;
+    return null;
+  }
 }
 
 // True once the at-rest encryption migration (#81) has completed for the open
@@ -298,6 +307,14 @@ let _migrationComplete = false;
 let _strayPlaintextOnRead = 0;
 export function _getStrayPlaintextCount(): number {
   return _strayPlaintextOnRead;
+}
+
+/** Count of content rows that failed the GCM auth check on read — i.e. rows
+ *  written under a master key that no longer exists. A count only, never a
+ *  body. Exposed for tests / a future health metric. */
+let _undecryptableOnRead = 0;
+export function _getUndecryptableCount(): number {
+  return _undecryptableOnRead;
 }
 
 // ── Message-content encryption at rest (#81) ───────────────────────────────
@@ -360,7 +377,23 @@ function decryptBody(
     return null; // no way to heal → refuse rather than serve plaintext
   }
   const buf = Buffer.isBuffer(stored) ? stored : Buffer.from(stored);
-  return unwrap(buf);
+  try {
+    return unwrap(buf);
+  } catch (e) {
+    // A row written under a master key that no longer exists can never be
+    // recovered. Returning null degrades that one message to "content
+    // unavailable"; letting the throw escape would take out the entire
+    // enclosing thread/search read, so a single stale row would make the
+    // whole transport look broken. This is NOT the stray-plaintext case
+    // above — we are withholding content, never serving it unencrypted.
+    //
+    // A Keychain outage is different in kind (transient, and every row would
+    // fail): let it propagate so the caller surfaces a real error instead of
+    // silently rendering the user's whole history as empty.
+    if (!isCiphertextAuthError(e)) throw e;
+    _undecryptableOnRead += 1;
+    return null;
+  }
 }
 
 /** Build a heal callback that re-encrypts a stray-plaintext content column in

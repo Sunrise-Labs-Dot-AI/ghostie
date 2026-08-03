@@ -22,8 +22,7 @@ import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 
 import { PATHS } from "../paths.ts";
-import { unwrap, wrap } from "./crypto.ts";
-import { deleteMasterKey } from "./keychain.ts";
+import { isCiphertextAuthError, unwrap, wrap } from "./crypto.ts";
 
 const SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS auth_state (
@@ -160,17 +159,122 @@ export async function useSqliteAuthState(): Promise<{
   };
 }
 
-/** Wipe the session entirely. Called from unlinkAndReset recovery path.
- *  Also deletes the Keychain master key so a fresh re-pair generates a
- *  fresh wrapping key (defense in depth). */
+/**
+ * Wipe the Baileys session so the daemon can re-pair from scratch. Called from
+ * the unlinkAndReset recovery path.
+ *
+ * Deletes the auth rows ONLY. It deliberately does NOT rotate the Keychain
+ * master key, despite that having once looked like free defense in depth:
+ *
+ *   `messages.db` encrypts `body` / `body_full` / `media_descriptor` with the
+ *   SAME master key as these auth rows (see storage/messages.ts, #81). Deleting
+ *   the key therefore did not just invalidate the session — it silently made
+ *   every cached message body permanently undecryptable, on a code path whose
+ *   own UI copy promised "your message history is preserved".
+ *
+ * It was also self-defeating: crypto.ts caches the master key for the process
+ * lifetime, so after a delete the SAME process kept wrapping the freshly-paired
+ * credentials with the now-deleted key. The next daemon start found no Keychain
+ * item, minted a new one, and every read failed the GCM auth check — a reset
+ * that bricked the session it had just repaired, one restart later.
+ *
+ * Rotating the key is only safe once message content is keyed separately.
+ */
 export function deleteSession(): void {
   const db = getDb();
+  // Forensic breadcrumb. Wiping the session silently unlinks the user's phone,
+  // and during this change we hit a real instance of the auth rows vanishing
+  // that could not be attributed after the fact: no daemon was running, no
+  // caller was in any log, and every candidate (tests, MCP, review tooling, the
+  // menu bar's confirm-gated reset paths) was individually ruled out. The event
+  // was real but unexplained, which is a bad place to leave a destructive
+  // operation. Record who called and what was destroyed so a recurrence is
+  // attributable instead of forensic guesswork. Cheap: runs only on reset.
+  const before = countAuthRows(db);
+  const caller = (new Error().stack ?? "").split("\n").slice(2, 6).join(" <- ").trim();
+  process.stderr.write(
+    `deleteSession: wiping ${before.creds} creds + ${before.state} key rows at ${PATHS.sessionDb}\n` +
+    `deleteSession: called from ${caller || "(no stack)"}\n`,
+  );
+
   db.exec("DELETE FROM auth_state");
   db.exec("DELETE FROM auth_creds");
-  try { deleteMasterKey(); } catch (e) {
-    // Best-effort: if Keychain delete fails, surface to stderr but don't
-    // block the reset. The session ciphertext is gone either way.
-    process.stderr.write(`Keychain key delete warning: ${(e as Error).message}\n`);
+}
+
+/** Row counts for the forensic log above. Never touches row VALUES. */
+function countAuthRows(db: Database): { creds: number; state: number } {
+  try {
+    return {
+      creds: (db.prepare("SELECT count(*) AS n FROM auth_creds").get() as { n: number }).n,
+      state: (db.prepare("SELECT count(*) AS n FROM auth_state").get() as { n: number }).n,
+    };
+  } catch {
+    return { creds: -1, state: -1 };
+  }
+}
+
+/**
+ * Raised when stored auth rows exist but cannot be decrypted under the current
+ * master key. Terminal for the session: the only fix is a re-pair.
+ *
+ * NOT raised when the Keychain itself is unreachable — that surfaces as
+ * `KeychainAccessError`, which is transient and must never trigger a wipe.
+ */
+export class SessionUnreadableError extends Error {
+  /** How many auth rows failed to decrypt (creds counts as one). */
+  readonly failedRows: number;
+  constructor(message: string, failedRows: number) {
+    super(message);
+    this.name = "SessionUnreadableError";
+    this.failedRows = failedRows;
+  }
+}
+
+/**
+ * Decrypt-check every stored auth row BEFORE Baileys is constructed.
+ *
+ * Why preflight rather than letting it fail naturally: `readCreds` runs inside
+ * `useSqliteAuthState`, but the per-key `auth_state` rows are decrypted lazily
+ * by `keys.get` long after `connection.start()` has returned. A corrupt Signal
+ * key row would therefore throw from deep inside a Baileys event handler, with
+ * no caller positioned to catch it and park the daemon. Checking everything up
+ * front gives exactly one decision point.
+ *
+ * Cost is trivial: a few thousand small AES-GCM opens, single-digit ms.
+ *
+ * Throws `SessionUnreadableError` if any row fails to authenticate, and lets
+ * `KeychainAccessError` propagate untouched.
+ */
+export function assertSessionReadable(): void {
+  const db = getDb();
+  let failed = 0;
+
+  const credsRow = db.prepare("SELECT value FROM auth_creds WHERE k = ?").get(CREDS_KEY) as { value: Buffer } | null;
+  if (credsRow != null) {
+    try {
+      JSON.parse(unwrap(Buffer.from(credsRow.value)), BufferJSON.reviver);
+    } catch (e) {
+      if (!isCiphertextAuthError(e)) throw e;
+      failed += 1;
+    }
+  }
+
+  const rows = db.prepare("SELECT value FROM auth_state").all() as Array<{ value: Buffer }>;
+  for (const row of rows) {
+    try {
+      unwrap(Buffer.from(row.value));
+    } catch (e) {
+      if (!isCiphertextAuthError(e)) throw e;
+      failed += 1;
+    }
+  }
+
+  if (failed > 0) {
+    throw new SessionUnreadableError(
+      `${failed} of ${rows.length + (credsRow != null ? 1 : 0)} stored WhatsApp auth rows could not be decrypted ` +
+      "with the current Keychain key. The session must be re-paired.",
+      failed,
+    );
   }
 }
 

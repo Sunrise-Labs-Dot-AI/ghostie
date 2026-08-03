@@ -48,9 +48,20 @@ import {
   type QuotedReconstruction,
   type ReactionTargetKey,
 } from "../storage/messages.ts";
-import { useSqliteAuthState } from "../storage/session.ts";
+import { assertSessionReadable, SessionUnreadableError, useSqliteAuthState } from "../storage/session.ts";
+import { KeychainAccessError } from "../storage/keychain.ts";
+import { writeRecoverySentinel } from "./recovery.ts";
 
-export type ConnectionState = "connecting" | "connected" | "reconnecting" | "logged_out";
+export type ConnectionState =
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  /** Remotely unlinked from the phone's Linked Devices list. */
+  | "logged_out"
+  /** Stored auth rows exist but won't decrypt under the current master key.
+   *  Terminal like `logged_out`, and recovered the same way (wipe + re-pair),
+   *  but distinct so the UI can explain the actual cause. */
+  | "session_unreadable";
 
 export interface ConnectionEvents {
   state: (s: ConnectionState) => void;
@@ -62,6 +73,10 @@ const BACKOFF_INITIAL_MS = 1000;
 const BACKOFF_MULTIPLIER = 2;
 const BACKOFF_CAP_MS = 60_000;
 const BACKOFF_JITTER = 0.1;
+/** Ceiling on waiting for a Baileys socket to close. Its `end()` has no
+ *  timeout of its own, and a reset that awaits it forever is a reset that can
+ *  never be retried. */
+const TEARDOWN_TIMEOUT_MS = 3000;
 
 export class WhatsAppConnection extends EventEmitter {
   private socket: WASocket | null = null;
@@ -70,7 +85,19 @@ export class WhatsAppConnection extends EventEmitter {
   private meJid: string | null = null;
   private mePhone: string | null = null;
   private backoffMs: number = BACKOFF_INITIAL_MS;
+  private keychainRetryMs: number = BACKOFF_INITIAL_MS;
   private stopped = false;
+  /** Pending reconnect timer, so a reset can cancel it. Without a handle, a
+   *  backoff queued BEFORE a reset fired after it and called connect()
+   *  directly — bypassing start()'s teardown and racing a second socket onto
+   *  the same auth store. */
+  private connectTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Incremented whenever stop/start/reset invalidates in-flight connect work.
+   *  A connect that began before the bump is "obsolete": it must not install
+   *  its socket, because `prepareForReset` couldn't see it (this.socket is
+   *  still null while it awaits the Baileys version lookup) and so couldn't
+   *  tear it down. */
+  private generation = 0;
 
   override on<K extends keyof ConnectionEvents>(event: K, listener: ConnectionEvents[K]): this {
     return super.on(event, listener as never);
@@ -87,7 +114,29 @@ export class WhatsAppConnection extends EventEmitter {
 
   async start(): Promise<void> {
     this.stopped = false;
+    // Never leave a previous socket running underneath a new one. `start()` is
+    // re-entered by the reset path, and the old socket keeps its `creds.update`
+    // handler — two live sockets would interleave writes into the same auth
+    // rows and race each other's pairing handshake.
+    this.invalidateInFlight();
+    await this.teardownSocket();
     await this.connect();
+  }
+
+  /**
+   * Cancel any queued reconnect and mark every in-flight connect obsolete.
+   *
+   * Both halves matter. A pending timer would otherwise fire after a reset and
+   * call `connect()` behind our back, and a connect already awaiting
+   * `fetchLatestBaileysVersion()` has not yet assigned `this.socket`, so it is
+   * invisible to `teardownSocket()` and would install itself afterwards.
+   */
+  private invalidateInFlight(): void {
+    this.generation += 1;
+    if (this.connectTimer != null) {
+      clearTimeout(this.connectTimer);
+      this.connectTimer = null;
+    }
   }
 
   /**
@@ -100,17 +149,139 @@ export class WhatsAppConnection extends EventEmitter {
     this.setState("logged_out");
   }
 
+  /** Park in `session_unreadable` without starting Baileys. Same contract as
+   *  `markLoggedOut`: the RPC server stays up so the menu bar can reset. */
+  markSessionUnreadable(): void {
+    this.setState("session_unreadable");
+  }
+
+  /** Quiesce the connection ahead of a session wipe: the live socket's
+   *  `creds.update` handler must be detached before auth rows are deleted, or
+   *  it will write new rows into the store mid-wipe. Also cancels queued and
+   *  in-flight reconnects, which would otherwise reinstate a socket after the
+   *  wipe. */
+  async prepareForReset(): Promise<void> {
+    this.invalidateInFlight();
+    await this.teardownSocket();
+  }
+
+  /**
+   * Close the live socket and detach its listeners, WITHOUT setting `stopped`
+   * (which would also suppress legitimate reconnects). Used before any
+   * re-connect so exactly one socket is ever live.
+   *
+   * Bounded on purpose. Baileys' `end()` awaits a WebSocket `close` event with
+   * no timeout of its own, so a connection that dies without one never
+   * resolves. That would hang the awaiting `unlinkAndReset` RPC handler
+   * forever, and because the reset promise is shared for coalescing, EVERY
+   * later reset would then await the same stuck promise — one lost close event
+   * permanently disabling recovery. After the deadline we abandon the socket:
+   * its listeners are already detached, so it can no longer touch the store.
+   */
+  private async teardownSocket(): Promise<void> {
+    const sock = this.socket;
+    this.socket = null;
+    if (sock == null) return;
+    // Drop handlers first: `end()` itself emits connection.update, which would
+    // otherwise re-enter handleClose and schedule a competing reconnect.
+    try { (sock.ev as unknown as { removeAllListeners: () => void }).removeAllListeners(); } catch { /* ignore */ }
+    await Promise.race([
+      (async () => { try { await sock.end(new Error("connection reset")); } catch { /* ignore */ } })(),
+      new Promise<void>((resolve) => setTimeout(resolve, TEARDOWN_TIMEOUT_MS)),
+    ]);
+  }
+
   private setState(s: ConnectionState): void {
     if (s === this.state) return;
     this.state = s;
     this.emit("state", s);
   }
 
+  /**
+   * Reconnect entry point for the timer-driven paths. `connect()` can now throw
+   * `SessionUnreadableError` from its preflight, and those call sites are
+   * fire-and-forget (`void this.connect()`), so an unhandled rejection would
+   * take the process down instead of parking it. Funnel them through here.
+   */
+  private scheduleConnect(delayMs: number): void {
+    if (this.connectTimer != null) clearTimeout(this.connectTimer);
+    const gen = this.generation;
+    this.connectTimer = setTimeout(() => {
+      this.connectTimer = null;
+      // A reset (or stop) landed while this was queued — abandon it rather
+      // than reconnecting against state that has just been wiped.
+      if (gen !== this.generation || this.stopped) return;
+      this.connect().catch((e) => this.reportConnectFailure(e));
+    }, Math.max(0, delayMs));
+  }
+
+  /**
+   * Classify a failed connect attempt and decide what happens next.
+   *
+   * The distinction that matters: a session that cannot be decrypted is
+   * terminal and parks (offering the user a destructive re-pair), whereas a
+   * Keychain that is locked or denied is transient — the stored session is
+   * very likely fine, so parking would invite the user to destroy a healthy
+   * session over a temporary outage. Transient failures retry on their own
+   * backoff instead.
+   *
+   * Public so daemon startup can route its first-attempt failure through the
+   * same logic rather than exiting.
+   */
+  reportConnectFailure(e: unknown): void {
+    if (e instanceof SessionUnreadableError) {
+      this.parkUnreadable(e);
+      return;
+    }
+    if (e instanceof KeychainAccessError) {
+      const delay = Math.min(BACKOFF_CAP_MS, this.keychainRetryMs);
+      this.keychainRetryMs = Math.min(BACKOFF_CAP_MS, this.keychainRetryMs * BACKOFF_MULTIPLIER);
+      this.setState("reconnecting");
+      process.stderr.write(
+        `WhatsApp: Keychain unavailable (${(e as Error).message}). ` +
+        `Not touching the stored session; retrying in ${Math.round(delay / 1000)}s.\n`,
+      );
+      this.scheduleConnect(delay);
+      return;
+    }
+    // Anything else (network, Baileys internals): keep the normal backoff
+    // running. Previously this branch only logged, leaving a live daemon with
+    // no socket and nothing scheduled to try again.
+    const delay = Math.min(BACKOFF_CAP_MS, this.backoffMs);
+    this.backoffMs = Math.min(BACKOFF_CAP_MS, this.backoffMs * BACKOFF_MULTIPLIER);
+    this.setState("reconnecting");
+    process.stderr.write(`WhatsApp connect failed: ${(e as Error).message}. Retrying in ${Math.round(delay / 1000)}s.\n`);
+    this.scheduleConnect(delay);
+  }
+
+  /** Terminal-park on undecryptable auth state: record the reason on disk so
+   *  the next daemon start doesn't retry into the same wall, and hold the
+   *  process open so the RPC server can serve the reset. */
+  private parkUnreadable(e: SessionUnreadableError): void {
+    writeRecoverySentinel("session_unreadable", e.message);
+    this.setState("session_unreadable");
+    process.stderr.write(`${e.message} Parked for re-pair.\n`);
+  }
+
   private async connect(): Promise<void> {
+    // Snapshot the generation: everything below is async, and a reset landing
+    // mid-flight must not be overwritten by this attempt's socket.
+    const gen = this.generation;
     this.setState(this.socket == null ? "connecting" : "reconnecting");
+
+    // Preflight every stored auth row before Baileys exists. Signal key rows
+    // are otherwise decrypted lazily inside `keys.get`, deep in a Baileys
+    // event handler with no caller able to catch the failure and park.
+    // Throws SessionUnreadableError (recoverable by re-pair); a Keychain
+    // outage propagates as KeychainAccessError and is retried, not wiped.
+    assertSessionReadable();
 
     const { state: authState, saveCreds } = await useSqliteAuthState();
     const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: [2, 3000, 0] as [number, number, number] }));
+
+    // Superseded while we awaited above — before any socket exists, so there is
+    // nothing to clean up.
+    if (gen !== this.generation) return;
 
     const sock = makeWASocket({
       version,
@@ -136,6 +307,7 @@ export class WhatsAppConnection extends EventEmitter {
       if (connection === "open") {
         this.currentQr = null;
         this.backoffMs = BACKOFF_INITIAL_MS;
+        this.keychainRetryMs = BACKOFF_INITIAL_MS;
         this.setState("connected");
         const meId = sock.user?.id ?? null;
         // Baileys appends ":N@s.whatsapp.net" device suffix (e.g.
@@ -260,6 +432,15 @@ export class WhatsAppConnection extends EventEmitter {
       }
     });
 
+    // Last gate before this socket becomes the live one. A reset that ran while
+    // handlers were being wired would not have seen it (this.socket was still
+    // null), so installing it here would leave two sockets writing one store.
+    if (gen !== this.generation) {
+      try { (sock.ev as unknown as { removeAllListeners: () => void }).removeAllListeners(); } catch { /* ignore */ }
+      void sock.end(new Error("connection superseded"));
+      return;
+    }
+
     this.socket = sock;
   }
 
@@ -269,7 +450,7 @@ export class WhatsAppConnection extends EventEmitter {
 
     if (statusCode === DisconnectReason.loggedOut) {
       this.setState("logged_out");
-      writeFileSync(PATHS.loggedOutSentinel, `${new Date().toISOString()}\n`, { mode: 0o600 });
+      writeRecoverySentinel("logged_out", "WhatsApp unlinked this device from Linked Devices.");
       process.stderr.write("Baileys reports loggedOut — wrote LOGGED_OUT sentinel, exiting\n");
       process.exit(0);
     }
@@ -279,7 +460,7 @@ export class WhatsAppConnection extends EventEmitter {
     if (statusCode === DisconnectReason.restartRequired) {
       // Server told us to restart, no backoff needed.
       this.setState("reconnecting");
-      setImmediate(() => { void this.connect(); });
+      this.scheduleConnect(0);
       return;
     }
 
@@ -288,16 +469,14 @@ export class WhatsAppConnection extends EventEmitter {
     const delay = Math.min(BACKOFF_CAP_MS, this.backoffMs) * jitter;
     this.backoffMs = Math.min(BACKOFF_CAP_MS, this.backoffMs * BACKOFF_MULTIPLIER);
     this.setState("reconnecting");
-    setTimeout(() => { void this.connect(); }, delay);
+    this.scheduleConnect(delay);
   }
 
   /** Graceful shutdown for SIGTERM handling. */
   async stop(): Promise<void> {
     this.stopped = true;
-    if (this.socket != null) {
-      try { await this.socket.end(new Error("daemon shutting down")); } catch { /* ignore */ }
-      this.socket = null;
-    }
+    this.invalidateInFlight();
+    await this.teardownSocket();
   }
 
   /** Send a message via Baileys. Used by daemon's sendDraft handler.

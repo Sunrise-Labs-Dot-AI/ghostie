@@ -163,12 +163,36 @@ export function migrateKeychainAcl(): boolean {
   if (testKey != null && testKey.length > 0) return false;
 
   if (migrationDone()) return false;
-  if (!hasKey()) return false; // nothing to migrate (fresh install)
+  // An access failure propagates (fail-closed) rather than being read as
+  // "fresh install" — see probeKey.
+  if (probeKey() === "absent") return false; // nothing to migrate
 
   // Read the existing key (fail-closed: a malformed/denied item throws here).
   const existing = readKey();
   // Re-add WITH the -T ACL (writeKey deletes then re-adds with -T + absolute path).
-  writeKey(existing);
+  //
+  // That delete-then-add is a window in which the ONLY stored copy of the wrap
+  // key is the `existing` buffer in this process. If the add fails we must put
+  // it back: losing it is unrecoverable and takes the session AND every
+  // encrypted message body with it, whereas a failed migration is merely an
+  // inconvenience we can retry next start.
+  try {
+    writeKey(existing);
+  } catch (e) {
+    try {
+      restoreKeyAfterFailedMigration(existing);
+    } catch (restoreErr) {
+      throw new Error(
+        "Keychain ACL migration failed AND the wrap key could not be restored " +
+        `(${(restoreErr as Error).message}). The WhatsApp session and cached message ` +
+        "history may now be unreadable; reconnect WhatsApp to re-pair.",
+      );
+    }
+    throw new Error(
+      `Keychain ACL migration failed (${(e as Error).message}). The existing key was ` +
+      "restored, so nothing was lost — refusing to start until this succeeds.",
+    );
+  }
   // Verify the round-trip so we never declare success on a silently-failed re-add.
   const verify = readKey();
   if (!verify.equals(existing)) {
@@ -178,10 +202,62 @@ export function migrateKeychainAcl(): boolean {
   return true;
 }
 
-/** True if a key is already stored. */
-function hasKey(): boolean {
+/** Last-ditch re-add of the wrap key after a failed migration. Retries the
+ *  same `-T`-scoped write; the caller throws either way, so the daemon stays
+ *  down rather than running on an item whose ACL state is unknown. */
+function restoreKeyAfterFailedMigration(key: Buffer): void {
+  const b64 = key.toString("base64");
+  const r = runSecurity([
+    "add-generic-password",
+    "-s", SERVICE,
+    "-a", ACCOUNT,
+    "-w", b64,
+    "-T", daemonBinaryPath(),
+  ]);
+  if (r.exitCode !== 0) {
+    const err = new TextDecoder().decode(r.stderr).trim();
+    throw new Error(err || `exit ${r.exitCode}`);
+  }
+}
+
+/**
+ * Raised when the Keychain itself could not be consulted — locked, the user
+ * denied access, the ACL doesn't cover this binary, `security` is missing.
+ *
+ * Distinct from "the item isn't there". Callers MUST NOT treat this as absence:
+ * the stored key may be perfectly fine and simply unreadable right now, and
+ * responding by minting a replacement destroys every ciphertext wrapped with
+ * the real key (session creds AND messages.db content).
+ */
+export class KeychainAccessError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "KeychainAccessError";
+  }
+}
+
+/** `security`'s exit status for "the specified item could not be found". */
+const SECURITY_EXIT_ITEM_NOT_FOUND = 44;
+
+/**
+ * Tri-state probe for the stored key.
+ *
+ * The original two-state version returned `exitCode === 0` and so folded every
+ * failure mode into "absent" — after which `getOrCreateMasterKey` generated a
+ * replacement and `writeKey` deleted the real item to install it. One transient
+ * locked/denied read therefore permanently destroyed the wrap key, and with it
+ * the session credentials and all encrypted message bodies. Fail closed instead:
+ * only exit 44 is absence; anything else is an access failure and throws.
+ */
+function probeKey(): "present" | "absent" {
   const r = runSecurity(["find-generic-password", "-s", SERVICE, "-a", ACCOUNT]);
-  return r.exitCode === 0;
+  if (r.exitCode === 0) return "present";
+  if (r.exitCode === SECURITY_EXIT_ITEM_NOT_FOUND) return "absent";
+  const err = new TextDecoder().decode(r.stderr).trim();
+  throw new KeychainAccessError(
+    `Keychain probe failed (${r.exitCode}): ${err || "keychain locked, access denied, or unavailable"}. ` +
+    "Refusing to treat this as a missing key — overwriting it would destroy the existing session and message history.",
+  );
 }
 
 /** Read the stored key, decoding from base64. Throws if missing/malformed. */
@@ -190,7 +266,12 @@ function readKey(): Buffer {
   const r = runSecurity(["find-generic-password", "-s", SERVICE, "-a", ACCOUNT, "-w"]);
   if (r.exitCode !== 0) {
     const err = new TextDecoder().decode(r.stderr).trim();
-    throw new Error(`Keychain read failed (${r.exitCode}): ${err || "user denied or item missing"}`);
+    // Typed so the daemon can tell "can't reach the Keychain" (transient,
+    // retry, never offer a destructive reset) from "the ciphertext is
+    // genuinely unauthenticatable" (needs a re-pair). See crypto.ts unwrap.
+    throw new KeychainAccessError(
+      `Keychain read failed (${r.exitCode}): ${err || "user denied or item missing"}`,
+    );
   }
   const b64 = new TextDecoder().decode(r.stdout).trim();
   let raw: Buffer;
@@ -260,7 +341,9 @@ export function getOrCreateMasterKey(): Buffer {
     return buf;
   }
 
-  if (hasKey()) {
+  // Tri-state: "present" → use it; "absent" → mint one; access failure →
+  // throw. Never mint a replacement on an ambiguous probe (see probeKey).
+  if (probeKey() === "present") {
     // One-time ACL migration (#82): a pre-`-T` item is rewritten WITH the
     // scoped ACL before we return it. Fail-closed (throws) if it can't
     // complete, rather than silently serving a permissive item.
@@ -274,6 +357,13 @@ export function getOrCreateMasterKey(): Buffer {
   if (!verify.equals(fresh)) {
     throw new Error("Keychain round-trip mismatch — refusing to start");
   }
+  // `writeKey` already applied the `-T` ACL, so this item needs no migration.
+  // Recording that matters: without the marker, the NEXT start would run
+  // migrateKeychainAcl against a key that is already correct, and that
+  // migration deletes before it re-adds. A failure in that window destroys a
+  // brand-new key and orphans the session that was just paired under it —
+  // the exact fault this module is being hardened against.
+  markMigrationDone();
   return fresh;
 }
 

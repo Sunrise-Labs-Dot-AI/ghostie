@@ -8,6 +8,7 @@ struct DaemonAttentionBanner: View {
   @EnvironmentObject var imessageDaemon: IMessageDaemonController
   @EnvironmentObject var whatsappDaemon: WhatsAppDaemonController
   @Environment(\.colorScheme) private var colorScheme
+  @Environment(\.openWindow) private var openWindow
 
   private var imessageDown: Bool {
     settings.imessageEnabled && imessageDaemon.status.needsUserAttention
@@ -28,12 +29,20 @@ struct DaemonAttentionBanner: View {
           )
         }
         if whatsappDown {
-          let loggedOut = whatsappDaemon.baileysState == "logged_out"
+          // A parked daemon is running deliberately, so start() does nothing —
+          // the banner used to offer a button that visibly failed. Send those
+          // cases to the pairing window, which owns the wipe + re-pair flow.
+          let reconnect = whatsappDaemon.needsReconnect
           row(
-            title: loggedOut ? "WhatsApp signed out" : "WhatsApp disconnected",
-            detail: loggedOut ? "Reconnect to send WhatsApp drafts." : "Drafts can't send until it reconnects.",
-            action: loggedOut ? "Reconnect" : "Restart",
-            run: { whatsappDaemon.start() }
+            title: reconnect ? "WhatsApp needs to reconnect" : "WhatsApp disconnected",
+            detail: reconnect
+              ? "Scan a new QR code to send WhatsApp drafts again."
+              : "Drafts can't send until it reconnects.",
+            action: reconnect ? "Reconnect" : "Restart",
+            run: {
+              if reconnect { openWindow(id: WindowID.whatsappPairing) }
+              else { whatsappDaemon.start() }
+            }
           )
         }
       }

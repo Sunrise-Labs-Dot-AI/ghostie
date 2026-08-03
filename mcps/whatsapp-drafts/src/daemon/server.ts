@@ -43,6 +43,7 @@ import {
   sweepOldMessages,
 } from "../storage/messages.ts";
 import { deleteSession } from "../storage/session.ts";
+import { clearRecoverySentinel } from "./recovery.ts";
 import {
   type Draft,
   type StageInput,
@@ -395,17 +396,9 @@ async function handle(
         return ok(id, { ok: true });
       }
       case "unlinkAndReset": {
-        deleteSession();
-        try { unlinkSync(PATHS.loggedOutSentinel); } catch { /* ignore */ }
-        // Reply BEFORE kicking off the async reconnect — Baileys's
-        // connect path takes a couple seconds (auth state + version
-        // fetch) and the menubar shouldn't be blocked on it.
-        setImmediate(() => {
-          connection.start().catch((e) => {
-            process.stderr.write(`unlinkAndReset → connection.start() failed: ${(e as Error).message}\n`);
-          });
-        });
-        return ok(id, { ok: true, note: "Session wiped; daemon reconnecting." });
+        const reset = await performUnlinkAndReset(connection);
+        if (!reset.ok) return err(id, RPC_ERR.INTERNAL, reset.error);
+        return ok(id, { ok: true, note: reset.note });
       }
       // ──────────────────────────────────────────────────────────────────
       // Phase 2 — Draft + Send
@@ -613,6 +606,84 @@ export function makeFrameReader(
   onOverflow: () => void,
 ): { push(chunk: Buffer | Uint8Array | string): void } {
   return makeSharedFrameReader(MAX_FRAME_BYTES, onLine, onOverflow);
+}
+
+// ── unlinkAndReset ──────────────────────────────────────────────────────────
+
+export type ResetOutcome =
+  | { ok: true; note: string }
+  | { ok: false; error: string };
+
+/** In-flight reset, so two clicks (or a menubar retry racing its own timeout)
+ *  can't run two wipes and start two Baileys sockets against one auth store. */
+let _resetInFlight: Promise<ResetOutcome> | null = null;
+
+/**
+ * Wipe the Baileys session and re-pair, as one serialized operation.
+ *
+ * Ordering is the whole point, and the previous version got it wrong in three
+ * ways, each of which could manufacture the corrupt state this verb exists to
+ * repair:
+ *
+ *   1. It never stopped the live socket. Called on a HEALTHY session (which the
+ *      new always-available Disconnect button does), the old socket kept its
+ *      `creds.update` handler and went on writing auth rows while — and after —
+ *      they were being deleted, then raced a second socket started underneath it.
+ *   2. It swallowed the sentinel-removal error. A failed unlink meant the daemon
+ *      re-paired successfully and then parked again on the next start, with the
+ *      user's fresh pairing stranded behind a gate nobody cleared.
+ *   3. It replied before doing the work, so a failure was invisible to the caller.
+ *
+ * Now: quiesce → wipe → verify the gate is actually clear → start exactly one
+ * socket. Any failure leaves the sentinel in place and reports it, because
+ * staying parked is recoverable and silently un-parking a broken session is not.
+ */
+export async function performUnlinkAndReset(connection: WhatsAppConnection): Promise<ResetOutcome> {
+  if (_resetInFlight != null) return _resetInFlight;
+  _resetInFlight = runUnlinkAndReset(connection).finally(() => { _resetInFlight = null; });
+  return _resetInFlight;
+}
+
+async function runUnlinkAndReset(connection: WhatsAppConnection): Promise<ResetOutcome> {
+  // 1. Quiesce: no listeners left that could write auth rows under us.
+  try {
+    await connection.prepareForReset();
+  } catch (e) {
+    return { ok: false, error: `could not stop the existing WhatsApp connection: ${(e as Error).message}` };
+  }
+
+  // 2. Wipe the auth rows. Note this deliberately does NOT rotate the Keychain
+  //    master key — messages.db content is wrapped with the same key, so
+  //    rotating it would destroy the message history this flow promises to keep.
+  try {
+    deleteSession();
+  } catch (e) {
+    return { ok: false, error: `could not clear the stored session: ${(e as Error).message}` };
+  }
+
+  // 3. Clear the recovery gate — BEFORE reconnecting, and fatally if it fails.
+  try {
+    clearRecoverySentinel();
+  } catch (e) {
+    return {
+      ok: false,
+      error:
+        `session cleared, but the recovery marker at ${PATHS.loggedOutSentinel} could not be removed ` +
+        `(${(e as Error).message}). Not reconnecting — remove that file and try again.`,
+    };
+  }
+
+  // 4. Exactly one fresh socket. `start()` tears down anything lingering first.
+  try {
+    await connection.start();
+  } catch (e) {
+    // A wiped store should be trivially readable, so this is a real fault
+    // (network, Keychain outage). The gate is already clear; the daemon's
+    // normal backoff will keep retrying.
+    return { ok: false, error: `session cleared, but reconnecting failed: ${(e as Error).message}` };
+  }
+
+  return { ok: true, note: "Session wiped; scan the QR code to re-pair. Message history was kept." };
 }
 
 function ok(id: string | number | null, result: unknown): RpcResponse {
