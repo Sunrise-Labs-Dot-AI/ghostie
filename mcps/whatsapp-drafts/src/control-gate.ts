@@ -42,7 +42,7 @@ import { join, dirname } from "node:path";
 
 // The app's SUPublicEDKey (same Ed25519 key Sparkle uses for update signing).
 // base64 of the raw 32-byte Ed25519 public key.
-const PUBLIC_KEY_B64 = "AIBthhXpByRlrje9eWEBE0lE4w1/PwVJDFs6VGLqOHQ=";
+const PUBLIC_KEY_B64 = "QS3oTcXGdrT5vuNoQcHu/Sr4UIu/D8D/cQKsZVs6M0U=";
 
 // DER SPKI prefix for an Ed25519 public key: SEQUENCE { AlgorithmIdentifier {
 // 1.3.101.112 }, BIT STRING (raw 32-byte key) }. Concatenated with the raw key
