@@ -165,7 +165,12 @@ final class WhatsAppDaemonController: ObservableObject {
     guard let stalePid = pid_t(trimmed), stalePid > 0 else { return }
     // Only reap if it's actually alive — otherwise the daemon's own
     // acquirePidLock will treat the file as stale and overwrite it.
-    if kill(stalePid, 0) != 0 { return }
+    //
+    // Liveness alone is NOT enough to justify signalling. PIDs are recycled,
+    // and a stale daemon.pid whose number now belongs to an unrelated process
+    // would get SIGTERM and then SIGKILL from us. Confirm the identity first
+    // and fail closed when it can't be proven.
+    guard Self.isLiveWhatsAppDaemon(stalePid) else { return }
 
     appendLogLine("[controller] reaping stale daemon at PID \(stalePid) before launch")
     kill(stalePid, SIGTERM)
@@ -241,6 +246,18 @@ final class WhatsAppDaemonController: ObservableObject {
     recoveryState = WhatsAppRecoveryState.current()
   }
 
+  /// Called right after a reset succeeds.
+  ///
+  /// Clearing `baileysState` matters as much as re-reading the sentinel: it
+  /// still holds the pre-reset value (`session_unreadable` / `logged_out`)
+  /// until the next 5s poll, and `needsReconnect` reads it — so without this
+  /// the UI keeps offering "Reconnect" for several seconds after the re-pair
+  /// has already started.
+  func noteSessionReset() {
+    baileysState = nil
+    refreshRecoveryState()
+  }
+
   /// Stop the daemon and return true only once nothing is left holding
   /// `~/.whatsapp-mcp/session.db` open.
   ///
@@ -263,8 +280,43 @@ final class WhatsAppDaemonController: ObservableObject {
     }
     let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
     guard let pid = pid_t(trimmed), pid > 0 else { return true }
-    // kill(pid, 0) succeeds only while the process is alive.
-    return kill(pid, 0) != 0
+    // Only a live process that is genuinely our daemon blocks the wipe. A
+    // recycled PID belonging to something else isn't holding session.db.
+    return !Self.isLiveWhatsAppDaemon(pid)
+  }
+
+  /// True only when `pid` is alive AND is this app's WhatsApp daemon.
+  ///
+  /// `kill(pid, 0)` proves a process exists, not which one — and macOS recycles
+  /// PIDs, so a stale `daemon.pid` can name a process that has nothing to do
+  /// with us. Since the reset path signals (and eventually SIGKILLs) whatever
+  /// this returns true for, it fails closed: any doubt reads as "not ours".
+  nonisolated static func isLiveWhatsAppDaemon(_ pid: pid_t) -> Bool {
+    guard pid > 0, kill(pid, 0) == 0 else { return false }
+    let proc = Process()
+    proc.executableURL = URL(fileURLWithPath: "/bin/ps")
+    proc.arguments = ["-p", String(pid), "-o", "args="]
+    let out = Pipe()
+    proc.standardOutput = out
+    proc.standardError = Pipe()
+    do { try proc.run() } catch { return false }
+    let data = out.fileHandleForReading.readDataToEndOfFile()
+    proc.waitUntilExit()
+    guard proc.terminationStatus == 0,
+          let args = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+          !args.isEmpty
+    else { return false }
+    return commandLineLooksLikeWhatsAppDaemon(args)
+  }
+
+  /// Pure predicate over a process's command line, split out for testing.
+  ///
+  /// The daemon runs either as the standalone `whatsapp-drafts-daemon` Mach-O
+  /// or via the shared launcher (`messages-for-ai-backend whatsapp-daemon`),
+  /// so both shapes count. Everything else does not.
+  nonisolated static func commandLineLooksLikeWhatsAppDaemon(_ args: String) -> Bool {
+    if args.contains("whatsapp-drafts-daemon") { return true }
+    return args.contains("messages-for-ai-backend") && args.contains("whatsapp-daemon")
   }
 
   // MARK: - Internal: launch + monitor

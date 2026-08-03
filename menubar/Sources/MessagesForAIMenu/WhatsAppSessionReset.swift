@@ -81,7 +81,7 @@ enum WhatsAppSessionReset {
     // handler first, which we cannot.
     do {
       try await WhatsAppRPCClient.unlinkAndReset()
-      daemon.refreshRecoveryState()
+      daemon.noteSessionReset()
       return .viaDaemon
     } catch {
       // Fall through. Any RPC failure — not running, refused, timed out,
@@ -141,7 +141,7 @@ enum WhatsAppSessionReset {
       )
     }
 
-    daemon.refreshRecoveryState()
+    daemon.noteSessionReset()
     daemon.start()
     return .viaLocalWipe
   }

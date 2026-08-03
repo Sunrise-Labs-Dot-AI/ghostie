@@ -19,6 +19,7 @@ import { PATHS } from "../paths.ts";
 import { DEFAULT_SETTINGS, readSettings } from "../settings.ts";
 import { sweepOldMessages } from "../storage/messages.ts";
 import { SessionUnreadableError } from "../storage/session.ts";
+import { KeychainAccessError } from "../storage/keychain.ts";
 import { WhatsAppConnection } from "./connection.ts";
 import { readRecoverySentinel, writeRecoverySentinel } from "./recovery.ts";
 import { startRpcServer } from "./server.ts";
@@ -89,6 +90,15 @@ async function main() {
       writeRecoverySentinel("session_unreadable", e.message);
       connection.markSessionUnreadable();
       process.stderr.write(`${e.message}\nParked — use Ghostie → Settings → WhatsApp → Disconnect to re-pair.\n`);
+      return;
+    }
+    // A locked or denied Keychain is transient and says nothing about whether
+    // the stored session is valid. Exiting here would crash-loop the daemon
+    // over, say, a keychain that unlocks a moment later; parking would be
+    // worse still, since the recovery it offers destroys a session that is
+    // probably fine. Stay up and retry on a backoff.
+    if (e instanceof KeychainAccessError) {
+      connection.reportConnectFailure(e);
       return;
     }
     throw e;

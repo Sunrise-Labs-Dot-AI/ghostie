@@ -91,6 +91,59 @@ final class WhatsAppSessionResetTests: XCTestCase {
     XCTAssertEqual(state.detail, "key=value pairs")
   }
 
+  // MARK: - PID identity check
+
+  // The reset path SIGTERMs and then SIGKILLs whatever it believes is the
+  // daemon, based on a PID read from a file that can be stale. macOS recycles
+  // PIDs, so "a process with this PID exists" is not evidence it is ours —
+  // acting on that alone can kill an unrelated process. This predicate is the
+  // guard, and it must fail closed.
+  func testRecognisesTheStandaloneDaemonBinary() {
+    XCTAssertTrue(WhatsAppDaemonController.commandLineLooksLikeWhatsAppDaemon(
+      "/Applications/Ghostie.app/Contents/MacOS/whatsapp-drafts-daemon"
+    ))
+  }
+
+  func testRecognisesTheSharedLauncherForm() {
+    XCTAssertTrue(WhatsAppDaemonController.commandLineLooksLikeWhatsAppDaemon(
+      "/Applications/Ghostie.app/Contents/MacOS/messages-for-ai-backend whatsapp-daemon"
+    ))
+  }
+
+  func testRejectsUnrelatedProcesses() {
+    for args in [
+      "/usr/sbin/cupsd -l",
+      "/Applications/Safari.app/Contents/MacOS/Safari",
+      "/bin/zsh -l",
+      "",
+    ] {
+      XCTAssertFalse(
+        WhatsAppDaemonController.commandLineLooksLikeWhatsAppDaemon(args),
+        "must not claim \"\(args)\" is the WhatsApp daemon"
+      )
+    }
+  }
+
+  /// The sibling iMessage daemon shares the launcher binary. Killing it during
+  /// a WhatsApp reset would take out an unrelated transport.
+  func testRejectsTheSiblingIMessageDaemon() {
+    XCTAssertFalse(WhatsAppDaemonController.commandLineLooksLikeWhatsAppDaemon(
+      "/Applications/Ghostie.app/Contents/MacOS/messages-for-ai-backend imessage-daemon"
+    ))
+  }
+
+  /// The WhatsApp *MCP* is a thin client, not the daemon holding session.db.
+  func testRejectsTheWhatsAppMCPClient() {
+    XCTAssertFalse(WhatsAppDaemonController.commandLineLooksLikeWhatsAppDaemon(
+      "/Applications/Ghostie.app/Contents/MacOS/messages-for-ai-backend whatsapp-mcp"
+    ))
+  }
+
+  func testPidZeroAndNegativeAreNeverTheDaemon() {
+    XCTAssertFalse(WhatsAppDaemonController.isLiveWhatsAppDaemon(0))
+    XCTAssertFalse(WhatsAppDaemonController.isLiveWhatsAppDaemon(-1))
+  }
+
   // MARK: - Outcome reporting
 
   func testFailureOutcomeCarriesAUserFacingMessage() {

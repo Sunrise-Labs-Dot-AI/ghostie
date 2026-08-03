@@ -170,7 +170,29 @@ export function migrateKeychainAcl(): boolean {
   // Read the existing key (fail-closed: a malformed/denied item throws here).
   const existing = readKey();
   // Re-add WITH the -T ACL (writeKey deletes then re-adds with -T + absolute path).
-  writeKey(existing);
+  //
+  // That delete-then-add is a window in which the ONLY stored copy of the wrap
+  // key is the `existing` buffer in this process. If the add fails we must put
+  // it back: losing it is unrecoverable and takes the session AND every
+  // encrypted message body with it, whereas a failed migration is merely an
+  // inconvenience we can retry next start.
+  try {
+    writeKey(existing);
+  } catch (e) {
+    try {
+      restoreKeyAfterFailedMigration(existing);
+    } catch (restoreErr) {
+      throw new Error(
+        "Keychain ACL migration failed AND the wrap key could not be restored " +
+        `(${(restoreErr as Error).message}). The WhatsApp session and cached message ` +
+        "history may now be unreadable; reconnect WhatsApp to re-pair.",
+      );
+    }
+    throw new Error(
+      `Keychain ACL migration failed (${(e as Error).message}). The existing key was ` +
+      "restored, so nothing was lost — refusing to start until this succeeds.",
+    );
+  }
   // Verify the round-trip so we never declare success on a silently-failed re-add.
   const verify = readKey();
   if (!verify.equals(existing)) {
@@ -178,6 +200,24 @@ export function migrateKeychainAcl(): boolean {
   }
   markMigrationDone();
   return true;
+}
+
+/** Last-ditch re-add of the wrap key after a failed migration. Retries the
+ *  same `-T`-scoped write; the caller throws either way, so the daemon stays
+ *  down rather than running on an item whose ACL state is unknown. */
+function restoreKeyAfterFailedMigration(key: Buffer): void {
+  const b64 = key.toString("base64");
+  const r = runSecurity([
+    "add-generic-password",
+    "-s", SERVICE,
+    "-a", ACCOUNT,
+    "-w", b64,
+    "-T", daemonBinaryPath(),
+  ]);
+  if (r.exitCode !== 0) {
+    const err = new TextDecoder().decode(r.stderr).trim();
+    throw new Error(err || `exit ${r.exitCode}`);
+  }
 }
 
 /**
@@ -317,6 +357,13 @@ export function getOrCreateMasterKey(): Buffer {
   if (!verify.equals(fresh)) {
     throw new Error("Keychain round-trip mismatch — refusing to start");
   }
+  // `writeKey` already applied the `-T` ACL, so this item needs no migration.
+  // Recording that matters: without the marker, the NEXT start would run
+  // migrateKeychainAcl against a key that is already correct, and that
+  // migration deletes before it re-adds. A failure in that window destroys a
+  // brand-new key and orphans the session that was just paired under it —
+  // the exact fault this module is being hardened against.
+  markMigrationDone();
   return fresh;
 }
 

@@ -9,7 +9,7 @@
 // else throws and must never reach delete/add.
 
 import { afterAll, describe, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
@@ -134,6 +134,56 @@ describe("Keychain probe is tri-state", () => {
     } catch (e) {
       expect(e).toBeInstanceOf(KeychainAccessError);
       expect((e as Error).message).toMatch(/destroy the existing session/i);
+    }
+  });
+
+  // Minting a fresh key must also record that its ACL is already correct.
+  // Otherwise the NEXT start runs the legacy migration against it, and that
+  // migration deletes before it re-adds — a failure in that window destroys a
+  // brand-new key and orphans the session just paired under it.
+  test("a freshly minted key is marked migrated so it is never re-written", () => {
+    const marker = join(markerDir, `marker-fresh-${markerSeq++}`);
+    const { runner } = makeRunner(44);
+    _setSecurityRunnerForTesting(runner);
+    _setMigrationMarkerPathForTesting(marker);
+
+    getOrCreateMasterKey();
+
+    expect(existsSync(marker)).toBe(true);
+  });
+});
+
+describe("deleteSession leaves the wrap key alone", () => {
+  // This is the invariant that keeps message history readable: messages.db
+  // content is wrapped with the same key. Asserted here rather than in
+  // session-recovery.test.ts because that file sets WHATSAPP_MCP_TEST_KEY,
+  // which makes deleteMasterKey() a no-op — so the assertion there would pass
+  // even if the call were reintroduced. Here the Keychain seam is live, so a
+  // regression shows up as a real `delete-generic-password`.
+  test("no delete-generic-password is issued while wiping the session", async () => {
+    const home = mkdtempSync(join(tmpdir(), "whatsapp-mcp-delete-session-"));
+    const savedHome = process.env.WHATSAPP_MCP_HOME;
+    process.env.WHATSAPP_MCP_HOME = home;
+
+    const stored = randomBytes(32).toString("base64");
+    const { runner, subcommands } = makeRunner(0, stored);
+    _setSecurityRunnerForTesting(runner);
+    _setMigrationMarkerPathForTesting(join(markerDir, `marker-del-${markerSeq++}`));
+
+    const { deleteSession, _resetForTesting } = await import("./session.ts");
+    const { _resetKeyCache } = await import("./crypto.ts");
+    _resetForTesting();
+    _resetKeyCache();
+
+    try {
+      deleteSession();
+      expect(subcommands).not.toContain("delete-generic-password");
+    } finally {
+      _resetForTesting();
+      _resetKeyCache();
+      if (savedHome == null) delete process.env.WHATSAPP_MCP_HOME;
+      else process.env.WHATSAPP_MCP_HOME = savedHome;
+      rmSync(home, { recursive: true, force: true });
     }
   });
 });
