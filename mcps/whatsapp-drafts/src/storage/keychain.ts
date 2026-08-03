@@ -163,7 +163,9 @@ export function migrateKeychainAcl(): boolean {
   if (testKey != null && testKey.length > 0) return false;
 
   if (migrationDone()) return false;
-  if (!hasKey()) return false; // nothing to migrate (fresh install)
+  // An access failure propagates (fail-closed) rather than being read as
+  // "fresh install" — see probeKey.
+  if (probeKey() === "absent") return false; // nothing to migrate
 
   // Read the existing key (fail-closed: a malformed/denied item throws here).
   const existing = readKey();
@@ -178,10 +180,44 @@ export function migrateKeychainAcl(): boolean {
   return true;
 }
 
-/** True if a key is already stored. */
-function hasKey(): boolean {
+/**
+ * Raised when the Keychain itself could not be consulted — locked, the user
+ * denied access, the ACL doesn't cover this binary, `security` is missing.
+ *
+ * Distinct from "the item isn't there". Callers MUST NOT treat this as absence:
+ * the stored key may be perfectly fine and simply unreadable right now, and
+ * responding by minting a replacement destroys every ciphertext wrapped with
+ * the real key (session creds AND messages.db content).
+ */
+export class KeychainAccessError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "KeychainAccessError";
+  }
+}
+
+/** `security`'s exit status for "the specified item could not be found". */
+const SECURITY_EXIT_ITEM_NOT_FOUND = 44;
+
+/**
+ * Tri-state probe for the stored key.
+ *
+ * The original two-state version returned `exitCode === 0` and so folded every
+ * failure mode into "absent" — after which `getOrCreateMasterKey` generated a
+ * replacement and `writeKey` deleted the real item to install it. One transient
+ * locked/denied read therefore permanently destroyed the wrap key, and with it
+ * the session credentials and all encrypted message bodies. Fail closed instead:
+ * only exit 44 is absence; anything else is an access failure and throws.
+ */
+function probeKey(): "present" | "absent" {
   const r = runSecurity(["find-generic-password", "-s", SERVICE, "-a", ACCOUNT]);
-  return r.exitCode === 0;
+  if (r.exitCode === 0) return "present";
+  if (r.exitCode === SECURITY_EXIT_ITEM_NOT_FOUND) return "absent";
+  const err = new TextDecoder().decode(r.stderr).trim();
+  throw new KeychainAccessError(
+    `Keychain probe failed (${r.exitCode}): ${err || "keychain locked, access denied, or unavailable"}. ` +
+    "Refusing to treat this as a missing key — overwriting it would destroy the existing session and message history.",
+  );
 }
 
 /** Read the stored key, decoding from base64. Throws if missing/malformed. */
@@ -190,7 +226,12 @@ function readKey(): Buffer {
   const r = runSecurity(["find-generic-password", "-s", SERVICE, "-a", ACCOUNT, "-w"]);
   if (r.exitCode !== 0) {
     const err = new TextDecoder().decode(r.stderr).trim();
-    throw new Error(`Keychain read failed (${r.exitCode}): ${err || "user denied or item missing"}`);
+    // Typed so the daemon can tell "can't reach the Keychain" (transient,
+    // retry, never offer a destructive reset) from "the ciphertext is
+    // genuinely unauthenticatable" (needs a re-pair). See crypto.ts unwrap.
+    throw new KeychainAccessError(
+      `Keychain read failed (${r.exitCode}): ${err || "user denied or item missing"}`,
+    );
   }
   const b64 = new TextDecoder().decode(r.stdout).trim();
   let raw: Buffer;
@@ -260,7 +301,9 @@ export function getOrCreateMasterKey(): Buffer {
     return buf;
   }
 
-  if (hasKey()) {
+  // Tri-state: "present" → use it; "absent" → mint one; access failure →
+  // throw. Never mint a replacement on an ambiguous probe (see probeKey).
+  if (probeKey() === "present") {
     // One-time ACL migration (#82): a pre-`-T` item is rewritten WITH the
     // scoped ACL before we return it. Fail-closed (throws) if it can't
     // complete, rather than silently serving a permissive item.

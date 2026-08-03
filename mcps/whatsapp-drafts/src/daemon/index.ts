@@ -18,7 +18,9 @@ import { dirname, join } from "node:path";
 import { PATHS } from "../paths.ts";
 import { DEFAULT_SETTINGS, readSettings } from "../settings.ts";
 import { sweepOldMessages } from "../storage/messages.ts";
+import { SessionUnreadableError } from "../storage/session.ts";
 import { WhatsAppConnection } from "./connection.ts";
+import { readRecoverySentinel, writeRecoverySentinel } from "./recovery.ts";
 import { startRpcServer } from "./server.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -56,19 +58,41 @@ async function main() {
   process.on("SIGTERM", () => { void shutdown("SIGTERM"); });
   process.on("SIGINT", () => { void shutdown("SIGINT"); });
 
-  // If the previous run was remotely unlinked, stay alive WITHOUT
-  // connecting Baileys — the RPC server above is still listening so the
-  // menubar's Reconnect flow can call unlinkAndReset to clear the
-  // sentinel and trigger a fresh pairing. Exiting here (the v0.2.0
-  // behavior) made unlinkAndReset unreachable: socket gone, menubar got
-  // RPCError.readError.
-  if (existsSync(PATHS.loggedOutSentinel)) {
-    process.stderr.write("LOGGED_OUT sentinel present — awaiting menu bar Reconnect (unlinkAndReset) to re-pair.\n");
-    connection.markLoggedOut();
+  // If a previous run parked for recovery, stay alive WITHOUT connecting
+  // Baileys — the RPC server above is still listening so the menubar's
+  // Reconnect flow can call unlinkAndReset to clear the sentinel and trigger a
+  // fresh pairing. Exiting here (the v0.2.0 behavior) made unlinkAndReset
+  // unreachable: socket gone, menubar got RPCError.readError.
+  const parked = readRecoverySentinel();
+  if (parked != null) {
+    process.stderr.write(
+      `Recovery sentinel present (${parked.reason}) — awaiting menu bar Reconnect (unlinkAndReset) to re-pair.\n`,
+    );
+    if (parked.reason === "session_unreadable") connection.markSessionUnreadable();
+    else connection.markLoggedOut();
     return;
   }
 
-  await connection.start();
+  try {
+    await connection.start();
+  } catch (e) {
+    // Auth rows that won't decrypt are terminal for THIS session but must not
+    // be terminal for the process: exiting is what trapped users before, since
+    // it takes the RPC socket down with it and the only repair verb
+    // (unlinkAndReset) lives on that socket. The menu bar then had nothing to
+    // talk to, "restart" just re-ran the same failure, and the daemon
+    // crash-looped until it gave up. Park instead and stay serviceable.
+    //
+    // Deliberately narrow: a KeychainAccessError (locked/denied) is transient
+    // and must NOT land here, because the recovery it offers is destructive.
+    if (e instanceof SessionUnreadableError) {
+      writeRecoverySentinel("session_unreadable", e.message);
+      connection.markSessionUnreadable();
+      process.stderr.write(`${e.message}\nParked — use Ghostie → Settings → WhatsApp → Disconnect to re-pair.\n`);
+      return;
+    }
+    throw e;
+  }
 }
 
 function acquirePidLock(): void {
