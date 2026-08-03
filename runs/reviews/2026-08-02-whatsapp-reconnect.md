@@ -124,3 +124,46 @@ Re-run against the fixed tree, out of sandbox:
 Content already encrypted under a lost key stays unreadable — this PR makes the
 failure recoverable, it does not resurrect data. Those rows now degrade to empty
 instead of throwing. Quarantining or purging them is deliberately out of scope.
+
+---
+
+## Post-validation investigation: the unexplained session wipe
+
+During live validation the production `session.db` was observed to lose all
+6398 `auth_state` rows plus its creds row sometime between 2026-08-02 21:42 PDT
+and 2026-08-03 10:36 PDT, replaced by a fresh empty session. Investigated
+before merge at James's request.
+
+### Ruled out, with evidence
+
+| Candidate | How it was excluded |
+|---|---|
+| The bun test suite (current, 302 tests) | Ran with `HOME` pointed at a seeded canary home. Canary `auth_state`/`auth_creds` rows untouched afterwards. |
+| The bun test suite as of the first checkpoint (`071dcb8`, 294 tests) — the version actually run inside the window | Same canary experiment against a detached worktree at that commit. Untouched. |
+| The WhatsApp MCP (stdio client) | No import path, direct or transitive, from `src/index.ts` or `src/tools/*` to `storage/session.ts`. |
+| Swift tests | Only reference `/tmp/.whatsapp-mcp/...`; the new `WhatsAppSessionResetTests` assert constants and never call `perform`. |
+| An automatic reset in the menu bar | Both call sites (`SettingsView.runDisconnect`, `WhatsAppPairingView.runUnlinkAndReset`) sit behind destructive-role confirmation buttons. No auto-invocation exists. |
+| The daemon itself | No daemon log entries at all between the final crash at `04:35:54Z` and the `17:36:19Z` startup. |
+| The Codex review agents (both ran inside the window with shell access) | Job logs contain no `sqlite3`, no `bun test`, no `rm`, no `$HOME` redirects. Only `stat` loops over the session files, all exit 0. `deleteSession(`/`unlink` hits are prose in their review text. |
+
+### What is established
+
+- The snapshot genuinely contained 6398 + 1 rows: the daemon later read exactly
+  `6399 of 6399` from it during the controlled park test.
+- The `17:36` startup did **not** park — the only park message in the entire
+  17k-line log is at line 17118, from the controlled test. So that daemon saw an
+  already-clean database.
+- The main `session.db` file is byte-identical to the pre-incident snapshot
+  (same SHA-256), so the rows were removed via a WAL write, not a file replace.
+
+### Disposition
+
+**Unresolved.** No remaining in-repo candidate explains it, and the external
+possibilities (another agent session, a sync/backup tool, another worktree) are
+not distinguishable from available evidence. It did not affect the validation,
+which ran against the preserved snapshot, and it is not reproducible.
+
+Rather than leave a destructive operation unattributable, `deleteSession()` now
+logs the resolved database path, the pre-wipe row counts, and the calling stack
+frames. A recurrence becomes a log line naming the caller instead of a forensic
+dead end.

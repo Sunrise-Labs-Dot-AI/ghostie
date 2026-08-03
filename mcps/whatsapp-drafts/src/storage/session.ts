@@ -182,8 +182,35 @@ export async function useSqliteAuthState(): Promise<{
  */
 export function deleteSession(): void {
   const db = getDb();
+  // Forensic breadcrumb. Wiping the session silently unlinks the user's phone,
+  // and during this change we hit a real instance of the auth rows vanishing
+  // that could not be attributed after the fact: no daemon was running, no
+  // caller was in any log, and every candidate (tests, MCP, review tooling, the
+  // menu bar's confirm-gated reset paths) was individually ruled out. The event
+  // was real but unexplained, which is a bad place to leave a destructive
+  // operation. Record who called and what was destroyed so a recurrence is
+  // attributable instead of forensic guesswork. Cheap: runs only on reset.
+  const before = countAuthRows(db);
+  const caller = (new Error().stack ?? "").split("\n").slice(2, 6).join(" <- ").trim();
+  process.stderr.write(
+    `deleteSession: wiping ${before.creds} creds + ${before.state} key rows at ${PATHS.sessionDb}\n` +
+    `deleteSession: called from ${caller || "(no stack)"}\n`,
+  );
+
   db.exec("DELETE FROM auth_state");
   db.exec("DELETE FROM auth_creds");
+}
+
+/** Row counts for the forensic log above. Never touches row VALUES. */
+function countAuthRows(db: Database): { creds: number; state: number } {
+  try {
+    return {
+      creds: (db.prepare("SELECT count(*) AS n FROM auth_creds").get() as { n: number }).n,
+      state: (db.prepare("SELECT count(*) AS n FROM auth_state").get() as { n: number }).n,
+    };
+  } catch {
+    return { creds: -1, state: -1 };
+  }
 }
 
 /**
