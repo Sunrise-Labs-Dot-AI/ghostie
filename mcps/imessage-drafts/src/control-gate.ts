@@ -51,7 +51,7 @@ import { join } from "node:path";
 // Embedded Ed25519 public key — the SAME 32-byte key as the app's Sparkle
 // SUPublicEDKey. The menu bar app signs control.json with the matching private
 // key (held only by the operator), so the MCP can verify the manifest offline.
-const DEFAULT_PUBKEY_B64 = "AIBthhXpByRlrje9eWEBE0lE4w1/PwVJDFs6VGLqOHQ=";
+const DEFAULT_PUBKEY_B64 = "QS3oTcXGdrT5vuNoQcHu/Sr4UIu/D8D/cQKsZVs6M0U=";
 
 // Test seam: override the embedded public key so tests can sign manifests with
 // a throwaway keypair (we don't ship the real private key into the repo). NEVER

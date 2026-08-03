@@ -27,4 +27,4 @@
 # Lines starting with "#" are ignored. build-release.sh refuses to ship until a
 # real key is present here (the placeholder below does NOT count).
 # ============================================================================
-AIBthhXpByRlrje9eWEBE0lE4w1/PwVJDFs6VGLqOHQ=
+QS3oTcXGdrT5vuNoQcHu/Sr4UIu/D8D/cQKsZVs6M0U=
