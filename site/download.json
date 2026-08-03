@@ -1,19 +1,19 @@
 {
-  "version": "v0.11.3",
-  "publishedAt": "2026-07-06T20:14:21Z",
+  "version": "v0.12.0",
+  "publishedAt": "2026-08-03T22:20:22Z",
   "minimumSystemVersion": "14.0",
   "dmg": {
-    "url": "https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.11.3/Ghostie.dmg",
+    "url": "https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.12.0/Ghostie.dmg",
     "name": "Ghostie.dmg",
-    "size": 34686144,
-    "sha256": "0ec40275954f728bb57b4320305a40b2410792c551dc587ee59130fc32ccfbc4",
+    "size": 34762544,
+    "sha256": "df8015e52102ff82bb6676d562d8f815c8c30eb42b0187bad25818f16514c5ce",
     "contentType": "application/x-apple-diskimage"
   },
   "sparkleZip": {
-    "url": "https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.11.3/messages-for-ai-v0.11.3.zip",
-    "name": "messages-for-ai-v0.11.3.zip",
-    "size": 34788753,
-    "sha256": "a4ca333b581e1f2035d96b56195f9867760f5c51c566e7d09dde79b659ca854d",
+    "url": "https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.12.0/messages-for-ai-v0.12.0.zip",
+    "name": "messages-for-ai-v0.12.0.zip",
+    "size": 34875448,
+    "sha256": "cc6fd5569369e20f5c83aa9684c1c0977e1a974e1b7873ee9f2d76e12d11a92e",
     "contentType": "application/zip"
   }
 }
