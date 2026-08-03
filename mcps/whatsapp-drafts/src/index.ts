@@ -17,7 +17,7 @@ import { registerPriorityTools } from "./tools/priorities.ts";
 
 async function main() {
   const server = new McpServer(
-    { name: "whatsapp-mcp", version: "0.11.3" },
+    { name: "whatsapp-mcp", version: "0.12.0" },
     {
       instructions:
         "WhatsApp access via a local Baileys-backed daemon: read threads, " +
