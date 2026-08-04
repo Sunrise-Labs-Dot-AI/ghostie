@@ -187,6 +187,32 @@ trap 'rc=$?; trap "" INT TERM; echo; echo "✗ build aborted (exit $rc); wiping 
 
 mkdir -p "$REPO_ROOT/bin"
 
+# ── Architecture matrix (see the universal-binary note in the Bun section) ──
+# One place that names every slice we ship, plus the per-toolchain spelling of
+# it. Adding or dropping an architecture should mean editing only this block.
+# Lookups are functions, not associative arrays: `/usr/bin/env bash` on macOS is
+# bash 3.2, which predates `declare -A`.
+ARCH_SLICES=(arm64 x86_64)
+bun_target_for() {
+  case "$1" in
+    arm64)  echo bun-darwin-arm64 ;;
+    x86_64) echo bun-darwin-x64 ;;
+    *) echo "✗ no Bun target for arch '$1'" >&2; return 1 ;;
+  esac
+}
+# Deployment target must match LSMinimumSystemVersion in the Info.plist below.
+swift_triple_for() {
+  case "$1" in
+    arm64)  echo arm64-apple-macosx14.0 ;;
+    x86_64) echo x86_64-apple-macosx14.0 ;;
+    *) echo "✗ no Swift triple for arch '$1'" >&2; return 1 ;;
+  esac
+}
+CC_ARCH_FLAGS=()
+for slice in "${ARCH_SLICES[@]}"; do
+  CC_ARCH_FLAGS+=(-arch "$slice")
+done
+
 echo
 echo "=== Building shared Bun backend + launchers ==="
 BACKEND_BIN_NAME="messages-for-ai-backend"
@@ -225,13 +251,40 @@ BACKEND_LAUNCHERS=(
   echo "› bun install"
   bun install
 )
-echo "› bun build --compile (single role-dispatched backend)"
-bun build "$REPO_ROOT/mcps/backend-dispatcher/src/index.ts" --compile \
-  --outfile "$REPO_ROOT/bin/$BACKEND_BIN_NAME" \
-  --external jimp --external sharp \
-  --external link-preview-js --external audio-decode
-echo "› cc (tiny role launchers)"
-/usr/bin/cc -O2 -Wall -Wextra "$REPO_ROOT/scripts/messages-for-ai-launcher.c" \
+# ── Universal (arm64 + x86_64) binaries ──
+# Every inner Mach-O ships both slices so ONE download runs on Apple Silicon
+# and on Intel Macs. Intel Macs are no longer sold and macOS 27 drops them, but
+# machines like the 2019 16" MacBook Pro and 2020 iMac run macOS 14-26 today and
+# would otherwise fail at launch with "not supported on this type of Mac"
+# (Rosetta translates x86→ARM, never the reverse, so it cannot help).
+#
+# Bun cannot emit a fat Mach-O directly, so we compile each slice with
+# `--target` and stitch them with `lipo`. Verified that lipo preserves the
+# JS payload Bun appends after the Mach-O images: both slices execute.
+#
+# We use the plain `bun-darwin-x64` target, NOT `-baseline`. Baseline exists for
+# CPUs without AVX2; every Intel Mac that can run macOS 14 (our floor) is
+# Skylake-or-later and has AVX2. Testing the x64 slice locally via `arch
+# -x86_64` prints an AVX warning because ROSETTA doesn't emulate AVX — that
+# warning does not apply to real Intel hardware.
+echo "› bun build --compile (single role-dispatched backend, universal)"
+for slice in "${ARCH_SLICES[@]}"; do
+  bun_target="$(bun_target_for "$slice")"
+  echo "  · $slice ($bun_target)"
+  bun build "$REPO_ROOT/mcps/backend-dispatcher/src/index.ts" --compile \
+    --target="$bun_target" \
+    --outfile "$REPO_ROOT/bin/$BACKEND_BIN_NAME.$slice" \
+    --external jimp --external sharp \
+    --external link-preview-js --external audio-decode
+done
+echo "  · lipo → $BACKEND_BIN_NAME"
+lipo -create -output "$REPO_ROOT/bin/$BACKEND_BIN_NAME" \
+  "${ARCH_SLICES[@]/#/$REPO_ROOT/bin/$BACKEND_BIN_NAME.}"
+rm -f "${ARCH_SLICES[@]/#/$REPO_ROOT/bin/$BACKEND_BIN_NAME.}"
+
+echo "› cc (tiny role launchers, universal)"
+/usr/bin/cc -O2 -Wall -Wextra "${CC_ARCH_FLAGS[@]}" \
+  "$REPO_ROOT/scripts/messages-for-ai-launcher.c" \
   -o "$REPO_ROOT/bin/messages-for-ai-launcher"
 for launcher in "${BACKEND_LAUNCHERS[@]}"; do
   cp "$REPO_ROOT/bin/messages-for-ai-launcher" "$REPO_ROOT/bin/$launcher"
@@ -244,7 +297,17 @@ done
 echo
 echo "=== Building MessagesForAIMenu (Swift) ==="
 cd "$REPO_ROOT/menubar"
-echo "› swift build -c release"
+# ── Universal menubar binary ──
+# We build each slice separately with `--triple` and lipo them, rather than
+# using SwiftPM's native `--arch arm64 --arch x86_64`. Both produce the same
+# result, but `--arch` routes through Xcode's build system, which cannot parse
+# dependency files when the repo path contains a space or a colon — and this
+# repo lives under ".../Live:WIP/BetterHuman/messages ai helper/". It fails with
+# `error reading dependency file ...: unexpected character in prerequisites`.
+# The `--triple` path uses SwiftPM's own build system and handles the path fine,
+# so this works wherever the checkout happens to live. No source changes were
+# needed for the x86_64 slice; the macOS 14 floor is unchanged.
+#
 # ── macOS build.db disk-I/O artifact tolerance ──
 # In long-running shells (e.g. a multi-hour agent session) `swift build` can
 # print `accessing build database ".../.build/build.db": disk I/O error` and
@@ -253,22 +316,33 @@ echo "› swift build -c release"
 # notarytool 1.1.0 SIGBUS handled later in this script. We rm the prior binary
 # first so a stale one can't masquerade as this run's output, tolerate the exit
 # code, then REQUIRE that the build produced a fresh binary — a genuine compile
-# failure leaves no binary and still aborts.
-SWIFT_RELEASE_BIN=".build/release/MessagesForAIMenu"
-rm -f "$SWIFT_RELEASE_BIN"
-set +e
-swift build -c release
-SWIFT_BUILD_RC=$?
-set -e
-if [[ ! -x "$SWIFT_RELEASE_BIN" ]]; then
-  echo "✗ swift build did not produce $SWIFT_RELEASE_BIN (exit $SWIFT_BUILD_RC)." >&2
-  echo "  This is a real build failure, not the build.db disk-I/O artifact." >&2
-  exit 1
-fi
-if [[ $SWIFT_BUILD_RC -ne 0 ]]; then
-  echo "  ⚠ swift build exited $SWIFT_BUILD_RC but linked a fresh binary —"
-  echo "  ⚠ proceeding (known macOS build.db disk-I/O artifact, not a compile error)."
-fi
+# failure leaves no binary and still aborts. Applied per slice.
+SWIFT_SLICE_BINS=()
+for slice in "${ARCH_SLICES[@]}"; do
+  triple="$(swift_triple_for "$slice")"
+  echo "› swift build -c release --triple $triple"
+  # Ask SwiftPM where this triple's products land rather than guessing the
+  # directory name (it drops the OS-version suffix: x86_64-apple-macosx).
+  slice_bin_dir="$(swift build -c release --triple "$triple" --show-bin-path)"
+  slice_bin="$slice_bin_dir/MessagesForAIMenu"
+  rm -f "$slice_bin"
+  set +e
+  swift build -c release --triple "$triple"
+  SWIFT_BUILD_RC=$?
+  set -e
+  if [[ ! -x "$slice_bin" ]]; then
+    echo "✗ swift build did not produce $slice_bin (exit $SWIFT_BUILD_RC)." >&2
+    echo "  This is a real build failure, not the build.db disk-I/O artifact." >&2
+    exit 1
+  fi
+  if [[ $SWIFT_BUILD_RC -ne 0 ]]; then
+    echo "  ⚠ swift build exited $SWIFT_BUILD_RC but linked a fresh binary —"
+    echo "  ⚠ proceeding (known macOS build.db disk-I/O artifact, not a compile error)."
+  fi
+  SWIFT_SLICE_BINS+=("$slice_bin")
+done
+echo "› lipo → universal MessagesForAIMenu"
+lipo -create -output "$REPO_ROOT/bin/MessagesForAIMenu" "${SWIFT_SLICE_BINS[@]}"
 cd "$REPO_ROOT"
 
 # Common .app layout variables
@@ -294,7 +368,9 @@ INNER_BINARIES=(
 APP_PATH="$STAGE/$RELEASE_NAME/$APP_NAME.app"
 ENTITLEMENTS="$REPO_ROOT/menubar/scripts/messages-for-ai.entitlements"
 
-MENUBAR_BIN="$REPO_ROOT/menubar/.build/release/$EXE_NAME"
+# The lipo'd universal binary from the per-triple builds above, NOT
+# menubar/.build/release/ (which now holds only the host-arch slice).
+MENUBAR_BIN="$REPO_ROOT/bin/$EXE_NAME"
 BACKEND_BIN="$REPO_ROOT/bin/$BACKEND_BIN_NAME"
 for f in "$MENUBAR_BIN" "$BACKEND_BIN" "$ENTITLEMENTS"; do
   if [[ ! -e "$f" ]]; then
@@ -607,7 +683,45 @@ verify_inner_identifiers() {
   echo "  ✓ [$where] all ${#INNER_BINARIES[@]} inner binaries report Identifier=$BUNDLE_ID"
 }
 
+# Assert every shipped Mach-O carries every slice in ARCH_SLICES. Without this
+# the build silently reverts to host-arch-only the moment a `--triple`/`--target`
+# flag is dropped, and the regression is invisible until an Intel user reports
+# "not supported on this type of Mac" — which is exactly how the arm64-only
+# releases up to v0.13.0 shipped. Cheap check, catches the whole class.
+verify_universal() {
+  local where="$1"
+  local app_path="$2"
+  local target rc=0
+  local -a targets=()
+  for inner in "${INNER_BINARIES[@]}"; do
+    targets+=("$app_path/Contents/MacOS/$inner")
+  done
+  # Sparkle ships universal upstream; verify rather than assume.
+  targets+=("$app_path/Contents/Frameworks/Sparkle.framework/Versions/B/Sparkle")
+  for target in "${targets[@]}"; do
+    if [[ ! -e "$target" ]]; then
+      echo "✗ [$where] missing Mach-O: $target" >&2
+      rc=1
+      continue
+    fi
+    local got
+    got="$(lipo -archs "$target" 2>/dev/null)"
+    local slice
+    for slice in "${ARCH_SLICES[@]}"; do
+      if [[ " $got " != *" $slice "* ]]; then
+        echo "✗ [$where] ${target##*/} is missing the '$slice' slice (has: ${got:-none})." >&2
+        echo "  Ghostie must ship universal — an Intel Mac cannot run an arm64-only" >&2
+        echo "  binary, and Rosetta translates x86→ARM, never the reverse." >&2
+        rc=1
+      fi
+    done
+  done
+  [[ $rc -eq 0 ]] || return 1
+  echo "  ✓ [$where] all ${#targets[@]} Mach-Os are universal (${ARCH_SLICES[*]})"
+}
+
 verify_inner_identifiers "post-seal" "$APP_PATH" || exit 1
+verify_universal "post-seal" "$APP_PATH" || exit 1
 
 "$CODESIGN" --verify --strict --verbose=2 "$APP_PATH"
 

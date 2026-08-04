@@ -143,6 +143,24 @@ bash scripts/build-dmg.sh vX.Y.Z       # → polished .dmg (stable name Messages
   `com.apple.security.cs.allow-jit` + `allow-unsigned-executable-memory` or Bun's
   JIT SIGTRAPs on first hot-loop recompile). Bundle-level entitlements do NOT
   propagate to inner Mach-Os.
+- **Releases ship universal (arm64 + x86_64); every inner Mach-O, no exceptions.**
+  Releases through v0.13.0 were arm64-only because `swift build` and
+  `bun build --compile` default to the host arch, so every Intel Mac failed at
+  launch with "not supported on this type of Mac" (Rosetta translates x86→ARM,
+  never the reverse). `verify_universal` in `build-release.sh` now fails the
+  build if any slice is missing, and `install-release.sh` refuses to install on
+  a Mac the bundle can't run. Mechanics: Swift builds **per-triple + `lipo`**,
+  NOT SwiftPM's `--arch a --arch b` — `--arch` routes through Xcode's build
+  system, which can't parse dependency files when the repo path contains a
+  space or colon, and this repo lives under `.../Live:WIP/BetterHuman/messages
+  ai helper/`. Bun can't emit a fat Mach-O, so it compiles each `--target` and
+  lipos (verified: lipo preserves the appended JS payload). Use the plain
+  `bun-darwin-x64` target, not `-baseline` — every Intel Mac that can run
+  macOS 14 has AVX2. Dev installs stay native-only for loop speed; use
+  `UNIVERSAL=1` to build both slices.
+- **These scripts run under bash 3.2.** `/usr/bin/env bash` on macOS is
+  3.2.57, so no `declare -A`, no `${var^^}`, no `mapfile`. Use `case`
+  functions for lookups.
 
 ## Rebrand invariants (Ghostie rename — what must NEVER be renamed)
 
