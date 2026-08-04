@@ -42,6 +42,17 @@ The manifest is signed with the **same Sparkle EdDSA key** that signs app update
 
 A site or CDN compromise therefore cannot push a malicious kill/min-version: a tampered manifest fails signature verification and is ignored. The residual risk is the same as the update channel itself (theft of the EdDSA private key), tracked under business continuity (#93).
 
+### Key LOSS is a separate failure, and it has already happened once
+
+Theft is not the only way this breaks. Because the manifest is verified against a public key **baked into each build**, losing the private key silently disables the kill switch for every install already in the field — they keep fetching and keep rejecting anything you sign with a replacement.
+
+That is the current state for anything older than v0.12.0. A macOS login-keychain reset on 2026-07-20 destroyed the original key (see `RELEASE.md` → Auto-update). Those installs cannot be remotely disabled or version-gated, and there is no recovery: their trust anchor is compiled in. v0.12.0 and later carry the replacement key and are controllable again.
+
+Two operational consequences:
+
+- **`messagesfor.ai` must keep serving `control.json` and `control.json.sig`.** v0.12.0 pins that host. Retiring the domain kills the switch for those installs too.
+- **Back up the private key off-machine.** The blast radius of losing it is not "re-issue a credential" — it is permanently forfeiting remote control over every copy already installed.
+
 ### Caveat: best-effort against a motivated user
 
 A determined user can null-route `ghostie.app` in `/etc/hosts` to dodge the fetch. The kill switch is therefore best-effort against honest failure and against a worm spreading through cooperative installs. It is not DRM. The `min_supported_version` floor is the harder control because, once the app has fetched any manifest, the floor is enforced locally and the cached manifest is sticky.
