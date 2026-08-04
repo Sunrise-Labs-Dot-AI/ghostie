@@ -143,14 +143,51 @@ echo "› installing Bun dependencies"
   bun install >/dev/null
 )
 
-echo "› building shared Bun backend"
-bun build "$REPO_ROOT/mcps/backend-dispatcher/src/index.ts" --compile \
-  --outfile "$REPO_ROOT/bin/$BACKEND_BIN_NAME" \
-  --external jimp --external sharp \
-  --external link-preview-js --external audio-decode
+# ── Native by default; universal on request ──
+# Releases ship universal (arm64 + x86_64) so Intel Macs can run Ghostie — see
+# the universal-binary note in scripts/build-release.sh. Dev builds default to
+# THIS machine's arch only, because building both slices roughly doubles the
+# ~10s dev loop for a slice you can't exercise locally anyway.
+#
+# Set UNIVERSAL=1 to smoke-test a universal dev build without cutting a release:
+#   UNIVERSAL=1 bash scripts/dev-install.sh
+if [[ "${UNIVERSAL:-0}" == "1" ]]; then
+  DEV_ARCH_SLICES=(arm64 x86_64)
+  echo "› UNIVERSAL=1 — building arm64 + x86_64 (slower)"
+else
+  DEV_ARCH_SLICES=("$(/usr/bin/uname -m)")
+fi
+# A function, not an associative array: `/usr/bin/env bash` on macOS is bash
+# 3.2, which predates `declare -A`.
+bun_target_for() {
+  case "$1" in
+    arm64)  echo bun-darwin-arm64 ;;
+    x86_64) echo bun-darwin-x64 ;;
+    *) echo "✗ no Bun target for arch '$1'" >&2; return 1 ;;
+  esac
+}
+CC_ARCH_FLAGS=()
+for slice in "${DEV_ARCH_SLICES[@]}"; do
+  CC_ARCH_FLAGS+=(-arch "$slice")
+done
+
+echo "› building shared Bun backend (${DEV_ARCH_SLICES[*]})"
+for slice in "${DEV_ARCH_SLICES[@]}"; do
+  bun build "$REPO_ROOT/mcps/backend-dispatcher/src/index.ts" --compile \
+    --target="$(bun_target_for "$slice")" \
+    --outfile "$REPO_ROOT/bin/$BACKEND_BIN_NAME.$slice" \
+    --external jimp --external sharp \
+    --external link-preview-js --external audio-decode
+done
+# Bun cannot emit a fat Mach-O, so stitch the slices. lipo with a single input
+# is a plain copy, which keeps the one-arch dev path on the same code path.
+lipo -create -output "$REPO_ROOT/bin/$BACKEND_BIN_NAME" \
+  "${DEV_ARCH_SLICES[@]/#/$REPO_ROOT/bin/$BACKEND_BIN_NAME.}"
+rm -f "${DEV_ARCH_SLICES[@]/#/$REPO_ROOT/bin/$BACKEND_BIN_NAME.}"
 
 echo "› building tiny role launchers"
-/usr/bin/cc -O2 -Wall -Wextra "$REPO_ROOT/scripts/messages-for-ai-launcher.c" \
+/usr/bin/cc -O2 -Wall -Wextra "${CC_ARCH_FLAGS[@]}" \
+  "$REPO_ROOT/scripts/messages-for-ai-launcher.c" \
   -o "$REPO_ROOT/bin/messages-for-ai-launcher"
 for launcher in "${BACKEND_LAUNCHERS[@]}"; do
   cp "$REPO_ROOT/bin/messages-for-ai-launcher" "$REPO_ROOT/bin/$launcher"
