@@ -1,6 +1,6 @@
 import Foundation
 
-/// Where the premium/account backend lives. Production is messagesfor.ai;
+/// Where the premium/account backend lives. Production is ghostie.app;
 /// dev/staging builds can point at a Vercel preview deployment with
 ///   defaults write com.sunriselabs.messages-for-ai premiumBaseURL https://…
 /// so Clerk/Stripe test-mode flows never touch production data.
@@ -10,7 +10,7 @@ enum PremiumEndpoints {
        let url = URL(string: override), url.scheme == "https" {
       return url
     }
-    return URL(string: "https://messagesfor.ai")!
+    return SiteURLs.base
   }
 
   static func api(_ path: String, query: [URLQueryItem] = []) -> URL? {

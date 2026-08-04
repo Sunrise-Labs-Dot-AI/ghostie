@@ -2,7 +2,7 @@
 
 A Claude/ChatGPT skill that turns the iMessage MCP into a personal Texting Wrapped. Pulls your message history, runs reply-latency and group-contribution analysis, and ships a markdown report plus four shareable PNG charts.
 
-Part of the [messagesfor.ai](https://messagesfor.ai) suite.
+Part of the [ghostie.app](https://ghostie.app) suite.
 
 ## What you get
 

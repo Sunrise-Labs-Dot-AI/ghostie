@@ -465,9 +465,7 @@ struct SettingsView: View {
       Spacer()
       if entitlements.subscriptionActive || PremiumFlags.subscriptionsLive {
         Button(entitlements.subscriptionActive ? "Manage" : "Sign in") {
-          if let url = URL(string: "https://messagesfor.ai/account.html") {
-            NSWorkspace.shared.open(url)
-          }
+          NSWorkspace.shared.open(SiteURLs.page("account.html"))
         }
         .dsButton(.secondary, size: .small)
       } else {

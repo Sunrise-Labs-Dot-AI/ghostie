@@ -152,7 +152,7 @@ with a plain-English message if something's off — before it changes anything.
 
 ## Auto-update (Sparkle) — runbook
 
-Sparkle is wired up. The app auto-checks `https://messagesfor.ai/appcast.xml` in
+Sparkle is wired up. The app auto-checks `https://ghostie.app/appcast.xml` in
 the background and, when a newer build exists, shows its "Update available" window;
 **the user clicks Install** (nothing auto-installs — `SUAutomaticallyUpdate` is off).
 Sparkle verifies every update (EdDSA signature + Developer ID + notarization) before
@@ -194,7 +194,7 @@ the stable `Messages-for-AI.dmg` remains the human marketing-site download.
 The EdDSA signature + Developer ID + notarization mean a compromised feed host or
 DNS **cannot inject attacker-authored code** — Sparkle rejects anything not signed
 by your private key. The residual risk is *update suppression / serve-an-old-signed
-build*: whoever controls the Vercel deploy creds or the `messagesfor.ai` domain
+build*: whoever controls the Vercel deploy creds or the `ghostie.app` domain
 could prune the feed to an older, still-validly-signed (but known-vulnerable)
 release. So lock down the Vercel project (scoped token, 2FA, minimal collaborators)
 and the domain registrar (registrar lock, 2FA), and don't treat auto-update as the
@@ -213,7 +213,7 @@ in production** (TCC has surprised this project before — see the #17 saga).
 
 ### Testing
 - **Smoke (no second release):** after keygen + the public key is committed + the
-  seeded `messagesfor.ai/appcast.xml` is live, `dev-install` the app, then status
+  seeded `ghostie.app/appcast.xml` is live, `dev-install` the app, then status
   menu → "Check for Updates" → Sparkle opens and says "You're up to date" (proves
   the framework loads, the feed fetches, and the key parses).
 - **End-to-end:** ship vN, install it, ship vN+1, then on vN click "Check for

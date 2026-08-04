@@ -4,7 +4,7 @@
 # This is the "service" for setting the minimum app version and for killing the
 # app fleet-wide in an incident. It is deliberately the lowest-ops design: a small
 # signed JSON manifest (site/control.json) hosted next to the Sparkle appcast at
-# https://messagesfor.ai/control.json, signed with the SAME Sparkle EdDSA key the
+# https://ghostie.app/control.json, signed with the SAME Sparkle EdDSA key the
 # app already trusts (SUPublicEDKey), and deployed with the same `vercel deploy`
 # flow as the appcast. The app fetches + verifies it on launch and every 15 min.
 #
@@ -118,12 +118,12 @@ note "pubkey (SUPublicEDKey) the app verifies against: $(grep -oE '[A-Za-z0-9+/]
 if [ "$DEPLOY" = "1" ]; then
   if command -v vercel >/dev/null 2>&1; then
     (cd "$REPO_ROOT/site" && vercel deploy --prod >/dev/null 2>&1) \
-      && ok "deployed site/ → messagesfor.ai/control.json" \
-      || die "vercel deploy failed — deploy site/ manually so messagesfor.ai/control.json updates"
+      && ok "deployed site/ → ghostie.app/control.json" \
+      || die "vercel deploy failed — deploy site/ manually so ghostie.app/control.json updates"
   else
     die "vercel CLI not found — deploy site/ manually (the manifest is signed and ready)"
   fi
 else
   note "not deployed. Run with --deploy, or: (cd site && vercel deploy --prod)"
-  note "verify after deploy: curl -s https://messagesfor.ai/control.json && echo && curl -s https://messagesfor.ai/control.json.sig"
+  note "verify after deploy: curl -s https://ghostie.app/control.json && echo && curl -s https://ghostie.app/control.json.sig"
 fi

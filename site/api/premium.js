@@ -14,7 +14,7 @@
 //
 // Required environment variables:
 //   CLERK_SECRET_KEY, STRIPE_SECRET_KEY, STRIPE_PREMIUM_PRICE_ID,
-//   STRIPE_PREMIUM_WEBHOOK_SECRET, PREMIUM_SITE_URL (https://messagesfor.ai)
+//   STRIPE_PREMIUM_WEBHOOK_SECRET, PREMIUM_SITE_URL (https://ghostie.app)
 
 const Stripe = require("stripe");
 const { createClerkClient, verifyToken } = require("@clerk/backend");
@@ -27,7 +27,7 @@ const clerk = process.env.CLERK_SECRET_KEY
   ? createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY })
   : null;
 
-const SITE_URL = (process.env.PREMIUM_SITE_URL || "https://messagesfor.ai").replace(/\/$/, "");
+const SITE_URL = (process.env.PREMIUM_SITE_URL || "https://ghostie.app").replace(/\/$/, "");
 // Entitlement files re-verify within the grace horizon even if the app stays
 // offline; period end + 3 days keeps a lapsed card from unlocking for long.
 const GRACE_DAYS = 3;

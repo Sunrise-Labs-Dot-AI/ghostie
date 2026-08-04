@@ -33,7 +33,7 @@ the approval gate, not protocol features.
 - `mcps/whatsapp-drafts/` — WhatsApp stdio MCP + Baileys-backed daemon
   (Bun/TypeScript).
 - `site/` — marketing site (Vercel project `messages-for-ai-marketing-site`,
-  domain `messagesfor.ai`).
+  domains `ghostie.app` primary + `messagesfor.ai` legacy).
 - `scripts/` — release + dev-install for the MCP binaries. `release.sh` is the
   one-command lockstep release orchestrator (see Build & dev loop);
   `dev-link-skills.sh` symlinks `skills/*` into `.claude/skills/` for dev.
@@ -159,8 +159,19 @@ old names:
   read settings, drafts, sockets, and logs there. A rename strands user state.
 - **DMG filename `Messages-for-AI.dmg`** — the stable download URL on GitHub
   Releases; docs and the marketing site link to it.
-- **`SUFeedURL` (Sparkle appcast URL)** — shipped apps poll the existing URL;
-  changing it orphans every installed copy from updates.
+- **`SUFeedURL` (Sparkle appcast URL)** — NO LONGER an invariant, as of v0.13.0:
+  it moved from `messagesfor.ai/appcast.xml` to `ghostie.app/appcast.xml`.
+  The rule existed because shipped apps poll the URL baked into them, so moving
+  it orphans every installed copy. That cost was already paid: the login-keychain
+  reset on 2026-07-20 destroyed the Sparkle EdDSA private key, so v0.12.0 had to
+  ship under a NEW key and every build before it is permanently unable to accept
+  an update regardless of URL. With the only updatable installs being v0.12.0
+  ones, moving the feed cost nothing extra — and doing it later would have cost
+  more, because every release from here adds installs pinned to the old domain.
+  **`messagesfor.ai` must keep serving `appcast.xml`, `control.json` and
+  `control.json.sig` until no v0.12.0 install remains**, since those poll the old
+  host. Both domains are aliases of the same Vercel project, so this is free;
+  don't remove the domain to "tidy up".
 - **Notary keychain profile** — NOT a true invariant: a local keychain name
   only, overridable via `NOTARY_PROFILE`. The scripts now default to `ghostie`;
   older machines may still carry the legacy `imessage-mcp-notary` profile.

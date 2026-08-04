@@ -324,7 +324,7 @@ cat > "${APP}/Contents/Info.plist" <<EOF
   <key>NSHumanReadableCopyright</key>
   <string>© 2026 Sunrise Labs. All rights reserved.</string>
   <key>SUFeedURL</key>
-  <string>https://messagesfor.ai/appcast.xml</string>
+  <string>https://ghostie.app/appcast.xml</string>
   <key>SUPublicEDKey</key>
   <string>${SU_PUBLIC_ED_KEY}</string>
   <key>MFAPostHogProjectToken</key>

@@ -78,8 +78,8 @@ final class ControlManifestController: ObservableObject {
 
   init(
     homeOverride: URL? = nil,
-    manifestURL: URL = URL(string: "https://messagesfor.ai/control.json")!,
-    signatureURL: URL = URL(string: "https://messagesfor.ai/control.json.sig")!,
+    manifestURL: URL = SiteURLs.controlManifest,
+    signatureURL: URL = SiteURLs.controlSignature,
     publicKeyBase64: String? = nil,
     currentVersion: String? = nil,
     session: URLSession = .shared,

@@ -1,6 +1,6 @@
 // Cloud kill switch / forced-upgrade gate for the MCP send path (issue #76).
 //
-// The menu bar app fetches a signed `control.json` from messagesfor.ai every
+// The menu bar app fetches a signed `control.json` from ghostie.app every
 // 15 minutes, verifies its Ed25519 signature against the bundle's
 // SUPublicEDKey, and — once verified — writes the RAW manifest bytes + the
 // detached signature atomically to the SHARED ~/.messages-mcp dir:

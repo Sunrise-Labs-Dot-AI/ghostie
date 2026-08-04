@@ -214,7 +214,7 @@ echo
 echo "Next steps:"
 echo "  1. Upload to the GitHub release:"
 echo "       gh release upload $VERSION $DMG"
-echo "  2. The marketing site at messagesfor.ai pulls from"
+echo "  2. The marketing site at ghostie.app pulls from"
 echo "       /releases/latest/download/Ghostie.dmg"
 echo "     so as long as this asset is attached to the latest release,"
 echo "     the Download button stays current."

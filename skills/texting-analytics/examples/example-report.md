@@ -35,7 +35,7 @@ Three obvious moves:
 2. **Voice-cloned drafts**: same agent, but it writes in my texting voice instead of generic chat-bot voice.
 3. **Group thread nudges**: a weekly nudge for the social groups I keep going silent in.
 
-All three are coming in the messagesfor.ai suite.
+All three are coming in the ghostie.app suite.
 
 ## Methodology
 
@@ -48,4 +48,4 @@ All processing local on my Mac. No data left the machine.
 
 ---
 
-*Run your own Texting Wrapped at [messagesfor.ai](https://messagesfor.ai). Skill source on [GitHub](https://github.com/Sunrise-Labs-Dot-AI/messagesfor-ai-suite).*
+*Run your own Texting Wrapped at [ghostie.app](https://ghostie.app). Skill source on [GitHub](https://github.com/Sunrise-Labs-Dot-AI/messagesfor-ai-suite).*

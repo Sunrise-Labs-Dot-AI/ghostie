@@ -4,7 +4,7 @@
      xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
     <title>Messages for AI</title>
-    <link>https://messagesfor.ai/appcast.xml</link>
+    <link>https://ghostie.app/appcast.xml</link>
     <description>Auto-update feed for the Messages for AI macOS app.</description>
     <language>en</language>
     <!--
