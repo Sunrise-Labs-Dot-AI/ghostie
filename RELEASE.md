@@ -109,10 +109,18 @@ with a plain-English message if something's off — before it changes anything.
   re-install `ghostie` from the marketplace. Put this in the release notes.
 - **Deliberately unchanged across the rebrand** (see CLAUDE.md "Rebrand
   invariants"): bundle id / codesign identifier
-  `com.sunriselabs.messages-for-ai`, `~/.messages-mcp` paths, the stable
-  `Messages-for-AI.dmg` download name, and `SUFeedURL`. (The notary keychain
-  profile is a local, overridable name — now defaulting to `ghostie` — not a
-  cross-machine invariant.)
+  `com.sunriselabs.messages-for-ai`, `~/.messages-mcp` paths, and the stable
+  `Messages-for-AI.dmg` download name. (The notary keychain profile is a local,
+  overridable name — now defaulting to `ghostie` — not a cross-machine
+  invariant.)
+- **`SUFeedURL` MOVED in v0.13.0**, from `messagesfor.ai/appcast.xml` to
+  `ghostie.app/appcast.xml`. It used to be on the list above. It came off it
+  because the July key loss (below) had already orphaned every pre-v0.12.0
+  install from updates regardless of URL, so the usual cost of moving a feed
+  was already sunk. **`messagesfor.ai` must keep serving `appcast.xml`,
+  `control.json` and `control.json.sig` until no v0.12.0 install remains** —
+  those poll the old host. Both domains are aliases of one Vercel project, so
+  this costs nothing; don't retire the domain to tidy up.
 
 ---
 
@@ -158,6 +166,31 @@ the background and, when a newer build exists, shows its "Update available" wind
 Sparkle verifies every update (EdDSA signature + Developer ID + notarization) before
 running it. Config: `SUEnableAutomaticChecks=true` (on by default; a Settings toggle
 + a status-menu "Check for Updates…" let the user check on demand).
+
+### ⚠️ The signing key was rotated on 2026-08-03 — back yours up
+
+A macOS login-keychain reset on 2026-07-20 destroyed the original EdDSA private
+key. It was unrecoverable: the pre-reset keychain still exists on disk at
+`~/Library/Keychains/login_renamed_1.keychain-db`, but its password (the login
+password from before that reset) is not known, and there is no way to change a
+keychain's password without it.
+
+Consequences, so nobody re-derives them under pressure:
+
+- Every build **before v0.12.0** is permanently unable to accept an update. No
+  appcast entry can ever be signed that they will verify. They must be replaced
+  by a manual DMG download.
+- The same key signs `control.json`, so the **remote kill switch and
+  minimum-version enforcement are also dead** for those installs. If a bad build
+  ships, you cannot disable it remotely on anything older than v0.12.0.
+- Cached WhatsApp message bodies written before the reset are undecryptable;
+  that key is gone too.
+
+**So: export the private key and store it off this Mac.** In Keychain Access,
+find the `https://sparkle-project.org` item, or re-run `generate_keys -x`. The
+same applies to the Developer ID certificate — export it with a password.
+Losing either again costs a re-download for every user; losing both costs the
+ability to ship at all until Apple reissues.
 
 ### One-time setup (per release machine)
 
