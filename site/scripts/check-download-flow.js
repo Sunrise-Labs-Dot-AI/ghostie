@@ -7,7 +7,7 @@ const path = require("path");
 
 const ROOT = path.resolve(__dirname, "..");
 const LIVE = process.argv.includes("--live");
-const LIVE_BASE_URL = (process.env.DOWNLOAD_FLOW_BASE_URL || "https://messagesfor.ai").replace(/\/$/, "");
+const LIVE_BASE_URL = (process.env.DOWNLOAD_FLOW_BASE_URL || "https://ghostie.app").replace(/\/$/, "");
 const DOWNLOAD_API = `${LIVE_BASE_URL}/api/download`;
 const DOWNLOAD_PATH = "/releases/latest/download/Ghostie.dmg";
 const LEGACY_DOWNLOAD_PATH = "/releases/latest/download/Messages-for-AI.dmg";

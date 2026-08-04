@@ -10,6 +10,6 @@ import Foundation
 enum Legal {
   /// Date-stamped Terms/Privacy version. Bump on any material change.
   static let termsVersion = "2026-06-09"
-  static let termsURL = URL(string: "https://messagesfor.ai/terms.html")!
-  static let privacyURL = URL(string: "https://messagesfor.ai/privacy.html")!
+  static let termsURL = SiteURLs.page("terms.html")
+  static let privacyURL = SiteURLs.page("privacy.html")
 }

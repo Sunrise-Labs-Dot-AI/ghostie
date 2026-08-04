@@ -1,4 +1,4 @@
-// Privacy-first web analytics for the Ghostie / messagesfor.ai marketing site.
+// Privacy-first web analytics for the Ghostie marketing site (ghostie.app).
 //
 // Same PostHog project as the macOS app, so site download-intent and in-app
 // usage live in one project. Deliberately minimal and cookieless:

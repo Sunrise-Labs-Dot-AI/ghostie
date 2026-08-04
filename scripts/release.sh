@@ -139,7 +139,7 @@ require_public_artifact() {
 require_public_download_flow() {
   # site/.vercel can silently end up linked to a sibling project (it did once:
   # texting-wrapped-landing-page took a v0.6.0 prod deploy meant for
-  # messagesfor.ai). Refuse to deploy through the wrong link.
+  # ghostie.app). Refuse to deploy through the wrong link.
   local expected_project="messages-for-ai-marketing-site"
   local linked_project
   linked_project="$(python3 -c 'import json; print(json.load(open("site/.vercel/project.json")).get("projectName", ""))' 2>/dev/null || true)"
@@ -152,7 +152,7 @@ require_public_download_flow() {
   if (cd site && vercel deploy --prod >/dev/null 2>&1); then
     ok "site redeployed (vercel)"
   else
-    die "vercel deploy failed — messagesfor.ai/appcast.xml and /api/download were not updated."
+    die "vercel deploy failed — ghostie.app/appcast.xml and /api/download were not updated."
   fi
 
   (cd site && npm run test:downloads:live >/dev/null) \
@@ -479,7 +479,7 @@ ok "download metadata updated"
 # Sparkle signs the downloaded zip bytes, not the host. If the URL changes to a
 # byte-identical mirror, the signature remains valid; if the zip bytes change,
 # rerun sign_update and update both sparkle:edSignature and length.
-step "Updating Sparkle appcast (messagesfor.ai/appcast.xml)"
+step "Updating Sparkle appcast (ghostie.app/appcast.xml)"
 APPCAST="site/appcast.xml"
 [ -f "$APPCAST" ] || die "Missing $APPCAST — the Sparkle feed seed should be committed."
 
@@ -557,7 +557,7 @@ fi
 
 # ── Done ───────────────────────────────────────────────────────────────────
 printf '\n\033[1m✓ Shipped %s\033[0m\n\n' "$VTAG"
-echo "  App:    https://github.com/Sunrise-Labs-Dot-AI/messages-for-ai/releases/tag/$VTAG"
+echo "  App:    https://github.com/Sunrise-Labs-Dot-AI/ghostie/releases/tag/$VTAG"
 echo "          DMG download: $DMG_PUBLIC_URL"
 echo "  Plugin: live with the tag. Users update with:  /plugin marketplace update ghostie"
 echo

@@ -1,6 +1,6 @@
-# messagesfor.ai — marketing site
+# ghostie.app — marketing site
 
-Static landing page deployed to Vercel at https://messagesfor.ai.
+Static landing page deployed to Vercel at https://ghostie.app.
 
 ## Deploy
 
@@ -16,8 +16,8 @@ Vercel auto-detects static HTML and serves `index.html`. No build step.
 
 ## Custom domain
 
-In the Vercel project's Settings → Domains, add `messagesfor.ai` (and
-`www.messagesfor.ai` if desired). Vercel surfaces the DNS records you
+In the Vercel project's Settings → Domains, add `ghostie.app` (and
+`www.ghostie.app` if desired). Vercel surfaces the DNS records you
 need to point at your registrar — typically:
 
 - `A` record on `@` → `76.76.21.21`

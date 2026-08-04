@@ -1009,9 +1009,7 @@ struct ConsoleView: View {
   private var helpMenuButton: some View {
     Menu {
       Button("Help & Support") {
-        if let url = URL(string: "https://messagesfor.ai/support.html") {
-          NSWorkspace.shared.open(url)
-        }
+        NSWorkspace.shared.open(SiteURLs.page("support.html"))
       }
       Button("Send Feedback") {
         openSupportEmail(subject: "Ghostie feedback")
@@ -1729,9 +1727,7 @@ private struct DisabledLabView: View {
         HStack(spacing: 8) {
           if copy.showsSubscribe {
             Button {
-              if let url = URL(string: "https://messagesfor.ai/account.html") {
-                NSWorkspace.shared.open(url)
-              }
+              NSWorkspace.shared.open(SiteURLs.page("account.html"))
             } label: {
               Label("Subscribe", systemImage: "person.crop.circle.badge.checkmark")
             }

@@ -160,9 +160,7 @@ struct WrappedDeepReadPanel: View {
       VStack(alignment: .trailing, spacing: 8) {
         if lockedCopy.showsSubscribe {
           Button {
-            if let url = URL(string: "https://messagesfor.ai/account.html") {
-              NSWorkspace.shared.open(url)
-            }
+            NSWorkspace.shared.open(SiteURLs.page("account.html"))
           } label: {
             Label("Subscribe", systemImage: "person.crop.circle.badge.checkmark")
           }

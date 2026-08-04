@@ -11,7 +11,7 @@ import Sparkle
 /// @MainActor): Sparkle may call it off the main thread, and it only returns a
 /// constant.
 private final class FeedURLPin: NSObject, SPUUpdaterDelegate {
-  static let feedURL = "https://messagesfor.ai/appcast.xml"
+  static let feedURL = SiteURLs.appcast
   var didFindUpdate: (@Sendable (String?) -> Void)?
   var didNotFindUpdate: (@Sendable () -> Void)?
 
@@ -32,7 +32,7 @@ private final class FeedURLPin: NSObject, SPUUpdaterDelegate {
 
 /// Wraps Sparkle's standard updater for the menu-bar app.
 ///
-/// The app checks `messagesfor.ai/appcast.xml` (pinned via `FeedURLPin`) on
+/// The app checks `ghostie.app/appcast.xml` (pinned via `FeedURLPin`) on
 /// Sparkle's schedule; when a newer build exists Sparkle shows its own "Update
 /// available" window and the USER clicks Install — **nothing auto-installs**
 /// (`SUAutomaticallyUpdate` is left off). Sparkle verifies every update (EdDSA

@@ -6,8 +6,8 @@ The control manifest is the cloud-side lever a solo operator uses to stop or for
 
 A small signed JSON file served at a stable URL:
 
-- Manifest: `https://messagesfor.ai/control.json`
-- Detached signature: `https://messagesfor.ai/control.json.sig`
+- Manifest: `https://ghostie.app/control.json`
+- Detached signature: `https://ghostie.app/control.json.sig`
 
 The app fetches both on launch and every 15 minutes (and on a manual check). It verifies the signature, applies the directives, and caches the last-good manifest so a kill stays applied even if the network later drops.
 
@@ -44,7 +44,7 @@ A site or CDN compromise therefore cannot push a malicious kill/min-version: a t
 
 ### Caveat: best-effort against a motivated user
 
-A determined user can null-route `messagesfor.ai` in `/etc/hosts` to dodge the fetch. The kill switch is therefore best-effort against honest failure and against a worm spreading through cooperative installs. It is not DRM. The `min_supported_version` floor is the harder control because, once the app has fetched any manifest, the floor is enforced locally and the cached manifest is sticky.
+A determined user can null-route `ghostie.app` in `/etc/hosts` to dodge the fetch. The kill switch is therefore best-effort against honest failure and against a worm spreading through cooperative installs. It is not DRM. The `min_supported_version` floor is the harder control because, once the app has fetched any manifest, the floor is enforced locally and the cached manifest is sticky.
 
 ### Fail behavior
 
@@ -88,7 +88,7 @@ scripts/set-min-version.sh --min-version 0.6.0 --dry-run
 
 Verify after deploy:
 ```
-curl -s https://messagesfor.ai/control.json && echo && curl -s https://messagesfor.ai/control.json.sig
+curl -s https://ghostie.app/control.json && echo && curl -s https://ghostie.app/control.json.sig
 ```
 
 Propagation: edge cache on the manifest is 30-60s (`site/vercel.json`), and the app polls every 15 minutes, so worst case a directive reaches a running client within ~15 minutes (immediately on its next launch). For a faster guarantee in a severe incident, also ship a `min_supported_version` bump so newly-launched clients block on the floor.

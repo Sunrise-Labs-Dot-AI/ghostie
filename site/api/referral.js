@@ -165,7 +165,7 @@ async function handleCode(req, res, deps) {
       publicMetadata: { referralCode: code },
     });
   }
-  const siteUrl = (deps.env.PREMIUM_SITE_URL || "https://messagesfor.ai").replace(/\/$/, "");
+  const siteUrl = (deps.env.PREMIUM_SITE_URL || "https://ghostie.app").replace(/\/$/, "");
   res.status(200).json({ code, shareUrl: `${siteUrl}/account.html?ref=${code}` });
 }
 

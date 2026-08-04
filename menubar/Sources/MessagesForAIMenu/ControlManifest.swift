@@ -4,7 +4,7 @@ import CryptoKit
 /// A signed, cloud-controlled control manifest: the forced-upgrade floor + remote
 /// kill switch + an optional in-app banner. (Issue #76.)
 ///
-/// Hosted as a tiny static `control.json` on `messagesfor.ai` (CDN-fronted) with a
+/// Hosted as a tiny static `control.json` on `ghostie.app` (CDN-fronted) with a
 /// detached `control.json.sig` next to it. The client verifies the signature with
 /// Ed25519 (CryptoKit) over the EXACT raw bytes of control.json before honoring
 /// anything, reusing the Sparkle EdDSA public key already embedded in the bundle
