@@ -261,6 +261,7 @@ final class DraftStore: ObservableObject {
     if existing.schedule_approved == true {
       updated = Self.authenticatingScheduleApproval(updated)
     }
+    AnalyticsClient.shared.recordDraftEdit(id: id, from: existing.body, to: trimmed)
     try writeDraft(updated)
     refresh()
     return updated
@@ -497,6 +498,11 @@ final class DraftStore: ObservableObject {
     guard let existing = readDraft(id: id) else {
       throw DraftStoreError.draftNotFound(id)
     }
+    AnalyticsClient.shared.safeCapture(.draftDiscarded, properties: [
+      .transport: .string(existing.effectivePlatform.analyticsTransport.rawValue),
+      .source: .string(AnalyticsClient.draftSource(existing.source).rawValue)
+    ])
+    AnalyticsClient.shared.clearDraftEditMagnitude(id: id)
     try FileManager.default.removeItem(at: draftURL(id: id, platform: existing.effectivePlatform))
     try removeAttachmentSnapshot(id: id, platform: existing.effectivePlatform)
     refresh()

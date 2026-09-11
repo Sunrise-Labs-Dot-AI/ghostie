@@ -84,5 +84,8 @@ struct FullDiskAccessGate: ViewModifier {
 
   private func refresh() {
     access = HealthChecks().chatDbAccessState()
+    if access == .ok {
+      AnalyticsClient.shared.captureFDAGranted()
+    }
   }
 }

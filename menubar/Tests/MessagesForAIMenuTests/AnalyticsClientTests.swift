@@ -172,6 +172,33 @@ final class AnalyticsClientTests: XCTestCase {
       (.featureViewed, [
         "feature": AnalyticsFeature.messages.rawValue
       ]),
+      (.featureViewed, [
+        "feature": AnalyticsFeature.dontGhost.rawValue
+      ]),
+      (.featureViewed, [
+        "feature": AnalyticsFeature.wrapped.rawValue
+      ]),
+      (.featureViewed, [
+        "feature": AnalyticsFeature.eq.rawValue
+      ]),
+      (.featureViewed, [
+        "feature": AnalyticsFeature.birthdays.rawValue
+      ]),
+      (.featureViewed, [
+        "feature": AnalyticsFeature.birthdayTexts.rawValue
+      ]),
+      (.fdaGranted, [:]),
+      (.mcpVerified, [
+        "transport": AnalyticsTransportName.imessage.rawValue
+      ]),
+      (.firstAha, [
+        "feature": AnalyticsFeature.wrapped.rawValue,
+        "time_to_aha_bucket": "1h_24h"
+      ]),
+      (.draftDiscarded, [
+        "transport": AnalyticsTransportName.imessage.rawValue,
+        "source": AnalyticsDraftSource.assistant.rawValue
+      ]),
       (.draftStaged, [
         "transport": AnalyticsTransportName.imessage.rawValue,
         "source": AnalyticsDraftSource.assistant.rawValue
@@ -179,6 +206,11 @@ final class AnalyticsClientTests: XCTestCase {
       (.draftSent, [
         "transport": AnalyticsTransportName.whatsapp.rawValue,
         "result": AnalyticsResult.success.rawValue
+      ]),
+      (.draftSent, [
+        "transport": AnalyticsTransportName.imessage.rawValue,
+        "result": AnalyticsResult.success.rawValue,
+        "edit_magnitude": AnalyticsEditMagnitude.light.rawValue
       ]),
       (.draftSent, [
         "transport": AnalyticsTransportName.imessage.rawValue,
@@ -288,6 +320,89 @@ final class AnalyticsClientTests: XCTestCase {
     XCTAssertEqual(secondBatch.count, 10)
     XCTAssertEqual(secondBatch.compactMap { $0["event"] as? String }, Array(repeating: AnalyticsEvent.settingsOpened.rawValue, count: 10))
     transport.completeNext(success: true)
+  }
+
+  func testEditMagnitudeUsesLengthAndPrefixOnly() {
+    XCTAssertEqual(AnalyticsClient.editMagnitude(from: "hello", to: "hello"), .none)
+    XCTAssertEqual(AnalyticsClient.editMagnitude(from: "hello there", to: "hello there!"), .light)
+    XCTAssertEqual(
+      AnalyticsClient.editMagnitude(
+        from: "Short draft.",
+        to: String(repeating: "Different text. ", count: 20)
+      ),
+      .heavy
+    )
+  }
+
+  func testTimeToAhaBucketIsCoarse() {
+    let start = Date(timeIntervalSince1970: 1_000_000)
+    XCTAssertEqual(AnalyticsClient.timeToAhaBucket(from: nil, to: start), "unknown")
+    XCTAssertEqual(AnalyticsClient.timeToAhaBucket(from: start, to: start.addingTimeInterval(60)), "lt_5m")
+    XCTAssertEqual(AnalyticsClient.timeToAhaBucket(from: start, to: start.addingTimeInterval(20 * 60)), "5m_1h")
+    XCTAssertEqual(AnalyticsClient.timeToAhaBucket(from: start, to: start.addingTimeInterval(2 * 3_600)), "1h_24h")
+    XCTAssertEqual(AnalyticsClient.timeToAhaBucket(from: start, to: start.addingTimeInterval(2 * 86_400)), "1d_7d")
+    XCTAssertEqual(AnalyticsClient.timeToAhaBucket(from: start, to: start.addingTimeInterval(10 * 86_400)), "gt_7d")
+  }
+
+  func testFirstAhaAndActivationCheckpointsFireOnce() throws {
+    let transport = RecordingAnalyticsTransport()
+    let client = AnalyticsClient(
+      config: AnalyticsClientConfig(projectToken: "phc_test", host: URL(string: "https://us.i.posthog.com")!),
+      userEnabled: true,
+      rootDirectory: tempDir(),
+      transport: transport
+    )
+
+    let started = Date(timeIntervalSince1970: 1_000_000)
+    client.captureFeatureViewed(.wrapped, activationStartedAt: started)
+    client.captureFeatureViewed(.dontGhost, activationStartedAt: started)
+    client.captureFDAGranted()
+    client.captureFDAGranted()
+    client.captureMCPVerified(transport: .imessage)
+    client.captureMCPVerified(transport: .imessage)
+    waitBriefly()
+
+    let events = transport.sentBatches.flatMap { $0 }.compactMap { $0["event"] as? String }
+    XCTAssertEqual(events.filter { $0 == AnalyticsEvent.featureViewed.rawValue }.count, 2)
+    XCTAssertEqual(events.filter { $0 == AnalyticsEvent.firstAha.rawValue }.count, 1)
+    XCTAssertEqual(events.filter { $0 == AnalyticsEvent.fdaGranted.rawValue }.count, 1)
+    XCTAssertEqual(events.filter { $0 == AnalyticsEvent.mcpVerified.rawValue }.count, 1)
+  }
+
+  func testDraftEditMagnitudePersistsWithoutBodies() {
+    let root = tempDir()
+    let client = AnalyticsClient(
+      config: AnalyticsClientConfig(projectToken: "phc_test", host: URL(string: "https://us.i.posthog.com")!),
+      userEnabled: true,
+      rootDirectory: root,
+      transport: RecordingAnalyticsTransport()
+    )
+    client.recordDraftEdit(id: "draft-1", from: "hey", to: "hey!")
+    XCTAssertEqual(client.peekDraftEditMagnitude(id: "draft-1"), .light)
+
+    let data = try? Data(contentsOf: root.appendingPathComponent("analytics-draft-edits.json"))
+    let json = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: String] }
+    XCTAssertEqual(json?["draft-1"], "light")
+    if let raw = data.flatMap({ String(data: $0, encoding: .utf8) }) {
+      XCTAssertFalse(raw.contains("hey"))
+    }
+    client.clearDraftEditMagnitude(id: "draft-1")
+    XCTAssertEqual(client.peekDraftEditMagnitude(id: "draft-1"), .none)
+  }
+
+  func testTipAndAmountPropertiesStayRejected() {
+    XCTAssertThrowsError(try AnalyticsClient.sanitize(event: .draftSent, properties: [
+      "transport": "imessage",
+      "result": "success",
+      "tip_amount": 8.67
+    ]))
+    XCTAssertThrowsError(try AnalyticsClient.payload(
+      eventName: "tip_opened",
+      properties: [:],
+      distinctID: "install-id"
+    )) { error in
+      XCTAssertEqual(error as? AnalyticsValidationError, .eventNotAllowed("tip_opened"))
+    }
   }
 
   private func tempDir() -> URL {

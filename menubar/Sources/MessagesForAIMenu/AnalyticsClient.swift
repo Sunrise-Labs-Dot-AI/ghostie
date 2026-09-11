@@ -1,5 +1,15 @@
 import Foundation
 
+/// Privacy-gated PostHog events. Capture is allowlisted: unknown event names,
+/// unknown properties, and sensitive strings are rejected before enqueue.
+///
+/// Growth consumer-pulse keys (feature_viewed.feature):
+/// `dont_ghost`, `wrapped`, `eq`, `birthdays`.
+/// Legacy `birthday_texts` is still accepted by the sanitizer.
+/// Activation: `fda_granted`, `mcp_verified` (transport), `first_aha`
+/// (feature + time_to_aha_bucket). Draft follow-ups: `draft_discarded`,
+/// `draft_sent.edit_magnitude` (`none` / `light` / `heavy`).
+/// Site-only (not this allowlist): `tip_opened`, `tip_completed`.
 enum AnalyticsEvent: String, CaseIterable {
   case appLaunched = "app_launched"
   case appVersionSeen = "app_version_seen"
@@ -11,8 +21,12 @@ enum AnalyticsEvent: String, CaseIterable {
   case telemetryEnabled = "telemetry_enabled"
   case telemetryDisabled = "telemetry_disabled"
   case featureViewed = "feature_viewed"
+  case fdaGranted = "fda_granted"
+  case mcpVerified = "mcp_verified"
+  case firstAha = "first_aha"
   case draftStaged = "draft_staged"
   case draftSent = "draft_sent"
+  case draftDiscarded = "draft_discarded"
   case scheduledMessageCreated = "scheduled_message_created"
   case labScanStarted = "lab_scan_started"
   case labScanCompleted = "lab_scan_completed"
@@ -43,6 +57,8 @@ enum AnalyticsProperty: String, CaseIterable {
   case includedCrashReports = "included_crash_reports"
   case includedLocalEvents = "included_local_events"
   case includedDaemonLogs = "included_daemon_logs"
+  case editMagnitude = "edit_magnitude"
+  case timeToAhaBucket = "time_to_aha_bucket"
   case insertID = "$insert_id"
 }
 
@@ -71,7 +87,19 @@ enum AnalyticsFeature: String {
   case eq
   case textingAnalytics = "texting_analytics"
   case wrapped
+  case birthdays
+  /// Legacy key accepted by the sanitizer. New views emit `birthdays`.
   case birthdayTexts = "birthday_texts"
+
+  /// Consumer aha surfaces Growth asked to distinguish from chrome views.
+  var isConsumerAha: Bool {
+    switch self {
+    case .dontGhost, .wrapped, .eq, .birthdays:
+      return true
+    default:
+      return false
+    }
+  }
 }
 
 enum AnalyticsLab: String {
@@ -115,6 +143,31 @@ enum AnalyticsErrorCategory: String {
   case localIO = "local_io"
   case invalidResponse = "invalid_response"
   case unknown
+}
+
+enum AnalyticsEditMagnitude: String, Comparable {
+  case none
+  case light
+  case heavy
+
+  private var rank: Int {
+    switch self {
+    case .none: return 0
+    case .light: return 1
+    case .heavy: return 2
+    }
+  }
+
+  static func < (lhs: AnalyticsEditMagnitude, rhs: AnalyticsEditMagnitude) -> Bool {
+    lhs.rank < rhs.rank
+  }
+}
+
+enum AnalyticsCheckpoint: String {
+  case fdaGranted = "fda_granted"
+  case mcpVerifiedImessage = "mcp_verified.imessage"
+  case mcpVerifiedWhatsapp = "mcp_verified.whatsapp"
+  case firstAha = "first_aha"
 }
 
 extension Platform {
@@ -211,6 +264,8 @@ final class AnalyticsClient {
   private var userEnabled: Bool
   private var isFlushing = false
   private var flushToken: UUID?
+  private let metaLock = NSLock()
+  private var draftEditMagnitudes: [String: AnalyticsEditMagnitude] = [:]
 
   init(
     config: AnalyticsClientConfig = .fromBundle(),
@@ -224,6 +279,7 @@ final class AnalyticsClient {
     self.rootDirectory = rootDirectory
     self.transport = transport
     self.environmentProvider = environmentProvider
+    self.draftEditMagnitudes = Self.readDraftEditMagnitudes(rootDirectory: rootDirectory)
   }
 
   var queueURL: URL {
@@ -258,6 +314,58 @@ final class AnalyticsClient {
     safeCapture(eventName: event.rawValue, properties: raw)
   }
 
+  /// Feature chrome view. Also emits `first_aha` once for Don't Ghost,
+  /// Wrapped, EQ, or Birthdays, with a bucketed time from Terms acceptance.
+  func captureFeatureViewed(_ feature: AnalyticsFeature, activationStartedAt: Date? = nil) {
+    safeCapture(.featureViewed, properties: [
+      .feature: .string(feature.rawValue)
+    ])
+    guard feature.isConsumerAha else { return }
+    var properties: [AnalyticsProperty: AnalyticsValue] = [
+      .feature: .string(feature.rawValue)
+    ]
+    properties[.timeToAhaBucket] = .string(Self.timeToAhaBucket(from: activationStartedAt))
+    captureOnce(.firstAha, event: .firstAha, properties: properties)
+  }
+
+  func captureFDAGranted() {
+    captureOnce(.fdaGranted, event: .fdaGranted)
+  }
+
+  func captureMCPVerified(transport: AnalyticsTransportName) {
+    let checkpoint: AnalyticsCheckpoint = {
+      switch transport {
+      case .imessage: return .mcpVerifiedImessage
+      case .whatsapp: return .mcpVerifiedWhatsapp
+      }
+    }()
+    captureOnce(checkpoint, event: .mcpVerified, properties: [
+      .transport: .string(transport.rawValue)
+    ])
+  }
+
+  func recordDraftEdit(id: String, from original: String, to current: String) {
+    let computed = Self.editMagnitude(from: original, to: current)
+    metaLock.lock()
+    let next = max(draftEditMagnitudes[id] ?? .none, computed)
+    draftEditMagnitudes[id] = next
+    Self.writeDraftEditMagnitudes(draftEditMagnitudes, rootDirectory: rootDirectory)
+    metaLock.unlock()
+  }
+
+  func peekDraftEditMagnitude(id: String) -> AnalyticsEditMagnitude {
+    metaLock.lock()
+    defer { metaLock.unlock() }
+    return draftEditMagnitudes[id] ?? .none
+  }
+
+  func clearDraftEditMagnitude(id: String) {
+    metaLock.lock()
+    draftEditMagnitudes.removeValue(forKey: id)
+    Self.writeDraftEditMagnitudes(draftEditMagnitudes, rootDirectory: rootDirectory)
+    metaLock.unlock()
+  }
+
   private func safeCapture(eventName: String, properties: [String: Any]) {
     queue.async {
       guard self.captureAllowedLocked() else { return }
@@ -269,6 +377,31 @@ final class AnalyticsClient {
       ) else {
         return
       }
+      self.enqueueLocked(payload)
+      self.flushLocked()
+    }
+  }
+
+  private func captureOnce(
+    _ checkpoint: AnalyticsCheckpoint,
+    event: AnalyticsEvent,
+    properties: [AnalyticsProperty: AnalyticsValue] = [:]
+  ) {
+    let raw = Dictionary(uniqueKeysWithValues: properties.map { ($0.key.rawValue, $0.value.jsonValue) })
+    queue.async {
+      guard self.captureAllowedLocked() else { return }
+      var seen = Self.readCheckpoints(rootDirectory: self.rootDirectory)
+      guard !seen.contains(checkpoint.rawValue) else { return }
+      guard let payload = try? Self.payload(
+        eventName: event.rawValue,
+        properties: raw,
+        distinctID: self.distinctIDLocked(),
+        now: Date()
+      ) else {
+        return
+      }
+      seen.insert(checkpoint.rawValue)
+      Self.writeCheckpoints(seen, rootDirectory: self.rootDirectory)
       self.enqueueLocked(payload)
       self.flushLocked()
     }
@@ -463,6 +596,35 @@ final class AnalyticsClient {
     }
   }
 
+  static func timeToAhaBucket(from start: Date?, to now: Date = Date()) -> String {
+    guard let start else { return "unknown" }
+    let seconds = now.timeIntervalSince(start)
+    switch seconds {
+    case ..<0: return "unknown"
+    case 0..<300: return "lt_5m"
+    case 300..<3_600: return "5m_1h"
+    case 3_600..<86_400: return "1h_24h"
+    case 86_400..<(7 * 86_400): return "1d_7d"
+    default: return "gt_7d"
+    }
+  }
+
+  /// Coarse edit size from length and shared-prefix only. Never stores or
+  /// transmits either string.
+  static func editMagnitude(from original: String, to current: String) -> AnalyticsEditMagnitude {
+    let a = original.trimmingCharacters(in: .whitespacesAndNewlines)
+    let b = current.trimmingCharacters(in: .whitespacesAndNewlines)
+    if a == b { return .none }
+    let maxLen = max(a.count, b.count)
+    if maxLen == 0 { return .none }
+    let lengthDelta = abs(a.count - b.count)
+    let sharedPrefix = zip(a, b).prefix { $0 == $1 }.count
+    let changed = max(maxLen - sharedPrefix, lengthDelta)
+    if changed <= 20 { return .light }
+    let ratio = Double(changed) / Double(maxLen)
+    return ratio <= 0.2 ? .light : .heavy
+  }
+
   static func scheduledDelayBucket(from now: Date = Date(), to scheduledAt: Date) -> String {
     let seconds = scheduledAt.timeIntervalSince(now)
     switch seconds {
@@ -503,8 +665,12 @@ final class AnalyticsClient {
     .telemetryEnabled: [],
     .telemetryDisabled: [],
     .featureViewed: [.feature],
+    .fdaGranted: [],
+    .mcpVerified: [.transport],
+    .firstAha: [.feature, .timeToAhaBucket],
     .draftStaged: [.transport, .source],
-    .draftSent: [.transport, .result, .source],
+    .draftSent: [.transport, .result, .source, .editMagnitude],
+    .draftDiscarded: [.transport, .source],
     .scheduledMessageCreated: [.cadence, .scheduledDelayBucket],
     .labScanStarted: [.lab],
     .labScanCompleted: [.lab, .resultCountBucket, .durationBucket],
@@ -569,6 +735,10 @@ final class AnalyticsClient {
       return WrappedPreviewTelemetryAction(rawValue: value) != nil
     case (.includedCrashReports, .boolValue), (.includedLocalEvents, .boolValue), (.includedDaemonLogs, .boolValue):
       return true
+    case (.editMagnitude, .stringValue(let value)):
+      return AnalyticsEditMagnitude(rawValue: value) != nil
+    case (.timeToAhaBucket, .stringValue(let value)):
+      return ["unknown", "lt_5m", "5m_1h", "1h_24h", "1d_7d", "gt_7d"].contains(value)
     default:
       return false
     }
@@ -605,5 +775,61 @@ final class AnalyticsClient {
 
   private static func iso(_ date: Date) -> String {
     isoFormatter.string(from: date)
+  }
+
+  private static func checkpointsURL(rootDirectory: URL) -> URL {
+    rootDirectory.appendingPathComponent("analytics-checkpoints.json")
+  }
+
+  private static func draftEditsURL(rootDirectory: URL) -> URL {
+    rootDirectory.appendingPathComponent("analytics-draft-edits.json")
+  }
+
+  private static func readCheckpoints(rootDirectory: URL) -> Set<String> {
+    guard let data = try? Data(contentsOf: checkpointsURL(rootDirectory: rootDirectory)),
+          let values = try? JSONSerialization.jsonObject(with: data) as? [String]
+    else { return [] }
+    return Set(values)
+  }
+
+  private static func writeCheckpoints(_ values: Set<String>, rootDirectory: URL) {
+    do {
+      try FileManager.default.createDirectory(at: rootDirectory, withIntermediateDirectories: true)
+      let data = try JSONSerialization.data(withJSONObject: values.sorted(), options: [.prettyPrinted])
+      let url = checkpointsURL(rootDirectory: rootDirectory)
+      try data.write(to: url, options: .atomic)
+      try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+    } catch {
+      // Best effort. Product behavior must not depend on analytics persistence.
+    }
+  }
+
+  private static func readDraftEditMagnitudes(rootDirectory: URL) -> [String: AnalyticsEditMagnitude] {
+    guard let data = try? Data(contentsOf: draftEditsURL(rootDirectory: rootDirectory)),
+          let values = try? JSONSerialization.jsonObject(with: data) as? [String: String]
+    else { return [:] }
+    var out: [String: AnalyticsEditMagnitude] = [:]
+    for (id, raw) in values {
+      if let magnitude = AnalyticsEditMagnitude(rawValue: raw) {
+        out[id] = magnitude
+      }
+    }
+    return out
+  }
+
+  private static func writeDraftEditMagnitudes(
+    _ values: [String: AnalyticsEditMagnitude],
+    rootDirectory: URL
+  ) {
+    do {
+      try FileManager.default.createDirectory(at: rootDirectory, withIntermediateDirectories: true)
+      let raw = Dictionary(uniqueKeysWithValues: values.map { ($0.key, $0.value.rawValue) })
+      let data = try JSONSerialization.data(withJSONObject: raw, options: [.prettyPrinted, .sortedKeys])
+      let url = draftEditsURL(rootDirectory: rootDirectory)
+      try data.write(to: url, options: .atomic)
+      try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+    } catch {
+      // Best effort. Product behavior must not depend on analytics persistence.
+    }
   }
 }

@@ -46,6 +46,23 @@ final class ConsoleViewModeTests: XCTestCase {
     XCTAssertNotNil(ConsoleView.labTool(for: .tool("wrapped"), tools: tools))
   }
 
+  func test_analyticsFeatureKeysMatchGrowthConsumerPulse() {
+    XCTAssertEqual(ConsoleView.analyticsFeature(for: .tool("dontGhost")), .dontGhost)
+    XCTAssertEqual(ConsoleView.analyticsFeature(for: .tool("wrapped")), .wrapped)
+    XCTAssertEqual(ConsoleView.analyticsFeature(for: .tool("eq")), .eq)
+    XCTAssertEqual(ConsoleView.analyticsFeature(for: .tool("birthdays")), .birthdays)
+    XCTAssertEqual(AnalyticsFeature.dontGhost.rawValue, "dont_ghost")
+    XCTAssertEqual(AnalyticsFeature.wrapped.rawValue, "wrapped")
+    XCTAssertEqual(AnalyticsFeature.eq.rawValue, "eq")
+    XCTAssertEqual(AnalyticsFeature.birthdays.rawValue, "birthdays")
+    XCTAssertTrue(AnalyticsFeature.dontGhost.isConsumerAha)
+    XCTAssertTrue(AnalyticsFeature.wrapped.isConsumerAha)
+    XCTAssertTrue(AnalyticsFeature.eq.isConsumerAha)
+    XCTAssertTrue(AnalyticsFeature.birthdays.isConsumerAha)
+    XCTAssertFalse(AnalyticsFeature.messages.isConsumerAha)
+    XCTAssertFalse(AnalyticsFeature.settings.isConsumerAha)
+  }
+
   func test_labToolLookupMapsMessagesSelectionToMessagesLab() {
     let tool = ConsoleView.labTool(for: .messages)
     XCTAssertEqual(tool?.id, "messages")

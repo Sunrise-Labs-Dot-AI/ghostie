@@ -153,7 +153,8 @@
         Product analytics are shown during first-run onboarding with the toggle off by default. You can turn them on
         before continuing and can change the setting any time in Settings. When enabled, Messages for AI sends a small
         allowlisted set of product events to Sunrise Labs through PostHog, such as app version seen, feature viewed,
-        draft staged, draft sent, and Lab scan started or completed. These events use coarse enums and buckets only.
+        draft staged, draft sent, draft discarded, Full Disk Access granted, MCP verified, first aha, and Lab scan
+        started or completed. These events use coarse enums and buckets only.
         Existing installs keep their stored analytics setting and do not see first-run onboarding again unless setup is
         reset.
       </p>
@@ -173,9 +174,10 @@
         The marketing website (messagesfor.ai and ghostie.app) uses privacy-preserving, cookieless analytics
         through PostHog to understand traffic and how many visitors begin a download. It sets no cookies and
         uses no local storage, creates no per-person profiles, and records no sessions or screens. It captures
-        only coarse, anonymous events: page views, and clicks on the Download button along with the page path
-        and the button's visible label. It never receives names, emails, phone numbers, message data, or any
-        other personal information, and there is nothing that identifies you across visits.
+        only coarse, anonymous events: page views, clicks on the Download button (page path and the button's
+        visible label), and tip-jar opened or completed (page path only, no tip amounts). It never receives
+        names, emails, phone numbers, message data, payment amounts, or any other personal information, and
+        there is nothing that identifies you across visits.
       </p>
 
       <h2>When models may receive content</h2>

@@ -4,7 +4,8 @@
     "test:downloads:live": "node scripts/check-download-flow.js --live",
     "test:tip-jar": "node scripts/check-tip-jar.js",
     "test:referral": "node scripts/check-referral.js",
-    "test:ai-proxy": "node scripts/check-ai-proxy.js"
+    "test:ai-proxy": "node scripts/check-ai-proxy.js",
+    "test:analytics": "node scripts/check-analytics.js"
   },
   "dependencies": {
     "@clerk/backend": "^1.21.0",

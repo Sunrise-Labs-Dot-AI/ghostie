@@ -283,6 +283,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     AnalyticsClient.shared.configure(userEnabled: settings.productAnalyticsEnabled)
     AnalyticsClient.shared.safeCapture(.appLaunched)
     AnalyticsClient.shared.safeCapture(.appVersionSeen)
+    if HealthChecks().chatDbAccessState() == .ok {
+      AnalyticsClient.shared.captureFDAGranted()
+    }
     featureFlags.refreshOnLaunch()
     DiagnosticsStore.shared.log("app_launch")
     NSApp.setActivationPolicy(.regular)

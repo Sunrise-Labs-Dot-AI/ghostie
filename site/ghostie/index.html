@@ -830,7 +830,9 @@
         }
       });
 
-      // post-tip thank you
+      // post-tip thank you. Leave tip_session_id on the URL until
+      // DOMContentLoaded so deferred analytics.js can record tip_completed
+      // (page path only, no session id or amount).
       const params = new URLSearchParams(window.location.search);
       if (params.get("tip_session_id")) {
         const banner = document.createElement("p");
@@ -838,9 +840,11 @@
         banner.textContent = "Thank you! Ghostie remains afloat.";
         document.body.appendChild(banner);
         setTimeout(() => banner.remove(), 6000);
-        const url = new URL(window.location.href);
-        url.searchParams.delete("tip_session_id");
-        history.replaceState(null, "", url.pathname + url.search);
+        document.addEventListener("DOMContentLoaded", function () {
+          const url = new URL(window.location.href);
+          url.searchParams.delete("tip_session_id");
+          history.replaceState(null, "", url.pathname + url.search);
+        });
       }
     })();
   </script>

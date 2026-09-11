@@ -8,9 +8,9 @@
 //   • disable_session_recording  → no session replay / screen capture
 //   • advanced_disable_decide    → no feature-flag/decide round-trips; pure ingestion
 //
-// It captures exactly two things: page views and clicks on the Download CTA.
-// No message data, no contact data, no PII. Mirrors the app's stance and is
-// disclosed in privacy.html ("Website analytics").
+// It captures page views, Download CTA clicks, and tip-jar opened/completed.
+// No message data, no contact data, no tip amounts, no PII. Mirrors the app's
+// stance and is disclosed in privacy.html ("Website analytics").
 //
 // The PostHog project API key below is a *publishable* client key (ingestion
 // only) — it is designed to live in client-side code, like every PostHog web
@@ -53,4 +53,29 @@
     },
     true
   );
+
+  // Tip jar: open clicks only (no amounts). Completed fires when Stripe
+  // returns with tip_session_id on the URL. The session id is not sent.
+  document.addEventListener(
+    "click",
+    function (ev) {
+      var el = ev.target && ev.target.closest
+        ? ev.target.closest(
+            "#tip-open-top, #tip-open-hero, #tip-open-main, #tip-open-footer, #tip-jar, #tip-jar-main, #tip-jar-footer"
+          )
+        : null;
+      if (!el || !window.posthog) return;
+      posthog.capture("tip_opened", { page: location.pathname });
+    },
+    true
+  );
+
+  try {
+    var params = new URLSearchParams(location.search);
+    if (params.get("tip_session_id") && window.posthog) {
+      posthog.capture("tip_completed", { page: location.pathname });
+    }
+  } catch (_) {
+    /* ignore malformed query strings */
+  }
 })();

@@ -219,9 +219,11 @@ enum DraftSender {
     }
     AnalyticsClient.shared.safeCapture(.draftSent, properties: [
       .transport: .string(draft.effectivePlatform.analyticsTransport.rawValue),
-      .result: .string(result.ok ? AnalyticsResult.success.rawValue : AnalyticsResult.failure.rawValue)
+      .result: .string(result.ok ? AnalyticsResult.success.rawValue : AnalyticsResult.failure.rawValue),
+      .editMagnitude: .string(AnalyticsClient.shared.peekDraftEditMagnitude(id: draft.id).rawValue)
     ])
     if result.ok {
+      AnalyticsClient.shared.clearDraftEditMagnitude(id: draft.id)
       broadcastDidSend(
         platform: draft.effectivePlatform,
         threadID: draft.in_reply_to_thread_id,

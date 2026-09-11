@@ -291,6 +291,10 @@ jobs:
         working-directory: site
         run: npm ci
 
+      - name: Check privacy-safe site analytics
+        working-directory: site
+        run: npm run test:analytics
+
       - name: Check Stripe Tip Jar handler
         working-directory: site
         run: npm run test:tip-jar

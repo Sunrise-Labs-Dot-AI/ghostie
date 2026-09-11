@@ -497,13 +497,20 @@ struct ConsoleView: View {
     .onChange(of: settings.appExperienceMode) { _, _ in
       normalizeSelectionForCurrentMode()
     }
-    .onChange(of: nav.selection) { oldValue, newValue in
+    .onChange(of: nav.selection, initial: true) { oldValue, newValue in
       normalizeSelectionForCurrentMode()
-      if let feature = Self.analyticsFeature(for: newValue) {
-        AnalyticsClient.shared.safeCapture(.featureViewed, properties: [
-          .feature: .string(feature.rawValue)
-        ])
+      // If this selection will be rewritten, skip and let the follow-up
+      // onChange capture the normalized item (avoids a double fire).
+      guard let newValue,
+            Self.normalizedSelection(newValue, experienceMode: settings.appExperienceMode) == newValue
+      else { return }
+      // Initial appear (old == new) only records consumer aha landings so
+      // a Messages-default launch does not inflate feature_viewed. Later
+      // tab changes still record every mapped surface.
+      if oldValue == newValue {
+        guard let feature = Self.analyticsFeature(for: newValue), feature.isConsumerAha else { return }
       }
+      captureFeatureView(newValue)
     }
   }
 
@@ -1358,7 +1365,15 @@ struct ConsoleView: View {
     }
   }
 
-  private static func analyticsFeature(for item: ConsoleItem?) -> AnalyticsFeature? {
+  private func captureFeatureView(_ item: ConsoleItem) {
+    guard let feature = Self.analyticsFeature(for: item) else { return }
+    let started = settings.termsAcceptedAt > 0
+      ? Date(timeIntervalSince1970: settings.termsAcceptedAt)
+      : nil
+    AnalyticsClient.shared.captureFeatureViewed(feature, activationStartedAt: started)
+  }
+
+  static func analyticsFeature(for item: ConsoleItem?) -> AnalyticsFeature? {
     switch item {
     case .messages, .drafts, .scheduled, .history:
       return .messages
@@ -1375,7 +1390,7 @@ struct ConsoleView: View {
       case "eq": return .eq
       case "textingAnalytics": return .textingAnalytics
       case "wrapped": return .wrapped
-      case "birthdays": return .birthdayTexts
+      case "birthdays": return .birthdays
       case "workPersonal": return .messages
       default: return nil
       }
