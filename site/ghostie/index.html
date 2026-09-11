@@ -4,12 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Ghostie — little tools for being a better friend</title>
-  <meta name="description" content="A friendly ghost for your Mac menu bar, full of little free tools for staying close to people: a nudge when a thread goes quiet, a heads-up before a birthday, and your whole texting year as a story. All on your Mac.">
+  <meta name="description" content="Ghostie is a free Mac app full of slightly nosy little tools for staying close: a nudge when a thread goes quiet, a birthday heads-up before you panic-buy a gift, and your whole texting year as a story you maybe shouldn't read at work.">
   <link rel="icon" type="image/svg+xml" href="/assets/idle.svg">
   <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
   <link rel="apple-touch-icon" href="/assets/apple-touch-icon-180.png">
   <meta property="og:title" content="Ghostie — little tools for being a better friend">
-  <meta property="og:description" content="A friendly ghost for your Mac. Nudges when threads go quiet, birthday heads-ups, and your texting year as a story. Free, and all on your Mac.">
+  <meta property="og:description" content="A free Mac app full of slightly nosy little tools for staying close. Runs on your Mac. Judges you gently.">
   <meta property="og:image" content="https://ghostie.app/assets/og-card.png">
   <meta property="og:url" content="https://ghostie.app">
   <meta name="twitter:card" content="summary_large_image">
@@ -349,8 +349,13 @@
     .card-note { position: absolute; top: 18px; right: 20px; }
     .card-note::before { display: none; }
 
-    /* quiet pro pointer */
-    .pro-pointer { padding: 48px 24px; }
+    .pro-pointer .section-head { margin-bottom: 22px; }
+    .pro-pointer .section-head h2 {
+      font-family: var(--font-display);
+      font-weight: 640;
+      font-size: clamp(26px, 3.2vw, 36px);
+      margin: 0;
+    }
     .pro-row {
       display: flex;
       align-items: center;
@@ -361,7 +366,8 @@
       padding: 22px 26px;
       background: var(--body-white);
     }
-    .pro-row p { flex: 1; min-width: 240px; color: var(--ink-soft); font-size: 16px; }
+    .pro-copy { flex: 1; min-width: 240px; display: grid; gap: 10px; }
+    .pro-copy p { margin: 0; color: var(--ink-soft); font-size: 16px; }
 
     /* gate */
     .gate-card {
@@ -414,7 +420,8 @@
       font-size: clamp(30px, 3.6vw, 42px);
       margin: 10px 0 12px;
     }
-    .tip-section p { color: var(--ink-soft); font-size: 17px; margin-bottom: 26px; }
+    .tip-section p { color: var(--ink-soft); font-size: 17px; margin-bottom: 14px; }
+    .tip-section .btn { margin-top: 12px; }
 
     /* footer */
     footer {
@@ -432,9 +439,18 @@
       align-items: center;
     }
     .foot .brand span { font-size: 17px; }
-    .foot nav { display: flex; gap: 22px; flex-wrap: wrap; }
-    .foot a { color: var(--ink-soft); text-decoration: none; font-size: 14.5px; }
+    .foot nav { display: flex; gap: 22px; flex-wrap: wrap; align-items: center; }
+    .foot a, .foot .vibe { color: var(--ink-soft); text-decoration: none; font-size: 14.5px; }
     .foot a:hover { color: var(--ink); text-decoration: underline; }
+    .foot button.vibe-tip {
+      background: none;
+      border: 0;
+      padding: 0;
+      font: inherit;
+      color: var(--ink-soft);
+      cursor: pointer;
+    }
+    .foot button.vibe-tip:hover { color: var(--ink); text-decoration: underline; }
     .foot .legal { width: 100%; font-size: 13px; color: var(--ink-soft); }
 
     /* ---------- tip dialog ---------- */
@@ -537,14 +553,13 @@
   <main>
     <section class="hero" aria-labelledby="hero-title">
       <div>
-        <p class="eyebrow reveal">A friendly ghost for your Mac</p>
-        <h1 id="hero-title" class="reveal">Don't <span class="no">ghost</span> the people you love.</h1>
-        <p class="sub reveal">Ghostie is a friendly little Mac app full of tools for staying close: a nudge when a thread goes quiet, a heads-up before a birthday, and your whole texting year as a story. <strong>Free, and all on your Mac.</strong></p>
+        <h1 id="hero-title" class="reveal">Don&rsquo;t <span class="no">ghost</span> the people you love.</h1>
+        <p class="sub reveal">Ghostie is a free Mac app full of slightly nosy little tools for staying close: a nudge when a thread goes quiet, a birthday heads-up before you panic-buy a gift, and your whole texting year as a story you maybe shouldn&rsquo;t read at work. Runs on your Mac. Judges you gently.</p>
         <div class="cta-row reveal">
           <a class="btn" id="download-hero" href="/api/download">&#8595; Download for Mac</a>
           <button class="btn ghosty" id="tip-open-hero" type="button">Leave a tip</button>
         </div>
-        <p class="cta-note reveal">Free for macOS 14+. No account. Works with iMessage and WhatsApp.</p>
+        <p class="cta-note reveal">Free. No account. Tip jar optional and emotionally manipulative.</p>
       </div>
       <div class="hero-visual" aria-hidden="true">
         <img class="hero-sprite pixel" src="/assets/ghostie-hero.png" alt="" width="250" height="240" decoding="async">
@@ -566,17 +581,16 @@
     <section class="features" aria-labelledby="tools-title">
       <div class="wrap">
         <div class="section-head">
-          <p class="eyebrow">Free, and just for you</p>
           <h2 id="tools-title">Little tools for being a better friend</h2>
-          <p>Ghostie watches your back so you stay close to people, and turns your texting life into something you actually want to look at. All on your Mac. Pick your favorites, ignore the rest.</p>
+          <p>Pick your favorites. Ignore the rest. Ghostie will not take it personally. (It will take it a little personally.)</p>
         </div>
         <div class="bento">
           <article class="tool-card big mint">
             <div class="tool-head">
               <img class="feature-art" src="/assets/ghostie-feature-dont-ghost-transparent.png" alt="" width="640" height="640" loading="lazy" decoding="async">
               <div>
-                <h3>Don't Ghost</h3>
-                <p>The conversations that have gone quiet: the ones waiting on your reply, and the ones worth reaching out on first. Sorted by who you'd hate to lose touch with. No guilt trips, just a nudge.</p>
+                <h3>Don&rsquo;t Ghost</h3>
+                <p>The conversations that have gone quiet: the ones waiting on your reply, and the ones worth poking first. Sorted by who you&rsquo;d actually hate to lose. No guilt trips. Okay, mild guilt. Homemade.</p>
               </div>
             </div>
             <div class="vignette" aria-hidden="true">
@@ -589,7 +603,7 @@
               <img class="feature-art" src="/assets/ghostie-feature-birthday-texts-transparent.png" alt="" width="640" height="640" loading="lazy" decoding="async">
               <div>
                 <h3>Birthdays</h3>
-                <p>Builds your birthday list from the people you actually talk to, not your whole address book, so you never miss one that matters.</p>
+                <p>Builds a list from people you <em>actually</em> talk to, not your entire Contacts app full of that one realtor from 2019. So you never miss the ones that matter.</p>
               </div>
             </div>
             <div class="vignette" aria-hidden="true">
@@ -600,51 +614,59 @@
           <article class="tool-card honey">
             <img class="pixel" src="/assets/gift.svg" alt="">
             <h3>Texting Wrapped</h3>
-            <p>Your year in texts as story cards. Equal parts flattering and incriminating.</p>
+            <p>Your year in texts as story cards. Equal parts flattering and incriminating. Shareable only if you&rsquo;re brave.</p>
           </article>
           <article class="tool-card lilac">
             <img class="feature-art" src="/assets/ghostie-feature-analytics-transparent.png" alt="" width="640" height="640" loading="lazy" decoding="async">
             <h3>Texting Analytics</h3>
-            <p>Who texts first? Who double-texts? The receipts, charted, for your eyes only.</p>
+            <p>Who texts first? Who double-texts? The receipts, charted, for your eyes only. We would never tell Mom. Unless she asks very nicely.</p>
           </article>
           <article class="tool-card coral">
             <img class="feature-art" src="/assets/ghostie-feature-eq-transparent.png" alt="" width="640" height="640" loading="lazy" decoding="async">
             <h3>EQ</h3>
-            <p>A gentle read on your relationships, with little nudges to show up better for the people in them: friends, partner, siblings, all of it.</p>
+            <p>A gentle read on your relationships, with tiny nudges to show up better for friends, partner, siblings, the whole circus. Not therapy. Adjacent to therapy. Cheaper than therapy.</p>
           </article>
           <article class="tool-card">
             <img class="feature-art" src="/assets/ghostie-feature-drafts-transparent.png" alt="" width="640" height="640" loading="lazy" decoding="async">
             <h3>Drafts</h3>
-            <p>A calm place to write a text out and sit on it, instead of firing off something at 2am you'll regret by breakfast.</p>
+            <p>A calm place to write a text and sit on it, instead of sending something at 2am that becomes a group chat artifact forever.</p>
           </article>
           <article class="tool-card mint">
             <img class="feature-art" src="/assets/ghostie-feature-scheduled-transparent.png" alt="" width="640" height="640" loading="lazy" decoding="async">
             <h3>Scheduled</h3>
-            <p>Line up a text for later, poke yourself to call Mom on Sunday, or set a standing "rent's due" nudge for your roommate.</p>
+            <p>Line up a text for later, poke yourself to call Mom on Sunday, or set a standing &ldquo;rent&rsquo;s due&rdquo; nudge for your roommate. Future-you can deal with it. Future-you hates you a little.</p>
           </article>
           <article class="tool-card honey">
             <img class="feature-art" src="/assets/ghostie-feature-severance-transparent.png" alt="" width="640" height="640" loading="lazy" decoding="async">
             <h3>Work / Personal</h3>
-            <p>Files work threads away from life threads, Severance-mode easter egg included. Your innie would approve.</p>
+            <p>Files work threads away from life threads. Severance-mode easter egg included. Your innie would approve. Your outie still texts in meetings.</p>
           </article>
         </div>
       </div>
     </section>
 
-    <section class="pro-pointer" aria-label="For AI nerds">
-      <div class="wrap pro-row">
-        <img class="pixel" src="/assets/gear.svg" alt="" width="52">
-        <p>Want Ghostie to actually <strong>ghostwrite</strong>? Hand the keys to Claude or Codex and it'll draft replies in your voice, every one still waiting for your approval. That part's for the tinkerers.</p>
-        <a class="btn ghosty" href="/pro">Ghostie for AI nerds &#8594;</a>
+    <section class="pro-pointer" aria-labelledby="tinkerers-title">
+      <div class="wrap">
+        <div class="section-head">
+          <h2 id="tinkerers-title">For the tinkerers (optional, weird, fine)</h2>
+        </div>
+        <div class="pro-row">
+          <img class="pixel" src="/assets/gear.svg" alt="" width="52">
+          <div class="pro-copy">
+            <p>Want Ghostie to actually <strong>ghostwrite</strong>? Hand the keys to Claude or Codex and it&rsquo;ll draft replies in your voice. Every one still waits for your approval: hold to send, like a responsible adult who owns a Mac.</p>
+            <p>That part&rsquo;s for people who read READMEs for fun. Everyone else can just&hellip; be slightly better at texting.</p>
+          </div>
+          <a class="btn ghosty" href="/pro">For tinkerers &#8594;</a>
+        </div>
       </div>
     </section>
 
     <section class="tip-section" aria-labelledby="tip-title">
       <div class="wrap">
         <img class="pixel" src="/assets/ghostie-hero.png" alt="" width="250" height="240" loading="lazy" decoding="async">
-        <p class="eyebrow">Free, honestly free</p>
         <h2 id="tip-title">The tip jar keeps Ghostie floating</h2>
-        <p>No account, no trial clock, no locked features. If Ghostie saves a friendship or two, you can buy the ghost a coffee.</p>
+        <p>No account. No trial clock. No features locked behind a sad paywall.</p>
+        <p>If Ghostie saves a friendship or two, buy the ghost a coffee. Or don&rsquo;t. Ghostie has known worse. Ghostie once watched you leave someone on read for nine days and said nothing. Growth.</p>
         <button class="btn" id="tip-open-main" type="button">Leave a tip</button>
       </div>
     </section>
@@ -657,9 +679,12 @@
         <span>GHOSTIE</span>
       </a>
       <nav aria-label="Footer">
-        <a href="/privacy">Privacy</a>
+        <span class="vibe">Made at weird hours</span>
+        <span class="vibe">Local on your Mac</span>
+        <a href="https://github.com/Sunrise-Labs-Dot-AI/ghostie">GitHub</a>
+        <button class="vibe-tip" id="tip-open-footer" type="button">Tip jar</button>
+        <a href="/privacy">Privacy that isn&rsquo;t a TED talk</a>
         <a href="/terms">Terms</a>
-        <a href="/security">Security</a>
         <a href="/support">Support</a>
       </nav>
       <p class="legal">&copy; 2016 <a href="https://sunriselabs.ai">Sunrise Labs</a></p>
@@ -669,7 +694,7 @@
   <dialog id="tip-dialog" aria-labelledby="tip-dialog-title">
     <div class="tip-config">
       <h3 id="tip-dialog-title">Feed the ghost.</h3>
-      <p class="tip-sub">Tips keep Sunrise Labs experiments weird, local, and more useful than your group chat deserves.</p>
+      <p class="tip-sub">No account. No trial clock. No features locked behind a sad paywall. If Ghostie saves a friendship or two, buy the ghost a coffee.</p>
       <div class="tip-amounts" role="group" aria-label="Tip amount">
         <button type="button" data-cents="100"><strong>$1</strong><small>Bob</small></button>
         <button type="button" data-cents="350"><strong>$3.50</strong><small>tree fiddy</small></button>
@@ -705,7 +730,7 @@
         dialog.showModal();
       }
 
-      ["tip-open-top", "tip-open-hero", "tip-open-main"].forEach((id) => {
+      ["tip-open-top", "tip-open-hero", "tip-open-main", "tip-open-footer"].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.addEventListener("click", openDialog);
       });
