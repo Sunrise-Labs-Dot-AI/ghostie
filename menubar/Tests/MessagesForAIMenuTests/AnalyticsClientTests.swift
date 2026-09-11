@@ -326,7 +326,7 @@ final class AnalyticsClientTests: XCTestCase {
     client.rememberStagedDraft(id: draftID, body: "hello there")
     XCTAssertEqual(
       client.consumeEditMagnitude(id: draftID, currentBody: "hello there"),
-      .none
+      AnalyticsEditMagnitude.none
     )
     client.rememberStagedDraft(id: draftID, body: "hello there")
     XCTAssertEqual(
