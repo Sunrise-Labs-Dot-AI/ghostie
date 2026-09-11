@@ -244,6 +244,81 @@ describe("buildKeepTabsRecommendations", () => {
     expect(r.available).toBe(false);
     expect(r.recommendations).toEqual([]);
   });
+
+  test("group-only outbound is affinity signal (named participants recommended)", () => {
+    const db = new Database(dbPath);
+    db.exec(`
+      CREATE TABLE handle (ROWID INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT, service TEXT);
+      CREATE TABLE chat (ROWID INTEGER PRIMARY KEY AUTOINCREMENT, guid TEXT);
+      CREATE TABLE message (
+        ROWID INTEGER PRIMARY KEY AUTOINCREMENT,
+        text TEXT, attributedBody BLOB, date INTEGER,
+        is_from_me INTEGER DEFAULT 0,
+        handle_id INTEGER,
+        associated_message_type INTEGER DEFAULT 0,
+        item_type INTEGER DEFAULT 0
+      );
+      CREATE TABLE chat_message_join (chat_id INTEGER, message_id INTEGER);
+      CREATE TABLE chat_handle_join (chat_id INTEGER, handle_id INTEGER);
+    `);
+    db.run(`INSERT INTO handle (id, service) VALUES ('+15551110040', 'iMessage')`);
+    db.run(`INSERT INTO handle (id, service) VALUES ('+15551110041', 'iMessage')`);
+    db.run(`INSERT INTO chat (guid) VALUES ('g-group')`);
+    db.run(`INSERT INTO chat_handle_join VALUES (1, 1)`);
+    db.run(`INSERT INTO chat_handle_join VALUES (1, 2)`);
+    for (let i = 0; i < 12; i++) {
+      db.run(
+        `INSERT INTO message (text, date, is_from_me, handle_id, associated_message_type, item_type) VALUES ('m', ?, 1, 0, 0, 0)`,
+        [isoUtcToAppleDateNs("2026-05-28T12:00:00Z")],
+      );
+      db.run(`INSERT INTO chat_message_join VALUES (1, ?)`, [i + 1]);
+    }
+    db.close();
+
+    const names = new Map<string, string>([
+      ["5551110040", "Group Dana"],
+      ["5551110041", "Group Eli"],
+    ]);
+    const r = buildKeepTabsRecommendations(dbPath, names, { nowMs: NOW });
+    const dana = r.recommendations.find((x) => x.name === "Group Dana")!;
+    const eli = r.recommendations.find((x) => x.name === "Group Eli")!;
+    expect(dana.out_count).toBe(12);
+    expect(eli.out_count).toBe(12);
+    expect(dana.last_texted_days).toBe(3);
+    expect(eli.last_texted_days).toBe(3);
+  });
+
+  test("group tapbacks do not count as outbound credit", () => {
+    const db = new Database(dbPath);
+    db.exec(`
+      CREATE TABLE handle (ROWID INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT, service TEXT);
+      CREATE TABLE chat (ROWID INTEGER PRIMARY KEY AUTOINCREMENT, guid TEXT);
+      CREATE TABLE message (
+        ROWID INTEGER PRIMARY KEY AUTOINCREMENT,
+        text TEXT, attributedBody BLOB, date INTEGER,
+        is_from_me INTEGER DEFAULT 0,
+        handle_id INTEGER,
+        associated_message_type INTEGER DEFAULT 0,
+        item_type INTEGER DEFAULT 0
+      );
+      CREATE TABLE chat_message_join (chat_id INTEGER, message_id INTEGER);
+      CREATE TABLE chat_handle_join (chat_id INTEGER, handle_id INTEGER);
+    `);
+    db.run(`INSERT INTO handle (id, service) VALUES ('+15551110050', 'iMessage')`);
+    db.run(`INSERT INTO handle (id, service) VALUES ('+15551110051', 'iMessage')`);
+    db.run(`INSERT INTO chat (guid) VALUES ('g-group')`);
+    db.run(`INSERT INTO chat_handle_join VALUES (1, 1)`);
+    db.run(`INSERT INTO chat_handle_join VALUES (1, 2)`);
+    db.run(
+      `INSERT INTO message (text, date, is_from_me, handle_id, associated_message_type, item_type) VALUES ('👍', ?, 1, 0, 2000, 0)`,
+      [isoUtcToAppleDateNs("2026-05-31T12:00:00Z")],
+    );
+    db.run(`INSERT INTO chat_message_join VALUES (1, 1)`);
+    db.close();
+
+    const r = buildKeepTabsStatus(dbPath, ["5551110050"], { nowMs: NOW });
+    expect(r.statuses[0]!.last_texted_days).toBeNull();
+  });
 });
 
 describe("buildKeepTabsStatus", () => {
@@ -277,6 +352,124 @@ describe("buildKeepTabsStatus", () => {
     const r = buildKeepTabsStatus(join(dir, "nope.db"), ["5551110001"], { nowMs: NOW });
     expect(r.available).toBe(false);
     expect(r.statuses).toEqual([]);
+  });
+
+  test("user outbound in a group credits last_texted for every participant", () => {
+    // Dana is ONLY in a group with Eli. Before the fix, scanOneToOne dropped
+    // that chat (pc > 1) so status treated Dana as never-texted.
+    const db = new Database(dbPath);
+    db.exec(`
+      CREATE TABLE handle (ROWID INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT, service TEXT);
+      CREATE TABLE chat (ROWID INTEGER PRIMARY KEY AUTOINCREMENT, guid TEXT);
+      CREATE TABLE message (
+        ROWID INTEGER PRIMARY KEY AUTOINCREMENT,
+        text TEXT, attributedBody BLOB, date INTEGER,
+        is_from_me INTEGER DEFAULT 0,
+        handle_id INTEGER,
+        associated_message_type INTEGER DEFAULT 0,
+        item_type INTEGER DEFAULT 0
+      );
+      CREATE TABLE chat_message_join (chat_id INTEGER, message_id INTEGER);
+      CREATE TABLE chat_handle_join (chat_id INTEGER, handle_id INTEGER);
+    `);
+    db.run(`INSERT INTO handle (id, service) VALUES ('+15551110010', 'iMessage')`); // Dana
+    db.run(`INSERT INTO handle (id, service) VALUES ('+15551110011', 'iMessage')`); // Eli
+    db.run(`INSERT INTO chat (guid) VALUES ('g-group')`);
+    db.run(`INSERT INTO chat_handle_join VALUES (1, 1)`);
+    db.run(`INSERT INTO chat_handle_join VALUES (1, 2)`);
+    db.run(
+      `INSERT INTO message (text, date, is_from_me, handle_id, associated_message_type, item_type) VALUES ('m', ?, 1, 0, 0, 0)`,
+      [isoUtcToAppleDateNs("2026-05-31T12:00:00Z")],
+    );
+    db.run(`INSERT INTO chat_message_join VALUES (1, 1)`);
+    db.close();
+
+    const r = buildKeepTabsStatus(dbPath, ["5551110010", "5551110011"], { nowMs: NOW });
+    expect(r.available).toBe(true);
+    const dana = r.statuses.find((s) => s.canon === "5551110010")!;
+    const eli = r.statuses.find((s) => s.canon === "5551110011")!;
+    expect(dana.last_texted_days).toBe(0); // sent today-ish (2026-05-31 vs NOW 2026-06-01)
+    expect(eli.last_texted_days).toBe(0);
+    expect(dana.thread_id).toBeNull(); // group chat must not become the 1:1 priority pin
+    expect(eli.thread_id).toBeNull();
+  });
+
+  test("busy group you never sent in does not credit last_texted for other members", () => {
+    // Fay is on the watchlist and in a group with Gus. Gus texts the group;
+    // Fay never does. Fay must stay quiet. Gus (the sender) gets inbound credit.
+    const db = new Database(dbPath);
+    db.exec(`
+      CREATE TABLE handle (ROWID INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT, service TEXT);
+      CREATE TABLE chat (ROWID INTEGER PRIMARY KEY AUTOINCREMENT, guid TEXT);
+      CREATE TABLE message (
+        ROWID INTEGER PRIMARY KEY AUTOINCREMENT,
+        text TEXT, attributedBody BLOB, date INTEGER,
+        is_from_me INTEGER DEFAULT 0,
+        handle_id INTEGER,
+        associated_message_type INTEGER DEFAULT 0,
+        item_type INTEGER DEFAULT 0
+      );
+      CREATE TABLE chat_message_join (chat_id INTEGER, message_id INTEGER);
+      CREATE TABLE chat_handle_join (chat_id INTEGER, handle_id INTEGER);
+    `);
+    db.run(`INSERT INTO handle (id, service) VALUES ('+15551110020', 'iMessage')`); // Fay
+    db.run(`INSERT INTO handle (id, service) VALUES ('+15551110021', 'iMessage')`); // Gus
+    db.run(`INSERT INTO chat (guid) VALUES ('g-group')`);
+    db.run(`INSERT INTO chat_handle_join VALUES (1, 1)`);
+    db.run(`INSERT INTO chat_handle_join VALUES (1, 2)`);
+    db.run(
+      `INSERT INTO message (text, date, is_from_me, handle_id, associated_message_type, item_type) VALUES ('m', ?, 0, 2, 0, 0)`,
+      [isoUtcToAppleDateNs("2026-05-31T12:00:00Z")],
+    );
+    db.run(`INSERT INTO chat_message_join VALUES (1, 1)`);
+    db.close();
+
+    const r = buildKeepTabsStatus(dbPath, ["5551110020", "5551110021"], { nowMs: NOW });
+    expect(r.statuses.find((s) => s.canon === "5551110020")!.last_texted_days).toBeNull();
+    expect(r.statuses.find((s) => s.canon === "5551110021")!.last_texted_days).toBe(0);
+  });
+
+  test("group outbound refreshes last_texted even when the 1:1 thread is stale", () => {
+    // Holly has an old 1:1 and a recent group send. Status must use the group
+    // date (the reported bug: Orbit ignored the group and showed her overdue).
+    const db = new Database(dbPath);
+    db.exec(`
+      CREATE TABLE handle (ROWID INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT, service TEXT);
+      CREATE TABLE chat (ROWID INTEGER PRIMARY KEY AUTOINCREMENT, guid TEXT);
+      CREATE TABLE message (
+        ROWID INTEGER PRIMARY KEY AUTOINCREMENT,
+        text TEXT, attributedBody BLOB, date INTEGER,
+        is_from_me INTEGER DEFAULT 0,
+        handle_id INTEGER,
+        associated_message_type INTEGER DEFAULT 0,
+        item_type INTEGER DEFAULT 0
+      );
+      CREATE TABLE chat_message_join (chat_id INTEGER, message_id INTEGER);
+      CREATE TABLE chat_handle_join (chat_id INTEGER, handle_id INTEGER);
+    `);
+    db.run(`INSERT INTO handle (id, service) VALUES ('+15551110030', 'iMessage')`); // Holly
+    db.run(`INSERT INTO handle (id, service) VALUES ('+15551110031', 'iMessage')`); // Ivy
+    db.run(`INSERT INTO chat (guid) VALUES ('g-1to1')`); // chat 1: Holly 1:1
+    db.run(`INSERT INTO chat (guid) VALUES ('g-group')`); // chat 2: group
+    db.run(`INSERT INTO chat_handle_join VALUES (1, 1)`);
+    db.run(`INSERT INTO chat_handle_join VALUES (2, 1)`);
+    db.run(`INSERT INTO chat_handle_join VALUES (2, 2)`);
+    db.run(
+      `INSERT INTO message (text, date, is_from_me, handle_id, associated_message_type, item_type) VALUES ('old', ?, 1, 0, 0, 0)`,
+      [isoUtcToAppleDateNs("2026-01-01T12:00:00Z")],
+    );
+    db.run(`INSERT INTO chat_message_join VALUES (1, 1)`);
+    db.run(
+      `INSERT INTO message (text, date, is_from_me, handle_id, associated_message_type, item_type) VALUES ('new', ?, 1, 0, 0, 0)`,
+      [isoUtcToAppleDateNs("2026-05-30T12:00:00Z")],
+    );
+    db.run(`INSERT INTO chat_message_join VALUES (2, 2)`);
+    db.close();
+
+    const r = buildKeepTabsStatus(dbPath, ["5551110030"], { nowMs: NOW });
+    const holly = r.statuses.find((s) => s.canon === "5551110030")!;
+    expect(holly.last_texted_days).toBe(1); // group send, not the 151-day 1:1
+    expect(holly.thread_id).toBe(1); // priority pin stays the 1:1 chat
   });
 });
 
