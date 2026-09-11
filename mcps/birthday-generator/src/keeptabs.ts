@@ -1,5 +1,7 @@
 // Keep Tabs recommendation engine: "who should I keep tabs on?" Reuses the
-// birthday seed's per-canon text aggregation (scanOneToOne/scanPerChat) + the
+// birthday seed's per-canon 1:1 aggregation (scanOneToOne/scanPerChat), then
+// folds in the user's group-thread outbound (birthday seed stays 1:1 on
+// purpose; Orbit credits group participation as staying in touch), plus the
 // call-history affinity signal to recommend PEOPLE worth a recurring check-in,
 // each with a suggested contact cadence. The user then picks who to actually
 // watch in the Keep Tabs mini-app.
@@ -18,6 +20,7 @@
 import { Database } from "bun:sqlite";
 import { readCallHistory, readCallDates, type CallAgg } from "./callhistory.ts";
 import { appleDateToIsoUtc } from "../../imessage-drafts/src/chatdb/open.ts";
+import { canonHandle } from "../../imessage-drafts/src/chatdb/canon.ts";
 import { scanOneToOne, scanPerChat } from "./signals.ts";
 import { looksLikeBusiness } from "../../wrapped-generator/src/business.ts";
 
@@ -55,6 +58,12 @@ export interface KeepTabsOpts {
 }
 
 interface Agg { canon: string; original: string | null; out: number; lastRaw: number | null; lastChatId: number | null; chatIds: number[] }
+
+// Same substantive-outbound predicate scanPerChat uses. Tapbacks (assoc 2xxx/3xxx)
+// and non-message items do not count as "I reached out."
+const SUBSTANTIVE_OUT = `m.is_from_me = 1
+  AND (m.associated_message_type IS NULL OR m.associated_message_type < 2000 OR m.associated_message_type > 3999)
+  AND (m.item_type IS NULL OR m.item_type = 0)`;
 
 function daysSinceApple(raw: number | bigint | null, nowMs: number): number | null {
   const iso = appleDateToIsoUtc(raw);
@@ -287,17 +296,114 @@ interface ContactAggregate {
   chatIds: number[]; // all 1:1 chat ROWIDs for this person (for the median-cadence query)
 }
 
-// Shared per-canon aggregation: 1:1 outbound text volume + most-recent message
-// (either direction), plus call volume + most-recent call. Used by BOTH the
-// recommend and status modes so there's one chat.db/CallHistory scan. The
-// caller owns the open db.
+function emptyAgg(canon: string, original: string | null): Agg {
+  return { canon, original, out: 0, lastRaw: null, lastChatId: null, chatIds: [] };
+}
+
+function touchLastRaw(a: Agg, lastNum: number | null): void {
+  if (lastNum != null && (a.lastRaw == null || lastNum > a.lastRaw)) a.lastRaw = lastNum;
+}
+
+// Group chats are every chat_handle_join set with more than one handle (the
+// user is not stored as a member). scanOneToOne drops these, which is correct
+// for birthday seed/wishes but wrong for Orbit: texting someone in a group is
+// still staying in touch.
+//
+// Attribution (matches Orbit copy: "by text or call", "who you actually text"):
+//   - Your substantive outbound in a group credits EVERY participant: out_count
+//     + last_texted. You reached out in a thread they are in.
+//   - An inbound group message credits last_texted for the SENDER only (the 1:1
+//     "either direction" analog). Other members do not get credit just because
+//     the thread is busy.
+//   - Group chats are NOT added to chatIds / thread_id. Cadence median stays
+//     1:1 + calls so other people's chatter does not look like your rhythm, and
+//     the Messages priority pin stays the person's 1:1 thread.
+function applyGroupThreadCredit(db: Database, byCanon: Map<string, Agg>): void {
+  const partsByChat = new Map<number, { canon: string; original: string }[]>();
+  for (const r of db
+    .query<{ chat_id: number; hid: string | null }, []>(
+      `SELECT chj.chat_id AS chat_id, h.id AS hid
+         FROM chat_handle_join chj JOIN handle h ON h.ROWID = chj.handle_id`,
+    )
+    .all()) {
+    if (!r.hid) continue;
+    const list = partsByChat.get(r.chat_id) ?? [];
+    list.push({ canon: canonHandle(r.hid), original: r.hid });
+    partsByChat.set(r.chat_id, list);
+  }
+
+  const groupIds: number[] = [];
+  for (const [chatId, parts] of partsByChat) {
+    if (parts.length > 1) groupIds.push(chatId);
+  }
+  if (groupIds.length === 0) return;
+
+  const placeholders = groupIds.map(() => "?").join(",");
+  const outRows = db
+    .query<{ chat_id: number; out_cnt: number | null; last_out: number | bigint | null }, number[]>(
+      `SELECT cmj.chat_id AS chat_id,
+              SUM(CASE WHEN ${SUBSTANTIVE_OUT} THEN 1 ELSE 0 END) AS out_cnt,
+              MAX(CASE WHEN ${SUBSTANTIVE_OUT} THEN m.date END) AS last_out
+         FROM message m JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
+        WHERE cmj.chat_id IN (${placeholders})
+        GROUP BY cmj.chat_id`,
+    )
+    .all(...groupIds);
+
+  for (const row of outRows) {
+    const out = Number(row.out_cnt ?? 0);
+    const lastOut = row.last_out == null ? null : Number(row.last_out);
+    if (out === 0 && lastOut == null) continue;
+    for (const p of partsByChat.get(row.chat_id) ?? []) {
+      const a = byCanon.get(p.canon) ?? emptyAgg(p.canon, p.original);
+      if (a.original == null) a.original = p.original;
+      a.out += out;
+      touchLastRaw(a, lastOut);
+      byCanon.set(p.canon, a);
+    }
+  }
+
+  // Sender-only inbound recency. message.handle_id is standard on chat.db;
+  // fixtures that omit the column skip this pass.
+  try {
+    const inRows = db
+      .query<{ hid: string | null; last_date: number | bigint | null }, number[]>(
+        `SELECT h.id AS hid, MAX(m.date) AS last_date
+           FROM message m
+           JOIN chat_message_join cmj ON cmj.message_id = m.ROWID
+           JOIN handle h ON h.ROWID = m.handle_id
+          WHERE m.is_from_me = 0
+            AND m.handle_id IS NOT NULL
+            AND m.date IS NOT NULL
+            AND cmj.chat_id IN (${placeholders})
+          GROUP BY h.id`,
+      )
+      .all(...groupIds);
+    for (const row of inRows) {
+      if (!row.hid || row.last_date == null) continue;
+      const canon = canonHandle(row.hid);
+      const a = byCanon.get(canon) ?? emptyAgg(canon, row.hid);
+      if (a.original == null) a.original = row.hid;
+      touchLastRaw(a, Number(row.last_date));
+      byCanon.set(canon, a);
+    }
+  } catch {
+    // Schema without message.handle_id (older unit fixtures): outbound credit still applies.
+  }
+}
+
+// Shared per-canon aggregation: 1:1 outbound text volume + most-recent 1:1
+// message (either direction), plus the user's group-thread outbound (and
+// inbound from the specific group sender), plus call volume + most-recent
+// call. Used by BOTH the recommend and status modes so there's one
+// chat.db/CallHistory scan. The caller owns the open db.
 function aggregateContacts(db: Database, opts: KeepTabsOpts): Map<string, ContactAggregate> {
   const oneToOne = scanOneToOne(db);
   const byCanon = new Map<string, Agg>();
   for (const row of scanPerChat(db)) {
     const o = oneToOne.get(row.chat_id);
     if (!o) continue;
-    const a = byCanon.get(o.canon) ?? { canon: o.canon, original: o.original, out: 0, lastRaw: null, lastChatId: null, chatIds: [] };
+    const a = byCanon.get(o.canon) ?? emptyAgg(o.canon, o.original);
     a.out += Number(row.out_cnt ?? 0);
     if (!a.chatIds.includes(row.chat_id)) a.chatIds.push(row.chat_id);
     const lastNum = row.last_date == null ? null : Number(row.last_date);
@@ -307,6 +413,7 @@ function aggregateContacts(db: Database, opts: KeepTabsOpts): Map<string, Contac
     }
     byCanon.set(o.canon, a);
   }
+  applyGroupThreadCredit(db, byCanon);
   const perCall: Map<string, CallAgg> = opts.callDbPath ? readCallHistory(opts.callDbPath) : new Map();
   const out = new Map<string, ContactAggregate>();
   for (const canon of new Set<string>([...byCanon.keys(), ...perCall.keys()])) {
