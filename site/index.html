@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Messages for AI: Claude and Codex for iMessage and WhatsApp</title>
-  <meta name="description" content="A local macOS app that lets Claude and Codex read iMessage and WhatsApp context, draft replies, and leave sending in your hands.">
-  <meta property="og:title" content="Messages for AI">
-  <meta property="og:description" content="Your AI helps with email and calendar. Messages for AI lets it help with texts, too, with drafts and sending visible on your Mac.">
+  <title>Ghostie — little tools for being a better friend</title>
+  <meta name="description" content="Ghostie is a free Mac app full of slightly nosy little tools for staying close: a nudge when a thread goes quiet, a birthday heads-up before you panic-buy a gift, and your whole texting year as a story you maybe shouldn't read at work.">
+  <meta property="og:title" content="Ghostie — little tools for being a better friend">
+  <meta property="og:description" content="A free Mac app full of slightly nosy little tools for staying close. Runs on your Mac. Judges you gently.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://ghostie.app">
   <meta property="og:image" content="https://ghostie.app/screenshots/messages-desktop.png">
@@ -84,6 +84,18 @@
     }
 
     a { color: inherit; }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
 
     .shell {
       max-width: 1180px;
@@ -301,6 +313,11 @@
     .secondary:hover {
       transform: translateY(-1px);
       opacity: 0.92;
+    }
+
+    button.secondary {
+      font: inherit;
+      cursor: pointer;
     }
 
     .release-note {
@@ -593,6 +610,10 @@
       font-size: 16px;
     }
 
+    .section-head p + p {
+      margin-top: 10px;
+    }
+
     .proof-strip {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -683,7 +704,7 @@
 
     .lab-row {
       display: grid;
-      grid-template-columns: 190px minmax(0, 1fr) 145px;
+      grid-template-columns: 190px minmax(0, 1fr);
       gap: 18px;
       align-items: start;
       padding: 16px 18px;
@@ -725,11 +746,44 @@
 
     footer a:hover { color: var(--fg); }
 
+    footer button.vibe-tip {
+      background: none;
+      border: 0;
+      padding: 0;
+      font: inherit;
+      color: var(--fg-muted);
+      cursor: pointer;
+    }
+
+    footer button.vibe-tip:hover { color: var(--fg); }
+
     .footer-links {
       display: flex;
       flex-wrap: wrap;
       gap: 8px 12px;
       justify-content: flex-end;
+      align-items: center;
+    }
+
+    .tinker-card {
+      background: var(--paper);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 22px 24px;
+      max-width: 790px;
+    }
+
+    .tinker-card p {
+      margin: 0 0 12px;
+      color: var(--fg-muted);
+      font-size: 15px;
+    }
+
+    .tinker-card p:last-child { margin-bottom: 0; }
+
+    .tinker-card a {
+      color: var(--fg);
+      font-weight: 700;
     }
 
     .tip-dialog {
@@ -1086,9 +1140,9 @@
 <body>
   <div class="shell">
     <header>
-      <a class="brand-lockup" href="/" aria-label="Messages for AI home">
+      <a class="brand-lockup" href="/" aria-label="Ghostie home">
         <img src="icon.png" alt="" width="34" height="34">
-        <span class="brand">Messages for AI</span>
+        <span class="brand">Ghostie</span>
       </a>
       <nav class="nav" aria-label="Primary">
         <a class="nav-action nav-download" href="/api/download">
@@ -1112,18 +1166,12 @@
     <main>
       <section class="hero" aria-labelledby="hero-title">
         <div>
-          <div class="eyebrow"><span class="dot" aria-hidden="true"></span> Claude and Codex, meet your texts</div>
-          <h1 id="hero-title">Your AI helps with email. Let it help with texts.</h1>
+          <h1 id="hero-title">Don&rsquo;t ghost the people you love.</h1>
           <p class="tagline">
-            Messages for AI connects Claude and Codex to local iMessage and WhatsApp context, then gives every draft,
-            follow-up, and scheduled send a visible place to land on your Mac.
+            Ghostie is a free Mac app full of slightly nosy little tools for staying close: a nudge when a thread goes quiet,
+            a birthday heads-up before you panic-buy a gift, and your whole texting year as a story you maybe shouldn&rsquo;t read at work.
+            Runs on your Mac. Judges you gently.
           </p>
-
-          <ul class="hero-points">
-            <li>Ask what you missed, what to say next, or which thread needs a reply.</li>
-            <li>Stage iMessage and WhatsApp drafts in a desktop queue you can actually see.</li>
-            <li>Keep it cautious with hold-to-send, or loosen the settings when you trust the workflow.</li>
-          </ul>
 
           <div class="actions">
             <a class="cta" href="/api/download">
@@ -1135,184 +1183,138 @@
               Download for Mac
             </a>
           </div>
-          <p class="release-note">Latest: v0.5.5, notarized for macOS.</p>
+          <p class="release-note">Free. No account. Tip jar optional and emotionally manipulative.</p>
           <p class="release-note">By installing, you agree to the <a href="terms.html">Terms</a> and <a href="privacy.html">Privacy Policy</a>.</p>
         </div>
 
-        <div class="hero-demo" aria-label="Mini hold-to-send demo">
+        <div class="hero-demo" aria-label="Ghostie noticing quiet threads and birthdays">
           <div class="window-topbar">
             <div class="traffic" aria-hidden="true"><span></span><span></span><span></span></div>
-            <span class="window-title">Messages for AI</span>
-            <span class="window-status">1 draft</span>
+            <span class="window-title">Ghostie</span>
+            <span class="window-status">3 nudges</span>
           </div>
           <div class="demo-body">
             <aside class="demo-sidebar" aria-hidden="true">
-              <p class="demo-side-title">Conversations</p>
-              <div class="demo-thread-row"><span>Sam</span><span class="demo-pill">1</span></div>
-              <div class="demo-thread-row" style="opacity: .55;"><span>Maya</span><span class="demo-pill">2</span></div>
-              <div class="demo-thread-row" style="opacity: .42;"><span>Ryan</span><span class="demo-pill">1</span></div>
+              <p class="demo-side-title">Don&rsquo;t Ghost</p>
+              <div class="demo-thread-row"><span>Emma</span><span class="demo-pill">12d</span></div>
+              <div class="demo-thread-row" style="opacity: .55;"><span>Marcus</span><span class="demo-pill">3w</span></div>
+              <div class="demo-thread-row" style="opacity: .42;"><span>Jordan</span><span class="demo-pill">sat</span></div>
             </aside>
             <div class="demo-thread">
               <div class="demo-thread-head">
                 <div>
-                  <strong>Sam</strong>
-                  <span>iMessage</span>
+                  <strong>A few gentle nudges</strong>
+                  <span>Local on your Mac</span>
                 </div>
-                <span class="demo-pill">draft</span>
               </div>
               <div class="bubble-row">
-                <div class="message-bubble them">Can you send the address again?</div>
+                <div class="message-bubble them">Emma has been quiet 12 days</div>
               </div>
-              <div class="bubble-row you">
-                <div class="message-bubble you">Yep, one sec</div>
+              <div class="bubble-row">
+                <div class="message-bubble them">Jordan turns 31 on Saturday</div>
               </div>
-              <div class="demo-divider"><span>Pending message</span></div>
-              <button class="draft-bubble" id="demoDraft" type="button" aria-describedby="demoStatus">
-                <span class="draft-fill" aria-hidden="true"></span>
-                <span class="draft-copy">1025 Mission St. I can meet at 6:30</span>
-              </button>
-              <p class="demo-status" id="demoStatus">Press and hold the draft to simulate sending</p>
+              <div class="bubble-row">
+                <div class="message-bubble them">Your texting year is ready. Maybe don&rsquo;t open it at work.</div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       <section id="requirements" aria-labelledby="requirements-title">
+        <h2 id="requirements-title" class="visually-hidden">What you get</h2>
         <div class="requirements">
+          <div class="req-card">
+            <strong>Free. No account.</strong>
+            <span>No trial clock. No features locked behind a sad paywall. Tip jar optional.</span>
+          </div>
           <div class="req-card">
             <strong>macOS 14+</strong>
             <span>Sonoma or later on Apple Silicon. The current notarized build is arm64.</span>
           </div>
           <div class="req-card">
-            <strong>Claude or Codex</strong>
-            <span>Use the local MCP/plugin bridge so your assistant can request thread context and stage drafts.</span>
-          </div>
-          <div class="req-card">
             <strong>iMessage + WhatsApp</strong>
-            <span>iMessage uses your Mac's Messages database. WhatsApp requires linking your account.</span>
+            <span>iMessage uses your Mac&rsquo;s Messages database. WhatsApp requires linking your account.</span>
           </div>
           <div class="req-card">
-            <strong>Local permissions</strong>
-            <span>Grant Full Disk Access for iMessage reads. Contacts access improves names and matching.</span>
+            <strong>Local on your Mac</strong>
+            <span>Runs on your machine. Judges you gently. Does not text your friends for you.</span>
           </div>
         </div>
       </section>
 
-      <section id="core" aria-labelledby="core-title">
+      <section id="tools" aria-labelledby="tools-title">
         <div class="section-head">
-          <h2 id="core-title">A control center for AI texting</h2>
-          <p>
-            Assistants can add useful text-message context. Messages for AI adds the missing desktop layer:
-            draft review, conversation history, scheduling, transport choice, and logs.
-          </p>
+          <h2 id="tools-title">Little tools for being a better friend</h2>
+          <p>Pick your favorites. Ignore the rest. Ghostie will not take it personally. (It will take it a little personally.)</p>
         </div>
 
-        <div class="proof-strip">
-          <article class="proof-item">
-            <span>Context</span>
-            <h3>Let Claude and Codex see the thread before they write.</h3>
-            <p>Recent iMessage and WhatsApp messages are available through a local bridge, so drafting can account for what was actually said.</p>
-          </article>
-          <article class="proof-item">
-            <span>Draft queue</span>
-            <h3>Turn assistant replies into visible desktop work.</h3>
-            <p>Drafts and scheduled messages appear by conversation, inline with surrounding messages, instead of disappearing into a prompt transcript.</p>
-          </article>
-          <article class="proof-item">
-            <span>Send policy</span>
-            <h3>You decide how much automation belongs in texting.</h3>
-            <p>Keep hold-to-send for every message, approve scheduled sends first, or enable the automation settings that fit your risk tolerance.</p>
-          </article>
-          <article class="proof-item">
-            <span>History</span>
-            <h3>Keep logs, failures, retries, and sent states inspectable.</h3>
-            <p>The app gives you a native place to see what was drafted, what was sent, what failed, and what still needs attention.</p>
-          </article>
-        </div>
-      </section>
-
-      <section id="workflow" aria-labelledby="workflow-title">
-        <div class="section-head">
-          <h2 id="workflow-title"><span id="download"></span>How it works</h2>
-          <p>A local bridge makes your assistant useful while the macOS app stays in charge of permissions, review, and sending.</p>
-        </div>
-
-        <div class="workflow">
-          <div class="step">
-            <b>1</b>
-            <h3>Install the app</h3>
-            <p>Install the notarized app, drag Messages for AI to Applications, then launch it.</p>
-          </div>
-          <div class="step">
-            <b>2</b>
-            <h3>Connect your assistant</h3>
-            <p>Use Claude or Codex with the Messages for AI plugin/MCP so it can request text-message context.</p>
-          </div>
-          <div class="step">
-            <b>3</b>
-            <h3>Ask for help</h3>
-            <p>Have your assistant summarize a thread, draft a reply, find a follow-up, or schedule a text.</p>
-          </div>
-          <div class="step">
-            <b>4</b>
-            <h3>Review in the app</h3>
-            <p>Inspect the draft, edit it, schedule it, send now, or leave it queued according to your settings.</p>
-          </div>
-        </div>
-      </section>
-
-      <section id="labs" aria-labelledby="labs-title">
-        <div class="section-head">
-          <h2 id="labs-title">Labs for the text-message overthinker</h2>
-          <p>
-            The core product is the bridge. Labs are the strange little side quests once your Mac can finally reason
-            over texts: style, follow-ups, birthdays, dashboards, and relationship questions you may or may not regret asking.
-          </p>
-        </div>
-
-        <div class="labs-list" aria-label="Messages for AI Labs">
+        <div class="labs-list" aria-label="Ghostie tools">
           <article class="lab-row">
-            <h3>Texting Style</h3>
-            <p>Turn your “lol no punctuation but somehow warm” texting habits into an editable guide for Claude or Codex.</p>
-            <small>Uses your API key</small>
+            <h3>Don&rsquo;t Ghost</h3>
+            <p>The conversations that have gone quiet: the ones waiting on your reply, and the ones worth poking first. Sorted by who you&rsquo;d actually hate to lose. No guilt trips. Okay, mild guilt. Homemade.</p>
           </article>
           <article class="lab-row">
-            <h3>Don't Ghost</h3>
-            <p>Find the threads where you probably owe someone a reply, then write, send, or schedule it before guilt becomes a personality.</p>
-            <small>Optional AI reasoning</small>
-          </article>
-          <article class="lab-row">
-            <h3>EQ</h3>
-            <p>Pick a person and ask the vulnerable question: “Am I being normal in this relationship?” AI can be wrong, but it can still be useful.</p>
-            <small>Sends excerpts</small>
-          </article>
-          <article class="lab-row">
-            <h3>Texting Analytics</h3>
-            <p>Dashboard reply speed, top people, conversation volume, ghost risk, and the tiny behavioral numbers you will absolutely screenshot.</p>
-            <small>Local dashboards</small>
+            <h3>Birthdays</h3>
+            <p>Builds a list from people you <em>actually</em> talk to, not your entire Contacts app full of that one realtor from 2019. So you never miss the ones that matter.</p>
           </article>
           <article class="lab-row">
             <h3><a href="https://textingwrapped.com/">Texting Wrapped</a></h3>
-            <p>Turn reply speed, group-chat lurking, top people, and other numbers you might pretend not to care about into shareable story cards.</p>
-            <small>Local recap</small>
+            <p>Your year in texts as story cards. Equal parts flattering and incriminating. Shareable only if you&rsquo;re brave.</p>
           </article>
           <article class="lab-row">
-            <h3>Birthday Texts</h3>
-            <p>Keep a short list of birthdays you actually care about, then stage the text before the day turns into “ah shoot.”</p>
-            <small>Local curation</small>
+            <h3>Texting Analytics</h3>
+            <p>Who texts first? Who double-texts? The receipts, charted, for your eyes only. We would never tell Mom. Unless she asks very nicely.</p>
+          </article>
+          <article class="lab-row">
+            <h3>EQ</h3>
+            <p>A gentle read on your relationships, with tiny nudges to show up better for friends, partner, siblings, the whole circus. Not therapy. Adjacent to therapy. Cheaper than therapy.</p>
+          </article>
+          <article class="lab-row">
+            <h3>Drafts</h3>
+            <p>A calm place to write a text and sit on it, instead of sending something at 2am that becomes a group chat artifact forever.</p>
+          </article>
+          <article class="lab-row">
+            <h3>Scheduled</h3>
+            <p>Line up a text for later, poke yourself to call Mom on Sunday, or set a standing &ldquo;rent&rsquo;s due&rdquo; nudge for your roommate. Future-you can deal with it. Future-you hates you a little.</p>
+          </article>
+          <article class="lab-row">
+            <h3>Work / Personal</h3>
+            <p>Files work threads away from life threads. Severance-mode easter egg included. Your innie would approve. Your outie still texts in meetings.</p>
           </article>
         </div>
+      </section>
+
+      <section id="tinkerers" aria-labelledby="tinkerers-title">
+        <div class="section-head">
+          <h2 id="tinkerers-title">For the tinkerers (optional, weird, fine)</h2>
+        </div>
+        <div class="tinker-card">
+          <p>Want Ghostie to actually ghostwrite? Hand the keys to Claude or Codex and it&rsquo;ll draft replies in your voice. Every one still waits for your approval: hold to send, like a responsible adult who owns a Mac.</p>
+          <p>That part&rsquo;s for people who read READMEs for fun. Everyone else can just&hellip; be slightly better at texting.</p>
+        </div>
+      </section>
+
+      <section id="tip" aria-labelledby="tip-section-title">
+        <div class="section-head">
+          <h2 id="tip-section-title">The tip jar keeps Ghostie floating</h2>
+          <p>No account. No trial clock. No features locked behind a sad paywall.</p>
+          <p>If Ghostie saves a friendship or two, buy the ghost a coffee. Or don&rsquo;t. Ghostie has known worse. Ghostie once watched you leave someone on read for nine days and said nothing. Growth.</p>
+        </div>
+        <button class="secondary" id="tip-jar-main" type="button">Leave a tip</button>
       </section>
     </main>
 
     <footer>
-      <span><a href="https://sunriselabs.ai">&copy; 2026 Sunrise Labs</a></span>
+      <span>Made at weird hours &middot; Local on your Mac</span>
       <span class="footer-links">
+        <a href="https://github.com/Sunrise-Labs-Dot-AI/ghostie">GitHub</a>
+        <span>&middot;</span>
+        <button class="vibe-tip" id="tip-jar-footer" type="button">Tip jar</button>
+        <span>&middot;</span>
+        <a href="privacy.html">Privacy that isn&rsquo;t a TED talk</a>
+        <span>&middot;</span>
         <a href="terms.html">Terms</a>
-        <span>&middot;</span>
-        <a href="privacy.html">Privacy</a>
-        <span>&middot;</span>
-        <a href="security.html">Security</a>
         <span>&middot;</span>
         <a href="support.html">Support</a>
       </span>
@@ -1321,9 +1323,9 @@
     <dialog class="tip-dialog" id="tipDialog" aria-labelledby="tip-title">
       <div class="tip-shell">
         <header class="tip-header">
-          <p class="tip-kicker">Sunrise Labs Tip Jar</p>
-          <h2 class="tip-title" id="tip-title">Keep the local bridge alive.</h2>
-          <p class="tip-copy">Tips help keep Messages for AI maintained, notarized, and mildly overbuilt in the correct ways.</p>
+          <p class="tip-kicker">The tip jar keeps Ghostie floating</p>
+          <h2 class="tip-title" id="tip-title">Feed the ghost.</h2>
+          <p class="tip-copy">No account. No trial clock. No features locked behind a sad paywall. If Ghostie saves a friendship or two, buy the ghost a coffee. Or don&rsquo;t. Ghostie has known worse.</p>
           <button class="tip-close" id="tipClose" type="button" aria-label="Close tip jar">
             <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
               <path d="M18 6 6 18"></path>
@@ -1351,64 +1353,14 @@
         </form>
         <div class="stripe-box" id="stripeCheckout"></div>
         <div class="tip-footer">
-          <p class="tip-note">Stripe handles the payment form. Messages for AI does not see or store card details. This is a tip, not a charitable donation.</p>
+          <p class="tip-note">Stripe handles the payment form. Ghostie does not see or store card details. This is a tip, not a charitable donation.</p>
         </div>
       </div>
     </dialog>
   </div>
   <script>
-    const demoDraft = document.getElementById("demoDraft");
-    const demoStatus = document.getElementById("demoStatus");
-    let holdTimer;
-    let resetTimer;
-
-    function resetDemo() {
-      demoDraft.classList.remove("is-sent", "is-holding");
-      demoStatus.textContent = "Press and hold the draft to simulate sending";
-    }
-
-    function startHold() {
-      if (demoDraft.classList.contains("is-sent")) return;
-      clearTimeout(holdTimer);
-      clearTimeout(resetTimer);
-      demoDraft.classList.add("is-holding");
-      demoStatus.textContent = "Keep holding...";
-      holdTimer = setTimeout(() => {
-        demoDraft.classList.remove("is-holding");
-        demoDraft.classList.add("is-sent");
-        demoStatus.textContent = "Sent. In the app, this goes through your Mac.";
-        resetTimer = setTimeout(resetDemo, 3200);
-      }, 1200);
-    }
-
-    function cancelHold() {
-      if (demoDraft.classList.contains("is-sent")) return;
-      clearTimeout(holdTimer);
-      demoDraft.classList.remove("is-holding");
-      demoStatus.textContent = "Almost. Hold until the bubble fills.";
-    }
-
-    if (demoDraft) {
-      demoDraft.addEventListener("pointerdown", startHold);
-      demoDraft.addEventListener("pointerup", cancelHold);
-      demoDraft.addEventListener("pointerleave", cancelHold);
-      demoDraft.addEventListener("pointercancel", cancelHold);
-      demoDraft.addEventListener("keydown", (event) => {
-        if (event.key === " " || event.key === "Enter") {
-          event.preventDefault();
-          startHold();
-        }
-      });
-      demoDraft.addEventListener("keyup", (event) => {
-        if (event.key === " " || event.key === "Enter") {
-          event.preventDefault();
-          cancelHold();
-        }
-      });
-    }
-
     const tipDialog = document.getElementById("tipDialog");
-    const tipButtons = Array.from(document.querySelectorAll("#tip-jar"));
+    const tipButtons = Array.from(document.querySelectorAll("#tip-jar, #tip-jar-main, #tip-jar-footer"));
     const tipClose = document.getElementById("tipClose");
     const tipForm = document.getElementById("tipForm");
     const tipInput = document.getElementById("customTipAmount");
