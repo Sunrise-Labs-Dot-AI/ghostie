@@ -12,8 +12,10 @@ identity and launched through the menu bar app where needed, so Claude
 does not need Full Disk Access. On first launch, an onboarding wizard
 asks which transports you want enabled.
 
-**v0.3.0 ships two transports: iMessage and WhatsApp.** Signal and
+**The current release ships two transports: iMessage and WhatsApp.** Signal and
 Slack remain on the roadmap.
+
+Product site and friendship tools live at [ghostie.app](https://ghostie.app).
 
 ## How this differs from the official Anthropic iMessage plugin
 
@@ -32,7 +34,7 @@ Claims below describe Anthropic's plugin as published at the linked commit on 20
 | **Audit log** | Not present at the linked revision | Every **successful** MCP send appended to `~/.messages-mcp/send-audit.log` with timestamp, recipient handle, and SHA-256 of body. Discards and blocked sends are not currently logged. |
 | **UI** | CLI-only | Menu bar surface with thread-context bubbles |
 | **Contact resolution** | Raw handles only | Resolves to Contacts names via local sidecar |
-| **Transports** | iMessage only | iMessage + WhatsApp (v0.3.0); Signal / Slack on the roadmap (per-transport MCPs sharing one menu bar) |
+| **Transports** | iMessage only | iMessage + WhatsApp; Signal / Slack on the roadmap (per-transport MCPs sharing one menu bar) |
 | **Daily send cap** | Not present at the linked revision | Circuit-breaker default 50/UTC-day, env-configurable via `IMESSAGE_DAILY_SEND_CAP` |
 | **Best for** | "Just send the message" automation | "Let me see what Claude wants to say before it goes out" — when the default approval gate is on |
 
@@ -177,34 +179,34 @@ Two paths. Pick A unless you're contributing code.
 
 ## Option A — Pre-built release (recommended)
 
-The release zip contains a signed, Apple-notarized .app. No Xcode, no
-Apple Developer account, no rebuild required, and no separate WhatsApp
-install. Drag and drop, then three manual permission steps.
+The latest GitHub Release ships a signed, Apple-notarized `Ghostie.dmg`.
+No Xcode, no Apple Developer account, no rebuild required, and no
+separate WhatsApp install. Drag the .app into Applications, then three
+manual permission steps.
 
 ```sh
-# 1. Download the latest release zip.
+# 1. Download the latest notarized DMG.
 curl -L \
-  https://github.com/Sunrise-Labs-Dot-AI/messages-for-ai/releases/latest/download/messages-for-ai.zip \
-  -o /tmp/messages-for-ai.zip
+  https://github.com/Sunrise-Labs-Dot-AI/ghostie/releases/latest/download/Ghostie.dmg \
+  -o /tmp/Ghostie.dmg
 
-# 2. Unzip and run the installer.
-cd /tmp && unzip -q messages-for-ai.zip
-cd messages-for-ai-v* && bash install.sh
+# 2. Open the disk image.
+open /tmp/Ghostie.dmg
 ```
 
-The installer copies `Ghostie.app` to `/Applications/`,
-refreshes LaunchServices, smoke-tests the bundled MCP binaries via
-`initialize` round-trips, creates symlinks at
-`~/bin/ghostie-mcp` and `~/bin/imessage-drafts-mcp`
-(legacy v0.1.x path), and prints the manual next steps.
+In the Finder window that opens, drag `Ghostie.app` onto the
+Applications shortcut (or into `/Applications`). Eject the disk image
+when you are done.
 
-After running it, you need to:
+After the .app is in `/Applications/`, you need to:
 
 1. **Grant Full Disk Access** to `Ghostie.app` — see
    [Permissions](#permissions) below. The menu bar app launches the
    daemons that perform protected local reads, so Claude does not need
    FDA.
 2. **Wire up the MCP client** — see [MCP client config](#mcp-client-config) below.
+   First launch also offers to add Ghostie to Claude Desktop's config
+   from the onboarding walkthrough.
 3. **Launch the menu bar app**:
    ```sh
    open "/Applications/Ghostie.app"
@@ -224,8 +226,8 @@ cert, contact lookup gracefully falls back to "raw phone numbers" mode
 — the rest of the server works fine.
 
 ```sh
-git clone https://github.com/Sunrise-Labs-Dot-AI/messages-for-ai.git
-cd messages-for-ai
+git clone https://github.com/Sunrise-Labs-Dot-AI/ghostie.git
+cd ghostie
 
 # Step 1: Build and install the menu bar app to /Applications/.
 # This MUST run first — it creates the Ghostie.app bundle
@@ -282,7 +284,7 @@ keys FDA grants by the bundle's `CFBundleIdentifier`
 (`com.sunriselabs.messages-for-ai`). The bundled helpers share that
 identifier for peer-auth and bundle coherence. Dragging an inner binary
 or symlink can create confusing stale entries, so targeting the .app is the
-unambiguous Apple convention and what the installer printout instructs.
+unambiguous Apple convention.
 
 **Troubleshooting: tools return `authorization denied` / `permission_denied`.**
 Run `health_check` from a Claude Desktop chat — it'll report which
@@ -330,10 +332,9 @@ your parent app → Messages → toggle off.
 
 # MCP client config
 
-> ⚠️ MCP client `command` fields vary in whether they expand `~`. Claude
-> Desktop and Codex CLI do; some terminals' MCP plugins don't. If a
-> client fails to launch the server, replace `~/bin/ghostie-mcp` with
-> the absolute path (`echo $HOME/bin/ghostie-mcp`).
+> The pre-built install's MCP launcher lives inside the .app. Point
+> clients at that path. Source builds also create convenience
+> symlinks at `~/bin/ghostie-mcp` and `~/bin/imessage-drafts-mcp`.
 
 **Claude Desktop** — `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
@@ -341,14 +342,15 @@ your parent app → Messages → toggle off.
 {
   "mcpServers": {
     "ghostie": {
-      "command": "~/bin/ghostie-mcp"
+      "command": "/Applications/Ghostie.app/Contents/MacOS/ghostie-mcp"
     }
   }
 }
 ```
 
 Restart Claude Desktop (Cmd+Q on the Claude menu, then reopen — the MCP
-child only spawns on app launch).
+child only spawns on app launch). First-run onboarding can write this
+entry for you.
 
 **Claude Code** — add to `.mcp.json` in your project, or
 `~/.claude/mcp.json` for global:
@@ -356,7 +358,7 @@ child only spawns on app launch).
 ```json
 {
   "mcpServers": {
-    "ghostie": { "command": "~/bin/ghostie-mcp" }
+    "ghostie": { "command": "/Applications/Ghostie.app/Contents/MacOS/ghostie-mcp" }
   }
 }
 ```
@@ -365,7 +367,7 @@ child only spawns on app launch).
 
 ```toml
 [mcp_servers.ghostie]
-command = "~/bin/ghostie-mcp"
+command = "/Applications/Ghostie.app/Contents/MacOS/ghostie-mcp"
 ```
 
 (Verify against current Codex docs — config shape may have shifted.)
@@ -373,7 +375,7 @@ command = "~/bin/ghostie-mcp"
 # Quick smoke test (no client needed)
 
 ```sh
-cat <<'EOF' | ~/bin/ghostie-mcp 2>/tmp/ghostie-mcp.stderr | tail -1
+cat <<'EOF' | /Applications/Ghostie.app/Contents/MacOS/ghostie-mcp 2>/tmp/ghostie-mcp.stderr | tail -1
 {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"smoke","version":"0"}}}
 {"jsonrpc":"2.0","method":"notifications/initialized"}
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"ghostie_health_check","arguments":{}}}
@@ -382,7 +384,8 @@ EOF
 
 The health check reports the facade and daemon dependency state. If you
 prefer to wire the legacy iMessage MCP directly, use
-`~/bin/imessage-drafts-mcp` and call `health_check`.
+`/Applications/Ghostie.app/Contents/MacOS/imessage-drafts-mcp` and call
+`health_check`.
 
 ---
 
