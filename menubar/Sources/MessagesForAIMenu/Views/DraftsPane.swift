@@ -6900,7 +6900,7 @@ struct PendingMessageBubble: View {
         if featureFlags.resolved(.draftSafetyStates) {
           beginDiscard()
         } else {
-          do { try store.discard(id: draft.id) }
+          do { try store.discard(id: draft.id, trackUserDiscard: true) }
           catch { lastError = "discard failed: \(error.localizedDescription)" }
         }
       }
@@ -7349,7 +7349,7 @@ struct PendingMessageBubble: View {
       try? await Task.sleep(nanoseconds: 3_000_000_000)
       guard !Task.isCancelled else { return }
       do {
-        try store.discard(id: draft.id)
+        try store.discard(id: draft.id, trackUserDiscard: true)
       } catch {
         discardPending = false
         lastError = "Couldn't discard: \(error.localizedDescription)"

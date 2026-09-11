@@ -163,6 +163,6 @@ struct ScheduledPane: View {
   }
 
   private func discard(_ draft: Draft) {
-    try? store.discard(id: draft.id)
+    try? store.discard(id: draft.id, trackUserDiscard: true)
   }
 }

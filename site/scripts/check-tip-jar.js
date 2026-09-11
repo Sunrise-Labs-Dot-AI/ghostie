@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+const fs = require("node:fs");
+const path = require("node:path");
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
@@ -207,4 +209,13 @@ test("internals keep redirect and source parsing strict", () => {
   );
   assert.deepEqual(_internals.getBody({ body: "{\"amount\":867}" }), { amount: 867 });
   assert.deepEqual(_internals.getBody({ body: "nope" }), {});
+});
+
+test("site analytics tip events omit amounts and Stripe session IDs", () => {
+  const source = fs.readFileSync(path.join(__dirname, "../analytics.js"), "utf8");
+  assert.match(source, /capture\("tip_opened"/);
+  assert.match(source, /capture\("tip_completed"/);
+  assert.match(source, /Never send[\s\S]*amounts/);
+  assert.doesNotMatch(source, /capture\("tip_opened"[\s\S]{0,200}amount/);
+  assert.doesNotMatch(source, /capture\("tip_completed"[\s\S]{0,200}(amount|tip_session_id)/);
 });

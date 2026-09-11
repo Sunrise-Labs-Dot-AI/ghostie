@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 enum AnalyticsEvent: String, CaseIterable {
@@ -11,8 +12,12 @@ enum AnalyticsEvent: String, CaseIterable {
   case telemetryEnabled = "telemetry_enabled"
   case telemetryDisabled = "telemetry_disabled"
   case featureViewed = "feature_viewed"
+  case fdaGranted = "fda_granted"
+  case mcpVerified = "mcp_verified"
+  case firstAha = "first_aha"
   case draftStaged = "draft_staged"
   case draftSent = "draft_sent"
+  case draftDiscarded = "draft_discarded"
   case scheduledMessageCreated = "scheduled_message_created"
   case labScanStarted = "lab_scan_started"
   case labScanCompleted = "lab_scan_completed"
@@ -43,6 +48,8 @@ enum AnalyticsProperty: String, CaseIterable {
   case includedCrashReports = "included_crash_reports"
   case includedLocalEvents = "included_local_events"
   case includedDaemonLogs = "included_daemon_logs"
+  case timeToAhaBucket = "time_to_aha_bucket"
+  case editMagnitude = "edit_magnitude"
   case insertID = "$insert_id"
 }
 
@@ -72,6 +79,17 @@ enum AnalyticsFeature: String {
   case textingAnalytics = "texting_analytics"
   case wrapped
   case birthdayTexts = "birthday_texts"
+
+  /// Growth aha surfaces. `feature_viewed` still fires for every mapped
+  /// sidebar destination; `first_aha` fires once for these keys only.
+  var isAha: Bool {
+    switch self {
+    case .dontGhost, .wrapped, .eq, .birthdayTexts:
+      return true
+    default:
+      return false
+    }
+  }
 }
 
 enum AnalyticsLab: String {
@@ -115,6 +133,12 @@ enum AnalyticsErrorCategory: String {
   case localIO = "local_io"
   case invalidResponse = "invalid_response"
   case unknown
+}
+
+enum AnalyticsEditMagnitude: String {
+  case none
+  case light
+  case heavy
 }
 
 extension Platform {
@@ -258,6 +282,87 @@ final class AnalyticsClient {
     safeCapture(eventName: event.rawValue, properties: raw)
   }
 
+  /// Sidebar / lab aha. Always emits `feature_viewed`. The first aha-key
+  /// view also emits `first_aha` once per install (bucketed time only).
+  func trackFeatureViewed(_ feature: AnalyticsFeature) {
+    safeCapture(.featureViewed, properties: [
+      .feature: .string(feature.rawValue)
+    ])
+    guard feature.isAha else { return }
+    queue.async {
+      let bucket = Self.timeToAhaBucket(
+        from: Self.firstSeenAt(rootDirectory: self.rootDirectory),
+        to: Date()
+      )
+      self.captureOnceLocked(
+        marker: "analytics-first-aha",
+        event: .firstAha,
+        properties: [
+          AnalyticsProperty.feature.rawValue: feature.rawValue,
+          AnalyticsProperty.timeToAhaBucket.rawValue: bucket
+        ]
+      )
+    }
+  }
+
+  func observeFDAGranted(_ granted: Bool) {
+    guard granted else { return }
+    queue.async {
+      self.captureOnceLocked(marker: "analytics-fda-granted", event: .fdaGranted)
+    }
+  }
+
+  func observeMCPVerified(_ transport: AnalyticsTransportName) {
+    queue.async {
+      self.captureOnceLocked(
+        marker: "analytics-mcp-verified-\(transport.rawValue)",
+        event: .mcpVerified,
+        properties: [AnalyticsProperty.transport.rawValue: transport.rawValue]
+      )
+    }
+  }
+
+  /// Local-only staged-body digest so send can classify edit magnitude
+  /// without transmitting text, length, or the hash.
+  func rememberStagedDraft(id: String, body: String) {
+    guard let url = fingerprintURL(id: id) else { return }
+    let fingerprint = Self.bodyFingerprint(body)
+    do {
+      try FileManager.default.createDirectory(
+        at: url.deletingLastPathComponent(),
+        withIntermediateDirectories: true
+      )
+      try "\(fingerprint.length)\n\(fingerprint.hash)".write(
+        to: url, atomically: true, encoding: .utf8
+      )
+      try? FileManager.default.setAttributes(
+        [.posixPermissions: 0o600], ofItemAtPath: url.path
+      )
+    } catch {
+      // Best effort. Missing fingerprints omit edit_magnitude.
+    }
+  }
+
+  func forgetStagedDraft(id: String) {
+    guard let url = fingerprintURL(id: id) else { return }
+    try? FileManager.default.removeItem(at: url)
+  }
+
+  func consumeEditMagnitude(id: String, currentBody: String) -> AnalyticsEditMagnitude? {
+    guard let url = fingerprintURL(id: id) else { return nil }
+    let current = Self.bodyFingerprint(currentBody)
+    guard let raw = try? String(contentsOf: url, encoding: .utf8) else { return nil }
+    try? FileManager.default.removeItem(at: url)
+    let lines = raw.split(separator: "\n", omittingEmptySubsequences: false)
+    guard let lengthLine = lines.first, let originalLength = Int(lengthLine) else { return nil }
+    let originalHash = lines.dropFirst().first.map(String.init) ?? ""
+    return Self.editMagnitude(
+      originalLength: originalLength,
+      currentLength: current.length,
+      unchanged: originalHash == current.hash
+    )
+  }
+
   private func safeCapture(eventName: String, properties: [String: Any]) {
     queue.async {
       guard self.captureAllowedLocked() else { return }
@@ -272,6 +377,39 @@ final class AnalyticsClient {
       self.enqueueLocked(payload)
       self.flushLocked()
     }
+  }
+
+  private func captureOnceLocked(
+    marker: String,
+    event: AnalyticsEvent,
+    properties: [String: Any] = [:]
+  ) {
+    let url = rootDirectory.appendingPathComponent(marker)
+    if FileManager.default.fileExists(atPath: url.path) { return }
+    guard captureAllowedLocked() else { return }
+    guard let payload = try? Self.payload(
+      eventName: event.rawValue,
+      properties: properties,
+      distinctID: distinctIDLocked(),
+      now: Date()
+    ) else {
+      return
+    }
+    enqueueLocked(payload)
+    do {
+      try Data().write(to: url, options: .atomic)
+      try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+    } catch {
+      // Sentinel write is best-effort; a repeat on next launch is acceptable.
+    }
+    flushLocked()
+  }
+
+  private func fingerprintURL(id: String) -> URL? {
+    guard Self.isSafeFingerprintID(id) else { return nil }
+    return rootDirectory
+      .appendingPathComponent("analytics-draft-fingerprints", isDirectory: true)
+      .appendingPathComponent(id)
   }
 
   private func captureAllowedLocked() -> Bool {
@@ -452,6 +590,38 @@ final class AnalyticsClient {
     }
   }
 
+  static func timeToAhaBucket(from start: Date, to now: Date = Date()) -> String {
+    let seconds = now.timeIntervalSince(start)
+    switch seconds {
+    case ..<0: return "unknown"
+    case 0..<3_600: return "lt_1h"
+    case 3_600..<86_400: return "1h_24h"
+    case 86_400..<(7 * 86_400): return "1d_7d"
+    default: return "gt_7d"
+    }
+  }
+
+  static func editMagnitude(
+    originalLength: Int,
+    currentLength: Int,
+    unchanged: Bool
+  ) -> AnalyticsEditMagnitude {
+    if unchanged { return .none }
+    let delta = abs(currentLength - originalLength)
+    let threshold = max(20, originalLength / 5)
+    return delta <= threshold ? .light : .heavy
+  }
+
+  static func firstSeenAt(rootDirectory: URL) -> Date {
+    let url = rootDirectory.appendingPathComponent("analytics-installation-id")
+    if let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
+       let created = (attrs[.creationDate] as? Date) ?? (attrs[.modificationDate] as? Date) {
+      return created
+    }
+    _ = installationID(rootDirectory: rootDirectory)
+    return Date()
+  }
+
   static func durationBucket(ms: Int) -> String {
     switch ms {
     case ..<0: return "unknown"
@@ -503,8 +673,12 @@ final class AnalyticsClient {
     .telemetryEnabled: [],
     .telemetryDisabled: [],
     .featureViewed: [.feature],
+    .fdaGranted: [],
+    .mcpVerified: [.transport],
+    .firstAha: [.feature, .timeToAhaBucket],
     .draftStaged: [.transport, .source],
-    .draftSent: [.transport, .result, .source],
+    .draftSent: [.transport, .result, .source, .editMagnitude],
+    .draftDiscarded: [.transport, .source],
     .scheduledMessageCreated: [.cadence, .scheduledDelayBucket],
     .labScanStarted: [.lab],
     .labScanCompleted: [.lab, .resultCountBucket, .durationBucket],
@@ -517,7 +691,8 @@ final class AnalyticsClient {
     "message_body", "draft_text", "prompt", "response_text", "recipient",
     "contact_name", "phone", "email", "apple_id", "whatsapp_id", "chat_id",
     "message_id", "thread_id", "handle", "raw_identifier", "api_key",
-    "access_token", "file_path", "calendar_event_title", "body", "text"
+    "access_token", "file_path", "calendar_event_title", "body", "text",
+    "tip_amount", "amount_cents", "stripe_session"
   ]
 
   private static func isForbiddenKey(_ key: String) -> Bool {
@@ -569,9 +744,25 @@ final class AnalyticsClient {
       return WrappedPreviewTelemetryAction(rawValue: value) != nil
     case (.includedCrashReports, .boolValue), (.includedLocalEvents, .boolValue), (.includedDaemonLogs, .boolValue):
       return true
+    case (.timeToAhaBucket, .stringValue(let value)):
+      return ["unknown", "lt_1h", "1h_24h", "1d_7d", "gt_7d"].contains(value)
+    case (.editMagnitude, .stringValue(let value)):
+      return AnalyticsEditMagnitude(rawValue: value) != nil
     default:
       return false
     }
+  }
+
+  private static func isSafeFingerprintID(_ id: String) -> Bool {
+    let allowed = CharacterSet(charactersIn: "0123456789abcdefABCDEF-")
+    return !id.isEmpty
+      && id.count <= 64
+      && id.unicodeScalars.allSatisfy { allowed.contains($0) }
+  }
+
+  private static func bodyFingerprint(_ body: String) -> (length: Int, hash: String) {
+    let digest = SHA256.hash(data: Data(body.utf8))
+    return (body.count, digest.map { String(format: "%02x", $0) }.joined())
   }
 
   private static func looksSensitive(_ value: String) -> Bool {

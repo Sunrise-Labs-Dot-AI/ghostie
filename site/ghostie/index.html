@@ -833,6 +833,13 @@
       // post-tip thank you
       const params = new URLSearchParams(window.location.search);
       if (params.get("tip_session_id")) {
+        // analytics.js is defer, so this inline script may strip the
+        // return param first. Leave a flag; never pass the session id.
+        if (window.posthog) {
+          window.posthog.capture("tip_completed", { page: location.pathname });
+        } else {
+          window.__ghostiePendingTipCompleted = true;
+        }
         const banner = document.createElement("p");
         banner.className = "thanks-banner";
         banner.textContent = "Thank you! Ghostie remains afloat.";

@@ -172,6 +172,30 @@ final class AnalyticsClientTests: XCTestCase {
       (.featureViewed, [
         "feature": AnalyticsFeature.messages.rawValue
       ]),
+      (.featureViewed, [
+        "feature": AnalyticsFeature.dontGhost.rawValue
+      ]),
+      (.featureViewed, [
+        "feature": AnalyticsFeature.wrapped.rawValue
+      ]),
+      (.featureViewed, [
+        "feature": AnalyticsFeature.eq.rawValue
+      ]),
+      (.featureViewed, [
+        "feature": AnalyticsFeature.birthdayTexts.rawValue
+      ]),
+      (.fdaGranted, [:]),
+      (.mcpVerified, [
+        "transport": AnalyticsTransportName.imessage.rawValue
+      ]),
+      (.firstAha, [
+        "feature": AnalyticsFeature.wrapped.rawValue,
+        "time_to_aha_bucket": "lt_1h"
+      ]),
+      (.draftDiscarded, [
+        "transport": AnalyticsTransportName.imessage.rawValue,
+        "source": AnalyticsDraftSource.assistant.rawValue
+      ]),
       (.draftStaged, [
         "transport": AnalyticsTransportName.imessage.rawValue,
         "source": AnalyticsDraftSource.assistant.rawValue
@@ -183,7 +207,8 @@ final class AnalyticsClientTests: XCTestCase {
       (.draftSent, [
         "transport": AnalyticsTransportName.imessage.rawValue,
         "result": AnalyticsResult.failure.rawValue,
-        "source": AnalyticsDraftSource.firstPartyDirect.rawValue
+        "source": AnalyticsDraftSource.firstPartyDirect.rawValue,
+        "edit_magnitude": AnalyticsEditMagnitude.light.rawValue
       ]),
       (.scheduledMessageCreated, [
         "cadence": AnalyticsCadence.oneTime.rawValue,
@@ -218,6 +243,102 @@ final class AnalyticsClientTests: XCTestCase {
         "\(event.rawValue) should accept \(properties)"
       )
     }
+  }
+
+  func testAhaFeatureKeysStayStableAndRejectAliases() throws {
+    XCTAssertEqual(AnalyticsFeature.dontGhost.rawValue, "dont_ghost")
+    XCTAssertEqual(AnalyticsFeature.wrapped.rawValue, "wrapped")
+    XCTAssertEqual(AnalyticsFeature.eq.rawValue, "eq")
+    XCTAssertEqual(AnalyticsFeature.birthdayTexts.rawValue, "birthday_texts")
+    XCTAssertTrue(AnalyticsFeature.dontGhost.isAha)
+    XCTAssertTrue(AnalyticsFeature.wrapped.isAha)
+    XCTAssertTrue(AnalyticsFeature.eq.isAha)
+    XCTAssertTrue(AnalyticsFeature.birthdayTexts.isAha)
+    XCTAssertFalse(AnalyticsFeature.messages.isAha)
+
+    XCTAssertEqual(ConsoleView.analyticsFeature(for: .tool("dontGhost")), .dontGhost)
+    XCTAssertEqual(ConsoleView.analyticsFeature(for: .tool("wrapped")), .wrapped)
+    XCTAssertEqual(ConsoleView.analyticsFeature(for: .tool("eq")), .eq)
+    XCTAssertEqual(ConsoleView.analyticsFeature(for: .tool("birthdays")), .birthdayTexts)
+
+    XCTAssertThrowsError(try AnalyticsClient.sanitize(event: .featureViewed, properties: [
+      "feature": "birthdays"
+    ]))
+    XCTAssertThrowsError(try AnalyticsClient.sanitize(event: .firstAha, properties: [
+      "feature": AnalyticsFeature.wrapped.rawValue,
+      "time_to_aha_bucket": "12 minutes"
+    ]))
+    XCTAssertThrowsError(try AnalyticsClient.sanitize(event: .draftSent, properties: [
+      "transport": AnalyticsTransportName.imessage.rawValue,
+      "result": AnalyticsResult.success.rawValue,
+      "tip_amount": "8.67"
+    ]))
+  }
+
+  func testTimeToAhaAndEditMagnitudeAreCoarseBuckets() {
+    let start = Date(timeIntervalSince1970: 1_700_000_000)
+    XCTAssertEqual(AnalyticsClient.timeToAhaBucket(from: start, to: start.addingTimeInterval(60)), "lt_1h")
+    XCTAssertEqual(AnalyticsClient.timeToAhaBucket(from: start, to: start.addingTimeInterval(8_000)), "1h_24h")
+    XCTAssertEqual(AnalyticsClient.timeToAhaBucket(from: start, to: start.addingTimeInterval(200_000)), "1d_7d")
+    XCTAssertEqual(AnalyticsClient.timeToAhaBucket(from: start, to: start.addingTimeInterval(800_000)), "gt_7d")
+
+    XCTAssertEqual(AnalyticsClient.editMagnitude(originalLength: 80, currentLength: 80, unchanged: true), .none)
+    XCTAssertEqual(AnalyticsClient.editMagnitude(originalLength: 80, currentLength: 90, unchanged: false), .light)
+    XCTAssertEqual(AnalyticsClient.editMagnitude(originalLength: 80, currentLength: 200, unchanged: false), .heavy)
+  }
+
+  func testActivationCheckpointsFireOnceAndSkipWhenDisabled() throws {
+    let transport = RecordingAnalyticsTransport()
+    let root = tempDir()
+    let client = AnalyticsClient(
+      config: AnalyticsClientConfig(projectToken: "phc_test", host: URL(string: "https://us.i.posthog.com")!),
+      userEnabled: true,
+      rootDirectory: root,
+      transport: transport
+    )
+
+    client.observeFDAGranted(true)
+    client.observeFDAGranted(true)
+    client.observeMCPVerified(.imessage)
+    client.observeMCPVerified(.imessage)
+    client.trackFeatureViewed(.wrapped)
+    client.trackFeatureViewed(.eq)
+    waitBriefly()
+
+    let events = transport.sentBatches.flatMap { $0 }.compactMap { $0["event"] as? String }
+    XCTAssertEqual(events.filter { $0 == AnalyticsEvent.fdaGranted.rawValue }.count, 1)
+    XCTAssertEqual(events.filter { $0 == AnalyticsEvent.mcpVerified.rawValue }.count, 1)
+    XCTAssertEqual(events.filter { $0 == AnalyticsEvent.firstAha.rawValue }.count, 1)
+    XCTAssertEqual(events.filter { $0 == AnalyticsEvent.featureViewed.rawValue }.count, 2)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("analytics-fda-granted").path))
+    XCTAssertTrue(FileManager.default.fileExists(atPath: root.appendingPathComponent("analytics-first-aha").path))
+  }
+
+  func testStagedDraftFingerprintNeverLeavesTheDevice() throws {
+    let root = tempDir()
+    let client = AnalyticsClient(
+      config: AnalyticsClientConfig(projectToken: "phc_test", host: URL(string: "https://us.i.posthog.com")!),
+      userEnabled: true,
+      rootDirectory: root,
+      transport: RecordingAnalyticsTransport()
+    )
+    let draftID = "11111111-1111-1111-1111-111111111111"
+    client.rememberStagedDraft(id: draftID, body: "hello there")
+    XCTAssertEqual(
+      client.consumeEditMagnitude(id: draftID, currentBody: "hello there"),
+      .none
+    )
+    client.rememberStagedDraft(id: draftID, body: "hello there")
+    XCTAssertEqual(
+      client.consumeEditMagnitude(id: draftID, currentBody: "hello there, friend"),
+      .light
+    )
+    client.rememberStagedDraft(id: draftID, body: "short")
+    XCTAssertEqual(
+      client.consumeEditMagnitude(id: draftID, currentBody: String(repeating: "x", count: 80)),
+      .heavy
+    )
+    XCTAssertNil(client.consumeEditMagnitude(id: draftID, currentBody: "gone"))
   }
 
   func testTelemetryDisabledRemainsAllowlistedButNotReportPrimary() throws {
