@@ -60,6 +60,15 @@
       -webkit-font-smoothing: antialiased;
     }
 
+    /* Orphans: ignored where unsupported (pretty: Chrome/Edge 117+, Safari 26+; not Firefox).
+       balance is widely available (Chrome 114+, Safari 17.5+, Firefox 121+). */
+    h1, h2, h3 {
+      text-wrap: balance;
+    }
+    p {
+      text-wrap: pretty;
+    }
+
     .pixel { image-rendering: pixelated; image-rendering: crisp-edges; }
 
     .eyebrow {
@@ -534,6 +543,16 @@
       .tool-head { gap: 14px; }
       .tool-head img.feature-art { width: 112px; height: 112px; flex-basis: 112px; }
       .tip-amounts { grid-template-columns: repeat(2, 1fr); }
+      .foot {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+      }
+      .foot nav {
+        width: 100%;
+        column-gap: 12px;
+        row-gap: 8px;
+      }
     }
   </style>
   <script defer src="/analytics.js"></script>
@@ -590,7 +609,7 @@
               <img class="feature-art" src="/assets/ghostie-feature-dont-ghost-transparent.png" alt="" width="640" height="640" loading="lazy" decoding="async">
               <div>
                 <h3>Don&rsquo;t Ghost</h3>
-                <p>The conversations that have gone quiet: the ones waiting on your reply, and the ones worth poking first. Sorted by who you&rsquo;d actually hate to lose. No guilt trips. Okay, mild guilt. Homemade.</p>
+                <p>The conversations that have gone quiet: the ones waiting on your reply, and the ones worth poking first. Sorted by who you&rsquo;d actually hate to lose. No guilt trips. Okay, mild guilt.&nbsp;Homemade.</p>
               </div>
             </div>
             <div class="vignette" aria-hidden="true">
