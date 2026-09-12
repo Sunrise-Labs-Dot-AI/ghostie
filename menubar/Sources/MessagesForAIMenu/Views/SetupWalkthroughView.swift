@@ -868,11 +868,16 @@ struct SetupWalkthroughView: View {
             if let access = record.chatDbAccess {
                 clientChatDbAccess = access
                 imessageVerified = (access != .permissionDenied)
+                AnalyticsClient.shared.observeFDAGranted(access == .ok)
             } else {
                 imessageVerified = true
             }
+            if imessageVerified == true {
+                AnalyticsClient.shared.observeMCPVerified(.imessage)
+            }
         case .whatsapp:
             whatsappVerified = true
+            AnalyticsClient.shared.observeMCPVerified(.whatsapp)
         }
     }
 
@@ -967,6 +972,7 @@ struct SetupWalkthroughView: View {
         // for WhatsApp-only setups.
         if settings.imessageEnabled {
             chatDbAccess = checks.chatDbAccessState()
+            AnalyticsClient.shared.observeFDAGranted(chatDbAccess == .ok)
         }
     }
 }

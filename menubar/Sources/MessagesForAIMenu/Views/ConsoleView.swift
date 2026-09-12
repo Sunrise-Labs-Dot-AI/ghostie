@@ -492,18 +492,22 @@ struct ConsoleView: View {
       if settings.shouldPresentOnboarding {
         openWindow(id: WindowID.onboarding)
       }
+      // Capture the landing tab. onChange only fires when selection changes,
+      // so Wrapped-only (default `.tool("wrapped")`) and first-run Messages
+      // never emitted feature_viewed. If normalize rewrites selection,
+      // onChange records the normalized destination and we skip here.
+      let beforeNormalize = nav.selection
       normalizeSelectionForCurrentMode()
+      if nav.selection == beforeNormalize {
+        captureFeatureViewed(nav.selection)
+      }
     }
     .onChange(of: settings.appExperienceMode) { _, _ in
       normalizeSelectionForCurrentMode()
     }
-    .onChange(of: nav.selection) { oldValue, newValue in
+    .onChange(of: nav.selection) { _, _ in
       normalizeSelectionForCurrentMode()
-      if let feature = Self.analyticsFeature(for: newValue) {
-        AnalyticsClient.shared.safeCapture(.featureViewed, properties: [
-          .feature: .string(feature.rawValue)
-        ])
-      }
+      captureFeatureViewed(nav.selection)
     }
   }
 
@@ -1358,7 +1362,14 @@ struct ConsoleView: View {
     }
   }
 
-  private static func analyticsFeature(for item: ConsoleItem?) -> AnalyticsFeature? {
+  private func captureFeatureViewed(_ item: ConsoleItem?) {
+    guard let feature = Self.analyticsFeature(for: item) else { return }
+    AnalyticsClient.shared.trackFeatureViewed(feature)
+  }
+
+  /// Package-visible so AnalyticsClientTests can lock the Growth aha keys
+  /// (`dont_ghost`, `wrapped`, `eq`, `birthday_texts`) to sidebar IDs.
+  static func analyticsFeature(for item: ConsoleItem?) -> AnalyticsFeature? {
     switch item {
     case .messages, .drafts, .scheduled, .history:
       return .messages

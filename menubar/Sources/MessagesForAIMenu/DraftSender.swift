@@ -217,10 +217,14 @@ enum DraftSender {
         source: "swift-draft"
       )
     }
-    AnalyticsClient.shared.safeCapture(.draftSent, properties: [
+    var sentProperties: [AnalyticsProperty: AnalyticsValue] = [
       .transport: .string(draft.effectivePlatform.analyticsTransport.rawValue),
       .result: .string(result.ok ? AnalyticsResult.success.rawValue : AnalyticsResult.failure.rawValue)
-    ])
+    ]
+    if let magnitude = AnalyticsClient.shared.consumeEditMagnitude(id: draft.id, currentBody: draft.body) {
+      sentProperties[.editMagnitude] = .string(magnitude.rawValue)
+    }
+    AnalyticsClient.shared.safeCapture(.draftSent, properties: sentProperties)
     if result.ok {
       broadcastDidSend(
         platform: draft.effectivePlatform,

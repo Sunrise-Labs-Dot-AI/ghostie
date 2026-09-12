@@ -8,7 +8,8 @@
 //   • disable_session_recording  → no session replay / screen capture
 //   • advanced_disable_decide    → no feature-flag/decide round-trips; pure ingestion
 //
-// It captures exactly two things: page views and clicks on the Download CTA.
+// It captures page views, Download CTA clicks, and tip-jar open/complete.
+// Tip events never include amounts, Stripe session IDs, or contact data.
 // No message data, no contact data, no PII. Mirrors the app's stance and is
 // disclosed in privacy.html ("Website analytics").
 //
@@ -53,4 +54,44 @@
     },
     true
   );
+
+  // Tip jar: open (button click) and complete (return URL). Never send
+  // amounts, custom tip values, or Stripe checkout session IDs.
+  var TIP_OPEN_SELECTOR = [
+    "#tip-jar",
+    "#tip-jar-main",
+    "#tip-jar-footer",
+    "#tip-open-top",
+    "#tip-open-hero",
+    "#tip-open-main",
+    "#tip-open-footer",
+    ".tip-link"
+  ].join(", ");
+
+  function captureTipCompleted() {
+    if (!window.posthog) return;
+    posthog.capture("tip_completed", { page: location.pathname });
+  }
+
+  document.addEventListener(
+    "click",
+    function (ev) {
+      var el = ev.target;
+      var button = el && el.closest ? el.closest(TIP_OPEN_SELECTOR) : null;
+      if (!button || !window.posthog) return;
+      posthog.capture("tip_opened", {
+        cta_id: button.id || null,
+        page: location.pathname
+      });
+    },
+    true
+  );
+
+  try {
+    if (new URLSearchParams(location.search).get("tip_session_id")) {
+      captureTipCompleted();
+    } else if (window.__ghostiePendingTipCompleted) {
+      captureTipCompleted();
+    }
+  } catch (e) {}
 })();

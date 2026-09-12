@@ -474,6 +474,7 @@ final class DraftStore: ObservableObject {
   }
 
   private func trackDraftStaged(_ draft: Draft, scheduledAt: Date?) {
+    AnalyticsClient.shared.rememberStagedDraft(id: draft.id, body: draft.body)
     AnalyticsClient.shared.safeCapture(.draftStaged, properties: [
       .transport: .string(draft.effectivePlatform.analyticsTransport.rawValue),
       .source: .string(AnalyticsClient.draftSource(draft.source).rawValue)
@@ -488,7 +489,7 @@ final class DraftStore: ObservableObject {
 
   /// Removes a draft file. Routes by the draft's platform; if no draft
   /// with that id exists in either watched directory, throws.
-  func discard(id: String) throws {
+  func discard(id: String, trackUserDiscard: Bool = false) throws {
     guard Self.isSafeDraftID(id) else { throw DraftStoreError.invalidDraftID(id) }
     guard var mutationLock = SendLock.acquire(for: id) else {
       throw DraftStoreError.draftBusy(id)
@@ -499,6 +500,13 @@ final class DraftStore: ObservableObject {
     }
     try FileManager.default.removeItem(at: draftURL(id: id, platform: existing.effectivePlatform))
     try removeAttachmentSnapshot(id: id, platform: existing.effectivePlatform)
+    AnalyticsClient.shared.forgetStagedDraft(id: id)
+    if trackUserDiscard {
+      AnalyticsClient.shared.safeCapture(.draftDiscarded, properties: [
+        .transport: .string(existing.effectivePlatform.analyticsTransport.rawValue),
+        .source: .string(AnalyticsClient.draftSource(existing.source).rawValue)
+      ])
+    }
     refresh()
   }
 

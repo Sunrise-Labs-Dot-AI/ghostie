@@ -283,6 +283,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     AnalyticsClient.shared.configure(userEnabled: settings.productAnalyticsEnabled)
     AnalyticsClient.shared.safeCapture(.appLaunched)
     AnalyticsClient.shared.safeCapture(.appVersionSeen)
+    observeActivationCheckpoints()
     featureFlags.refreshOnLaunch()
     DiagnosticsStore.shared.log("app_launch")
     NSApp.setActivationPolicy(.regular)
@@ -373,6 +374,29 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     imessageDaemon.stopBlocking()
     whatsappDaemon.stopBlocking()
     messagesViewState.clearCache()
+  }
+
+  /// FDA + MCP activation checkpoints. Once-only sentinels live in
+  /// `~/.messages-mcp/`; nothing is sent until product analytics is on.
+  private func observeActivationCheckpoints() {
+    AnalyticsClient.shared.observeFDAGranted(HealthChecks().chatDbAccessState() == .ok)
+    let mcpDir = AppStoragePaths.homeDirectory.appendingPathComponent(".messages-mcp")
+    if FileManager.default.fileExists(
+      atPath: mcpDir.appendingPathComponent("last_invocation_imessage.json").path
+    ) {
+      AnalyticsClient.shared.observeMCPVerified(.imessage)
+    }
+    if FileManager.default.fileExists(
+      atPath: mcpDir.appendingPathComponent("last_invocation_whatsapp.json").path
+    ) {
+      AnalyticsClient.shared.observeMCPVerified(.whatsapp)
+    }
+    NotificationCenter.default.addObserver(
+      forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+    ) { [weak self] _ in
+      guard self != nil else { return }
+      AnalyticsClient.shared.observeFDAGranted(HealthChecks().chatDbAccessState() == .ok)
+    }
   }
 
   /// Keep the process (menu-bar app) alive when the last window closes.
