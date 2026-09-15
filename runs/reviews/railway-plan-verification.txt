@@ -1,0 +1,7 @@
+Disposition: **PASS for Stage 0 only**.
+
+The updated plan addresses the blocking findings in `runs/reviews/railway-plan-codex.txt`: release ambiguity is removed, Stage 0 now runs before tunnel work, it uses only a synthetic Railway HTTPS MCP fixture, it makes no relay-opacity claim, and production/message access are explicitly excluded.
+
+Stage 0 **may proceed**, limited to the isolated synthetic fixture on Railway. It must stop unless real ChatGPT and Claude hosted clients can list and call the harmless tool through the Railway-assigned port, with evidence recorded and temporary cert/DNS/service cleaned up afterward.
+
+Stage 1 remains gated until Stage 0 passes.

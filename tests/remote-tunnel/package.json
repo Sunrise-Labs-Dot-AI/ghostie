@@ -1,0 +1,1 @@
+{"name":"ghostie-railway-probe","private":true,"type":"module","scripts":{"test":"bun test","typecheck":"tsc --noEmit","start":"bun run probe.ts"},"devDependencies":{"@modelcontextprotocol/sdk":"1.26.0","@types/bun":"1.3.10","typescript":"5.9.3"}}

@@ -1,0 +1,29 @@
+**Verdict: BLOCK**
+
+I would not execute this plan as written. It is careful about synthetic data, but two assumptions are unsafe enough to block.
+
+1. **CRITICAL, Cost/Scope: release scope contradicts the probe boundary**  
+   [docs/plans/railway-encrypted-probe.md:4](docs/plans/railway-encrypted-probe.md:4) says James requires “app release after local testing,” while [line 24](docs/plans/railway-encrypted-probe.md:24) says “No production deployment, app replacement, release.”  
+   Refutation: a synthetic Railway probe must not imply any app release path. Release belongs after a separate production implementation review. Fix: remove the release phrase from Scope and state that a passing probe only authorizes the next reviewed production plan.
+
+2. **CRITICAL, Saboteur: hosted-client compatibility is deferred until after building the custom tunnel**  
+   The plan assumes a Railway TCP proxy with a nonstandard port can be used as a real ChatGPT and Claude hosted MCP URL: [lines 11, 14, 18](docs/plans/railway-encrypted-probe.md:11). Official Claude docs say remote MCP must be publicly exposed over HTTP with Streamable HTTP or SSE, and the URL must begin with `https://`. OpenAI API docs expose MCP as a `server_url`.  
+   Refutation: “TCP tunnel works with the SDK” does not imply hosted clients accept `https://host:railway-port/mcp`, preserve the port, tolerate raw TLS pass-through, or support the chosen MCP transport. Fix: add a zero-code preflight before tunnel implementation: confirm the exact accepted URL shape in each client, including explicit port, path, Streamable HTTP vs SSE, auth field behavior, and certificate validation.
+
+3. **WARNING, Security Auditor: canary absence is not enough proof of relay opacity**  
+   [line 15](docs/plans/railway-encrypted-probe.md:15) treats “canary absent from captured relay frames” as evidence.  
+   Refutation: literal canary absence only proves the relay capture did not contain that exact plaintext string. It does not prove the relay did not terminate TLS elsewhere, log decoded content in another layer, or capture transformed content. Fix: require positive evidence too: relay has no TLS private key material, no HTTP parser on the public stream path, no request body logging, no crash dumps, and packet capture shows opaque TLS records between hosted client and Mac endpoint.
+
+4. **WARNING, Security Auditor: temporary token auth is underspecified**  
+   [line 7](docs/plans/railway-encrypted-probe.md:7) says the host channel is authenticated by a temporary random token.  
+   Refutation: if that token lands in Railway env logs, process args, deploy logs, or a copied URL, an attacker can impersonate the Mac host for the probe. Synthetic-only lowers blast radius, but it can still invalidate the compatibility evidence. Fix: define token handling: generated locally, stored outside repo, never argv or URL query, redacted from logs, short TTL, one active token, rotate on every run, fail closed on reuse.
+
+5. **WARNING, Saboteur: connection lifecycle races are named but not specified**  
+   [line 9](docs/plans/railway-encrypted-probe.md:9) says one stream may claim an identifier and sessions are removed on disconnect. [line 16](docs/plans/railway-encrypted-probe.md:16) lists failures to test.  
+   Refutation: the plan does not define what happens when the public client connects before the host channel is ready, the host reconnects while a stream is half-open, or the data stream arrives after its control frame expires. Fix: add exact state-machine rules and expected client-visible errors for `host_absent`, `stream_pending`, `stream_claimed`, `host_lost`, `stream_expired`.
+
+6. **NOTE, Cost/Scope: certificate provisioning is too much for this probe unless sequenced**  
+   [line 11](docs/plans/railway-encrypted-probe.md:11) brings in public certs, DNS, ACME isolation, and private-key custody.  
+   Cheaper path: split this into two gates. First, prove hosted clients accept a synthetic HTTPS MCP endpoint on the exact Railway URL shape. Second, add Mac-held private key and TLS pass-through. That avoids building ACME and tunnel machinery before the client-port question is answered.
+
+No files edited. Sources checked: local plan, local `mcps/remote-relay/README.md`, OpenAI API docs for MCP `server_url`, and Anthropic MCP connector docs for HTTPS remote MCP requirements.
