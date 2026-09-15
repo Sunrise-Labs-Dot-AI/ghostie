@@ -341,6 +341,7 @@ bash scripts/bump-version.sh "$VNUM"
 # the tree dirty and failing the NEXT release's preflight.
 git add .claude-plugin/plugin.json mcps/*/package.json
 git add mcps/*/src/index.ts
+git add mcps/ghostie/src/facade.ts
 if git diff --cached --quiet; then
   ok "versions already at $VNUM — nothing to commit"
 else

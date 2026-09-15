@@ -25,6 +25,11 @@ the approval gate, not protocol features.
 - `mcps/shared/` — shared MCP/daemon substrate (JSON-RPC framing,
   daemon client, MCP result envelopes, and untrusted-content wrapping)
   used by the transport packages.
+- `mcps/remote-relay/`: optional standalone HTTPS/WSS relay for the Advanced
+  remote MCP flow. Clerk browser accounts, per-Mac OAuth consent, no cloud
+  message storage. The app owns `ghostie-remote-host` in the shared backend;
+  its allowlist and authentication-content filter live in `mcps/ghostie/src/remote-*`.
+  Deployment and encryption boundaries: `mcps/remote-relay/README.md`.
 - `mcps/imessage-drafts/` — iMessage stdio MCP **+ chat.db daemon**
   (Bun/TypeScript). The MCP is a thin socket client; the daemon (`src/daemon/`)
   performs all `~/Library/Messages/chat.db` + AddressBook reads because it's

@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 
 const ROLE_ALIASES: Record<string, string> = {
+  "ghostie-remote-host": "ghostie-remote-host",
   "imessage-drafts-mcp": "imessage-mcp",
   "imessage-mcp": "imessage-mcp",
   "ghostie-mcp": "ghostie-mcp",
@@ -40,6 +41,9 @@ function resolveRole(argv: string[]): string {
 const role = resolveRole(process.argv);
 
 switch (role) {
+  case "ghostie-remote-host":
+    await import("../../ghostie/src/remote-host.ts");
+    break;
   case "imessage-mcp":
     await import("../../imessage-drafts/src/index.ts");
     break;

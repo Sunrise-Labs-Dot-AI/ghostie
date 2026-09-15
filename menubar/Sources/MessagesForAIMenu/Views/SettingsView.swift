@@ -94,6 +94,7 @@ struct SettingsView: View {
           settingsGroup("Advanced", systemImage: "wrench.and.screwdriver") {
             DisclosureGroup(isExpanded: $advancedExpanded) {
               VStack(alignment: .leading, spacing: 16) {
+                RemoteHostingSettingsSection()
                 sendingApprovalSection
                 aiKeysSection
                 aiUsageSection
@@ -104,7 +105,7 @@ struct SettingsView: View {
               .padding(.top, 10)
             } label: {
               VStack(alignment: .leading, spacing: 3) {
-                Text("Keys, models, and diagnostics")
+                Text("Remote MCP, keys, models, and diagnostics")
                   .font(DS.Font.settingsLabel)
                   .foregroundStyle(DS.Color.ink(colorScheme))
                 Text("Bring your own AI key, control AI sending approval, choose models per tool, check connections, export diagnostics.")

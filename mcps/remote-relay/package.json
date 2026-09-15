@@ -1,0 +1,8 @@
+{
+  "name": "ghostie-remote-relay",
+  "private": true,
+  "type": "module",
+  "scripts": { "start": "bun run src/index.ts", "test": "bun test", "typecheck": "bun --bun tsc --noEmit" },
+  "dependencies": { "@clerk/backend": "^3.0.0", "zod": "^3.25.76" },
+  "devDependencies": { "@types/bun": "^1.1.13", "typescript": "^5.6.0" }
+}
