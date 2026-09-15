@@ -1,11 +1,8 @@
 /** Production-image test using only disposable identities and synthetic content. */
 import { randomBytes } from 'node:crypto';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { strict as assert } from 'node:assert';
 const name = `ghostie-relay-test-${randomBytes(4).toString('hex')}`;
-const dir = mkdtempSync(join(tmpdir(), 'ghostie-relay-test-'));
+const volume = `${name}-data`;
 const canary = `synthetic-content-${randomBytes(16).toString('hex')}`;
 const credential = randomBytes(32).toString('base64url');
 const token = randomBytes(32).toString('base64url');
@@ -23,7 +20,7 @@ try {
     '-e', `GHOSTIE_RELAY_ORIGIN=${origin}`, '-e', 'CLERK_PUBLISHABLE_KEY=pk_test_Zml4dHVyZS5jbGVyay5hY2NvdW50cy5kZXYk',
     '-e', 'CLERK_SECRET_KEY=sk_test_fixture', '-e', 'CLERK_FRONTEND_ORIGIN=https://fixture.clerk.accounts.dev',
     '-e', 'GHOSTIE_OAUTH_CLIENTS=[{"id":"fixture","name":"Fixture","redirects":["https://client.example.test/callback"]}]',
-    '-v', `${dir}:/data`, 'ghostie-relay:local']);
+    '-v', `${volume}:/data`, 'ghostie-relay:local']);
   const mapping = (await command(['docker', 'port', name, '8080'])).trim();
   assert.match(mapping, /^127\.0\.0\.1:\d+$/);
   const base = `http://${mapping}`;
@@ -69,5 +66,5 @@ try {
 } finally {
   socket?.close();
   await command(['docker', 'rm', '-f', name]).catch(() => {});
-  rmSync(dir, { recursive: true, force: true });
+  await command(['docker', 'volume', 'rm', '-f', volume]);
 }

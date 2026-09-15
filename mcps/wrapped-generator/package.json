@@ -18,5 +18,8 @@
   },
   "dependencies": {
     "html2canvas": "1.4.1"
+  },
+  "overrides": {
+    "@types/node": "26.5.1"
   }
 }
