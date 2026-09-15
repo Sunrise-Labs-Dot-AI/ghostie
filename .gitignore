@@ -4,6 +4,7 @@ bin/
 .DS_Store
 bun.lock
 !mcps/remote-relay/bun.lock
+!tests/remote-tunnel/bun.lock
 bun.lockb
 .*.bun-build
 

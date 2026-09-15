@@ -1,0 +1,9 @@
+**Verdict: BLOCK**
+
+I would not deploy this exact Stage 0 config yet. The fixture is synthetic-only and I did not find message/data access, arbitrary command/file/fetch behavior, or body/header logging in the reviewed files. The blocker is deploy-validity, not production-data risk.
+
+**Findings:**
+1. [probe.ts](tests/remote-tunnel/probe.ts:55) defaults `PROBE_BIND_HOST` to `127.0.0.1`. In a Railway container, that is likely unreachable from the public/raw TCP proxy unless overridden. [railway.json](tests/remote-tunnel/railway.json:1) does not set `PROBE_BIND_HOST=0.0.0.0`, so the temporary deploy can produce a false negative on nonstandard-port support.
+2. [railway.json](tests/remote-tunnel/railway.json:1) uses `"dockerfilePath":"Dockerfile"`. This is only correct if Railway’s project root is `tests/remote-tunnel`; from repo root it will look for a root `Dockerfile`. The plan should make that exact deploy root/config explicit before using the result as evidence.
+
+Verification note: I attempted `bun test tests/remote-tunnel/probe.test.ts`, but this read-only sandbox blocked tempdir creation with `EPERM`, so I could not validate the test run here.

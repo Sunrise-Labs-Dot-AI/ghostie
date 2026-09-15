@@ -1,0 +1,1 @@
+{"compilerOptions":{"target":"ESNext","module":"ESNext","moduleResolution":"Bundler","types":["bun"],"strict":true,"noUncheckedIndexedAccess":true,"skipLibCheck":true,"allowImportingTsExtensions":true,"noEmit":true},"include":["*.ts"]}

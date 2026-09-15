@@ -1,0 +1,9 @@
+Verdict: **Stage 0 synthetic fixture can be deployed**, scoped to the documented Railway probe flow.
+
+The two prior blockers are resolved:
+
+1. Bind host/port: [Dockerfile](tests/remote-tunnel/Dockerfile:3) now sets `PROBE_BIND_HOST=0.0.0.0`, and [Dockerfile](tests/remote-tunnel/Dockerfile:4) sets `PORT=9443`. `probe.ts` still has the localhost fallback, but the Docker runtime overrides it.
+
+2. Deploy root: [README.md](tests/remote-tunnel/README.md:9) now explicitly says to deploy only `tests/remote-tunnel` using `railway up . --path-as-root`. With that root, [railway.json](tests/remote-tunnel/railway.json:1)’s `"dockerfilePath":"Dockerfile"` resolves correctly.
+
+I did not run tests or broaden the review. No product data inspected. Preconditions still required for the live deployment: set `PROBE_TLS_CERT` and `PROBE_TLS_KEY` via Railway variables, configure raw TCP proxy to internal port `9443`, then collect hosted Claude and ChatGPT connector evidence.
