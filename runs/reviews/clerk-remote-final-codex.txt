@@ -1,0 +1,5 @@
+MERGE-OK.
+
+The last critical is addressed. In [scripts/build-release.sh](scripts/build-release.sh:452), the Info.plist heredoc closes at line 504, and optional Python starts after it at line 507. The Python parses/modifies the plist with `plistlib`, normalizes trailing slash, and rejects non-HTTPS origins.
+
+The contract test in [tests/experience/remote-release-contract.py](tests/experience/remote-release-contract.py:38) renders the actual fragment, parses unset/HTTPS/trailing-slash cases, and asserts HTTP fails. No files modified.

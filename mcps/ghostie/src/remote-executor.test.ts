@@ -43,7 +43,9 @@ test("HTTP results filter nested secrets and retain normal readable text", async
   const response = await client.callTool({ name: "get_message_thread", arguments: { thread_ref: "imessage:1" } });
   const serialized = JSON.stringify(response);
   expect(serialized).not.toContain("123456"); expect(serialized).not.toContain("234567");
-  expect(serialized).toContain("Dinner at 7?"); expect(serialized).toContain("Authentication content hidden");
+  expect(serialized).toContain("Dinner at 7?");
+  const content = response.content as { type: string; text: string }[];
+  expect(JSON.parse(content[0]!.text).messages).toHaveLength(1);
 });
 
 test("HTTP rejects forbidden tools and unknown draft fields before staging", async () => {

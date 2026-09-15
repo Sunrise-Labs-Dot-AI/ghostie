@@ -25,6 +25,10 @@ describe("remote authentication-content boundary", () => {
   test("a sibling context cannot leave a separate code field visible", () => {
     expect(sanitizeRemote({ label: "verification", value: "AB12-CD34" })).toEqual({ label: REDACTED, value: REDACTED });
   });
+  test("authentication search hits are omitted, not exposed as matching placeholders", () => {
+    expect(sanitizeRemote({ hits: [{ message_ref: "imessage:1", body: "Your code: 123456" }] })).toEqual({ hits: [] });
+    expect(sanitizeRemote({ hits: [{ message_ref: "imessage:2", body: "Dinner at 7?" }] })).toEqual({ hits: [{ message_ref: "imessage:2", body: "Dinner at 7?" }] });
+  });
 });
 
 describe("remote tool boundary", () => {

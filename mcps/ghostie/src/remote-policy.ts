@@ -31,6 +31,11 @@ export function authenticationContent(text: string): boolean {
 }
 
 const PRIVATE_FIELDS = new Set(["path", "filename", "attachments", "media", "body_sha256", "body_hash", "context_diagnostic"]);
+function authenticationRecord(value: unknown): boolean {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.entries(value).some(([key, item]) =>
+    ["body", "last_message_preview", "caption"].includes(key) && typeof item === "string" && authenticationContent(item));
+}
 /** Sanitize before serialization, including JSON nested inside MCP text envelopes. */
 export function sanitizeRemote(value: unknown): unknown {
   if (typeof value === "string") {
@@ -40,7 +45,9 @@ export function sanitizeRemote(value: unknown): unknown {
     }
     return authenticationContent(value) ? REDACTED : value;
   }
-  if (Array.isArray(value)) return value.map(sanitizeRemote);
+  // Omit matching message/search records entirely: replacing only their body
+  // would reveal which candidate code matched through search-result presence.
+  if (Array.isArray(value)) return value.filter(item => !authenticationRecord(item)).map(sanitizeRemote);
   if (value !== null && typeof value === "object") {
     if ("type" in value && value.type === "text" && "text" in value && typeof value.text === "string") {
       return { type: "text", text: sanitizeRemote(value.text) };
