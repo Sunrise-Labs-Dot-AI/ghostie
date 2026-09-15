@@ -53,10 +53,17 @@ if (import.meta.main) {
   const key = process.env.PROBE_TLS_KEY;
   if (!cert || !key) throw new Error('Disposable probe TLS configuration required');
   const { server, events } = startProbe({ hostname: process.env.PROBE_BIND_HOST ?? '127.0.0.1', port: Number(process.env.PORT ?? 9443), cert, key });
-  const stop = () => { server.stop(true); process.exit(0); };
+  // Synthetic comparison only: Railway's HTTPS edge forwards to this listener.
+  const control = process.env.PROBE_HTTPS_CONTROL === '1'
+    ? startProbe({ hostname: process.env.PROBE_BIND_HOST ?? '127.0.0.1', port: 9444 }) : undefined;
+  const stop = () => { server.stop(true); control?.server.stop(true); process.exit(0); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);
   setTimeout(stop, 30 * 60 * 1000);
   let seen = 0;
-  setInterval(() => { for (; seen < events.length; seen++) process.stdout.write(`probe ${events[seen]}\n`); }, 1000);
+  let controlSeen = 0;
+  setInterval(() => {
+    for (; seen < events.length; seen++) process.stdout.write(`probe ${events[seen]}\n`);
+    if (control) for (; controlSeen < control.events.length; controlSeen++) process.stdout.write(`control ${control.events[controlSeen]}\n`);
+  }, 1000);
   process.stdout.write('Synthetic probe ready\n');
 }

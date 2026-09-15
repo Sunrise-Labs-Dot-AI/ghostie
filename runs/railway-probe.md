@@ -1,6 +1,6 @@
 # Railway compatibility probe, 2026-09-15
 
-Status: local fixture verified, live hosted-client checks pending. Not a product release or encryption-against-relay claim.
+Status: local and live desktop SDK passed. Claude could not connect on the assigned TCP port; standard HTTPS comparison pending. ChatGPT is blocked by workspace role. Not a product release or encryption-against-relay claim.
 
 ## Provisioned temporary resources
 - Railway project: ghostie-compatibility-probe, 17c8e223-d82b-4cf3-b5f0-b5cc2027be8f.
@@ -12,10 +12,12 @@ Status: local fixture verified, live hosted-client checks pending. Not a product
 
 ## Evidence
 - 7 local tests, 17 assertions, typecheck passed: SDK initialize/list/call over verified TLS and a nonstandard port; untrusted certificates and hostname mismatch refused; unknown tools/arguments, oversized and malformed input refused; no OAuth claims; incomplete TLS config refused.
-- Claude URL-format preflight reached connection validation for a nonstandard-port URL. No real server was running at the preliminary address; its unreachable result is not a port-compatibility verdict. No connector created during format preflight.
+- Live desktop SDK passed on https://railway-probe.ghostie.app:37763/mcp using default certificate validation: initialize, tools/list, tools/call, and exact synthetic result verified. Deployment 8f98ca0b-c32c-4ef2-80f3-563652e38e65.
+- Claude hosted connector on the same live URL: preflight reported no server. Manual setup with No sign-in saved the connector, but Connect failed with "Couldn’t reach Ghostie compatibility probe", reference ofid_60535c8120b2a51e. Bounded server logs contained only the earlier SDK methods. This does not yet isolate a port restriction. Failed test connector was removed.
+- Controlled comparison: same synthetic handler through Railway HTTPS edge, https://synthetic-status-production.up.railway.app/mcp -> internal 9444. Deployment c25a5551-a13c-4f7c-bf91-738716111a8a pending.
 - Chrome ChatGPT account is currently a Sunrise Labs workspace Member. Owner is a separate Sunrise Labs login. Developer-mode switch is disabled; owner login requested. No security or permission settings changed.
 - Plan review initially BLOCK; sequencing corrected to test hosted-client port compatibility before custom tunnel. Independent verification PASS for Stage 0 only.
-- Code review found missing container bind override and ambiguous upload root. Dockerfile and README corrected; verification pending.
+- Code review found missing container bind override and ambiguous upload root. Dockerfile and README corrected; independent verification passed. Optional HTTPS-control delta reviewed separately.
 
 ## Remaining gates
-Live SDK and hosted-client calls, cleanup verification, independent code-review follow-up, CI and merge. Stage 1 encrypted reverse tunnel remains gated on both real hosted clients passing. No messages, local daemons, Clerk secrets or real draft actions are exposed.
+Hosted-client comparison, cleanup verification, final CI and merge. Prior CI is green, including the dedicated synthetic-mcp job. Stage 1 encrypted reverse tunnel remains gated on both real hosted clients passing. No messages, local daemons, Clerk secrets or real draft actions are exposed.

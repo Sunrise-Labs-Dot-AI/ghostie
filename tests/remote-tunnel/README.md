@@ -10,6 +10,8 @@ Deploy **only this directory** as Railway's upload root, using `railway up . --p
 
 `railway.json` selects the Dockerfile, one replica and restart policy NEVER. The process exits after 30 minutes. Also remove the active deployment when measurement finishes, then verify it is offline. Delete only the probe's exact DNS records and revoke the disposable certificate. Do not touch the marketing site's DNS records.
 
+For a controlled comparison when a hosted client cannot reach the assigned TCP port, set `PROBE_HTTPS_CONTROL=1` and point a Railway-generated HTTPS domain at internal port 9444. This serves the identical synthetic handler through Railway's normal TLS-terminating edge. It shares the 30-minute shutdown and logs only bounded method names under `control`. It is explicitly not a production privacy design. Remove this domain with the experiment.
+
 ## Evidence to collect
 
 - A standard MCP SDK lists and calls the fixed tool through the live certificate-verified Railway URL including its assigned port.

@@ -1,0 +1,11 @@
+**Verdict:** MERGE-OK
+
+No concrete blockers found in the requested scope.
+
+Evidence:
+- [probe.ts](tests/remote-tunnel/probe.ts:12) remains synthetic-only: bounded method-name logging, no inputs, headers, bodies, or backend imports.
+- [probe.ts](tests/remote-tunnel/probe.ts:57) optional control listener is gated by `PROBE_HTTPS_CONTROL === '1'` and shares the same synthetic handler.
+- [check-client.ts](tests/remote-tunnel/check-client.ts:5) hard-restricts the live client to `https://railway-probe.ghostie.app/mcp`.
+- [railway-probe.yml](.github/workflows/railway-probe.yml:12) uses read-only `contents` permission and only runs fixture typecheck/tests.
+
+I did not modify files or run external actions.
