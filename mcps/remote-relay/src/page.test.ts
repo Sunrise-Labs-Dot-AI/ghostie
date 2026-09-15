@@ -35,3 +35,39 @@ test('Clerk session updates preserve an in-progress sign-in form', async () => {
   expect(mounted).toBe(2);
   expect(get('account').hidden).toBe(true);
 });
+
+test('account management never authorizes a connection, including with consent query parameters', async () => {
+  const html = accountPage('pk_fixture', 'https://clerk.example.test/clerk.js', 'fixture');
+  const script = html.match(/<script nonce="fixture">([\s\S]+)<\/script>/)![1]!;
+  type Node = { hidden?: boolean; textContent?: string; onclick?: () => Promise<void> | void };
+  const nodes = new Map<string, Node>();
+  const get = (id: string) => { if (!nodes.has(id)) nodes.set(id, {}); return nodes.get(id)!; };
+  let loading!: Promise<void>, listener!: () => Promise<void>;
+  let profileOpened = 0, requests = 0;
+  const clerk = {
+    user: null as { id: string } | null,
+    load: async () => {}, mountSignIn: () => {}, unmountSignIn: () => {},
+    addListener: (callback: () => Promise<void>) => { listener = callback; },
+    openUserProfile: () => { profileOpened++; },
+  };
+  runInNewContext(script, {
+    window: { Clerk: clerk }, URLSearchParams,
+    location: { pathname: '/account', search: '?id=fixture&client_id=fixture&redirect_uri=https://client.example.test' },
+    fetch: () => { requests++; throw Error('Unexpected request'); },
+    document: { getElementById: get, createElement: () => ({ dataset: {} }),
+      head: { appendChild: (element: { onload: () => Promise<void> }) => { loading = element.onload(); } } },
+  });
+  await loading;
+  expect(get('account').hidden).toBe(true);
+  await get('manage').onclick!();
+  expect(profileOpened).toBe(0);
+  clerk.user = { id: 'fixture-user' }; await listener();
+  expect(get('account').hidden).toBe(false);
+  expect(get('connection').hidden).toBe(true);
+  expect(get('heading').textContent).toBe('Your Ghostie account');
+  await get('manage').onclick!();
+  expect(profileOpened).toBe(1);
+  await get('approve').onclick!(); await listener();
+  expect(requests).toBe(0);
+  expect(get('status').textContent).toContain('Security');
+});

@@ -1,0 +1,14 @@
+No blockers.
+
+The plan is directionally correct and keeps the important security boundaries intact: Clerk handles verified email signup/passkeys, MCP OAuth-PKCE consent stays unchanged, `/account` is account-management only, and the Swift link uses a validated saved HTTPS relay origin.
+
+A few non-blocking checks I’d keep explicit in the plan:
+
+- Confirm Apple/Google are disabled both in Clerk config/dashboard and hidden from any custom UI, so users do not see dead social buttons.
+- Ensure `/account` has no pairing/consent side effects even through shared page scripts or query params.
+- Validate CSP allows only the Clerk resources required for `openUserProfile`, without widening to unsafe origins.
+- `no-store` should apply to `/account` responses in both signed-out and signed-in states.
+- The saved relay origin should reject non-HTTPS, localhost in production, embedded credentials, path/query tricks, and lookalike malformed URLs.
+- Live QA should include: email OTP signup, email signin, signed-in account profile open, passkey enrollment attempt, and confirmation that MCP consent still behaves exactly as before.
+
+I don’t see a correctness or security reason to block this plan.

@@ -52,7 +52,7 @@ export function startRelay(options: RelayOptions) {
         });
         const metadata = /^\/\.well-known\/oauth-protected-resource\/mcp\/hosts\/([A-Za-z0-9_-]{43})$/.exec(path);
         if (request.method === "GET" && metadata) return json({ resource: auth.resource(metadata[1]!), authorization_servers: [options.origin], scopes_supported: ["messages:read", "messages:draft"], bearer_methods_supported: ["header"] });
-        if (request.method === "GET" && ["/pair", "/oauth/authorize"].includes(path)) {
+        if (request.method === "GET" && ["/account", "/pair", "/oauth/authorize"].includes(path)) {
           const nonce = secret();
           const clerkOrigin = new URL(options.clerkScriptURL).origin;
           return new Response(accountPage(options.publishableKey, options.clerkScriptURL, nonce), { headers: {

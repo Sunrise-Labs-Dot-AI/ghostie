@@ -60,6 +60,18 @@ test("browser approvals require exact origin and a verified Clerk session", asyn
   expect((await f.request("/api/pair/approve", body, f.token, { Origin: "https://relay.example.test" })).status).toBe(401);
 });
 
+test("account page retains browser isolation and no-store headers", async () => {
+  const f = fixture();
+  const page = await f.request('/account');
+  expect(page.status).toBe(200);
+  expect(page.headers.get('cache-control')).toBe('no-store');
+  expect(page.headers.get('referrer-policy')).toBe('no-referrer');
+  expect(page.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
+  expect(page.headers.get('content-security-policy')).toContain('https://clerk.example.test');
+  expect(await page.text()).toContain('openUserProfile');
+  expect((await f.request('/account', undefined, f.token, { Origin: 'https://evil.example.test' })).status).toBe(403);
+});
+
 test("duplicate host cannot replace an existing connection", async () => {
   const f = fixture(); const socket = await f.connect();
   const refused = await f.connect().then(other => { other.close(); return false; }, () => true);
