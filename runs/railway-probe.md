@@ -20,7 +20,7 @@ Status: local and live desktop SDK passed. Claude could not connect on the assig
 - Code review found missing container bind override and ambiguous upload root. Dockerfile and README corrected; independent verification passed. Optional HTTPS-control delta, live check script and CI reviewed separately: MERGE-OK, no blockers.
 
 ## Cleanup verified
-- Active deployment removed using Railway down. Project deletion accepted for the exact disposable project; project no longer appears in the account list. Railway schedules final deletion internally.
+- Active deployment removed using Railway down. Project deletion accepted for the exact disposable project; Railway still lists project metadata while its scheduled deletion is pending. Endpoint shutdown is verified below; final project metadata purge is not claimed.
 - Dedicated CNAME rec_4de92aea5fda588e276e304e removed. Disposable certificate revoked through ACME. Local account key, TLS key and certificate files removed.
 - Control endpoint now returns 404; TCP endpoint has no successful connection (5-second timeout). No fixture remains serving.
 - Both temporary Claude connectors removed. The synthetic chat contains only test instructions and fixed status output. No other connectors were called.
