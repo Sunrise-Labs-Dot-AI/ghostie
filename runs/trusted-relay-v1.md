@@ -11,7 +11,7 @@ James approved the trusted-relay privacy model and instructed build and ship. He
 - Production environment: `f2926fbf-e990-4175-8791-79e5b60b8373`
 - Relay service: `2470b3b8-029d-4046-a7d0-bf7ba9687c9b`
 - Metadata volume: `13daa279-1e0c-4a29-8f59-02757cc887d1`, `/data`
-- First deployment: `1679cf1c-7fac-4d5c-ad78-7b8e30775da5`, initializing at last check
+- First deployment: `1679cf1c-7fac-4d5c-ad78-7b8e30775da5`, successful, verified HTTPS health and OAuth discovery. Follow-up `73a94965-e67a-404b-82b3-df99ef01b3a2` deploys the sign-in form fix; initializing at last check
 - One replica, US West California, Dockerfile builder, port 8080, `/health`, three failure retries. Serverless and CDN caching off.
 - Clerk production Frontend API: https://clerk.messagesfor.ai, existing primary domain messagesfor.ai. No account security or login-method changes.
 - Static Claude client: `ghostie-claude`, exact callback https://claude.ai/api/mcp/auth_callback, public client (no secret).
@@ -30,7 +30,7 @@ Never print raw Railway environment config or variables: production secrets are 
 
 ## Verification completed
 
-- Relay: 18 tests, 57 assertions, typecheck pass.
+- Relay: 19 tests, 64 assertions, typecheck pass.
 - Mac remote facade: 56 tests, 168 assertions, typecheck pass.
 - Swift: build complete; 796 tests, two skipped, zero failures.
 - Remote release packaging contract: pass.
@@ -41,3 +41,14 @@ Never print raw Railway environment config or variables: production secrets are 
 ## Still required
 
 Live Clerk and real hosted/desktop OAuth, live deployment log inspection, signed local app account/Keychain/offline/draft review, final CI/merge and James-run release. Keep the default public service unset until live acceptance supports enabling it.
+
+## Live findings and pending user step
+
+- Public TLS verification, `/health` and OAuth discovery pass. Railway application logs contain only volume/container startup messages after the browser pairing attempts. No authenticated payload forwarding has occurred yet, so live payload-canary proof remains pending.
+- Production Google sign-in fails at Google with `Missing required parameter: client_id`. Do not silently disable login methods or use development credentials to bypass this.
+- Production Clerk has no existing James account. Opened the email signup flow in Chrome. It requires a new password, so browser policy requires James to enter/submit it himself. Async handoff asks him to complete email signup or choose Google configuration first. No password was read or entered by the agent.
+- Fixed a live sign-in issue: Clerk listener notifications remounted the login form and reset its state. A regression test and independent follow-up review pass. Follow-up review: `runs/reviews/trusted-relay-page-code.txt`.
+- Added exact desktop callback `http://127.0.0.1:18764/callback`, client `ghostie-desktop`, to the configured client list. The second deployment includes that configuration. The synthetic desktop test uses PKCE, official SDK calls and token revocation; it still needs a real account login.
+- A signed temporary app with empty `MESSAGES_FOR_AI_HOME` was assembled under `/tmp/ghostie-trusted-local-qa`. Its startup blocks in existing TextingVoice Keychain access before the window opens (confirmed by process sample). Stopped the temporary process. This is not a passed local UI/Keychain test, and the installed app was not replaced.
+- CI initially failed because the unpinned Node type dependency resolved to an unavailable npm tarball. Pinned `@types/node` 26.5.1 in the five affected packages; portable CI passed. Changed the synthetic container test to a named Docker volume so Linux cleanup works after the container restricts metadata ownership; container CI passed.
+- PR: https://github.com/Sunrise-Labs-Dot-AI/ghostie/pull/39 (draft). Keep release gated on real account and client acceptance. No default app relay URL is enabled yet.
