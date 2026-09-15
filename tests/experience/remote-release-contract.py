@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Exercise sidecar discovery and version bumping without building or releasing an app."""
 import json
+import os
+import plistlib
 import shutil
 import subprocess
 import tempfile
@@ -32,4 +34,27 @@ with tempfile.TemporaryDirectory(prefix="ghostie-release-contract-") as temporar
     assert 'name: "ghostie-mcp", version: "99.0.0"' in (fixture / "mcps/ghostie/src/facade.ts").read_text()
     assert json.loads((fixture / "mcps/ghostie/package.json").read_text())["version"] == "99.0.0"
     assert "mcps/ghostie/src/facade.ts" in (ROOT / "scripts/release.sh").read_text()
+
+    # Render the actual release plist fragment, including optional remote config.
+    # A shell syntax check cannot detect Python accidentally placed INSIDE XML.
+    app = fixture / "Ghostie.app"
+    (app / "Contents").mkdir(parents=True)
+    plist_start = release.index('cat > "$APP_PATH/Contents/Info.plist" <<EOF')
+    plist_end = release.index("\n# ============================================================================", plist_start)
+    fragment = release[plist_start:plist_end]
+    env = {**os.environ, "APP_PATH": str(app), "EXE_NAME": "MessagesForAIMenu",
+           "BUNDLE_ID": "com.sunriselabs.messages-for-ai", "APP_DISPLAY_NAME": "Ghostie",
+           "VERSION": "v99.0.0", "CFBUNDLE_VERSION": "1", "SU_PUBLIC_ED_KEY": "fixture",
+           "POSTHOG_PROJECT_TOKEN": "", "POSTHOG_HOST": "https://example.test"}
+    for origin in ["", "https://relay.example.test", "https://relay.example.test/"]:
+        subprocess.run(["bash", "-e"], input=fragment, env={**env, "GHOSTIE_RELAY_ORIGIN": origin},
+                       text=True, capture_output=True, check=True)
+        with (app / "Contents/Info.plist").open("rb") as source:
+            info = plistlib.load(source)
+        assert info["CFBundleExecutable"] == "MessagesForAIMenu"
+        assert info.get("GhostieRemoteRelayURL", "") == origin.rstrip("/")
+    invalid = subprocess.run(["bash", "-e"], input=fragment,
+                             env={**env, "GHOSTIE_RELAY_ORIGIN": "http://relay.example.test"},
+                             text=True, capture_output=True)
+    assert invalid.returncode != 0, "Release must reject a plaintext relay"
 print("ok standalone relay packaging and extracted facade version bump")

@@ -450,26 +450,6 @@ echo "› CFBundleShortVersionString=${VERSION#v}  CFBundleVersion=$CFBUNDLE_VER
 echo "$CFBUNDLE_VERSION" > "$DIST/cfbundle-version.txt"
 
 cat > "$APP_PATH/Contents/Info.plist" <<EOF
-
-# Optional public remote-MCP origin. No credentials are bundled in the app.
-python3 - "$APP_PATH/Contents/Info.plist" <<'PYREMOTE'
-import os
-import plistlib
-import sys
-from urllib.parse import urlsplit
-
-origin = os.environ.get("GHOSTIE_RELAY_ORIGIN", "")
-if origin:
-    url = urlsplit(origin)
-    if (url.scheme != "https" or not url.hostname or url.username or url.password
-            or url.path not in ("", "/") or url.query or url.fragment):
-        raise SystemExit("GHOSTIE_RELAY_ORIGIN must be an HTTPS origin")
-    with open(sys.argv[1], "rb") as source:
-        info = plistlib.load(source)
-    info["GhostieRemoteRelayURL"] = origin.rstrip("/")
-    with open(sys.argv[1], "wb") as target:
-        plistlib.dump(info, target)
-PYREMOTE
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -522,6 +502,26 @@ PYREMOTE
 </dict>
 </plist>
 EOF
+
+# Optional public remote-MCP origin. No credentials are bundled in the app.
+python3 - "$APP_PATH/Contents/Info.plist" <<'PYREMOTE'
+import os
+import plistlib
+import sys
+from urllib.parse import urlsplit
+
+origin = os.environ.get("GHOSTIE_RELAY_ORIGIN", "")
+if origin:
+    url = urlsplit(origin)
+    if (url.scheme != "https" or not url.hostname or url.username or url.password
+            or url.path not in ("", "/") or url.query or url.fragment):
+        raise SystemExit("GHOSTIE_RELAY_ORIGIN must be an HTTPS origin")
+    with open(sys.argv[1], "rb") as source:
+        info = plistlib.load(source)
+    info["GhostieRemoteRelayURL"] = origin.rstrip("/")
+    with open(sys.argv[1], "wb") as target:
+        plistlib.dump(info, target)
+PYREMOTE
 
 # ============================================================================
 # Sign each inner binary with the BUNDLE's identifier, then seal the

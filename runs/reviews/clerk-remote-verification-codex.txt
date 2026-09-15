@@ -1,0 +1,13 @@
+**Verdict:** BLOCK
+
+1. Packaging critical: PARTIAL. The original `remote-relay-mcp` sidecar false positive is fixed by excluding `remote-relay` in [build-release.sh](scripts/build-release.sh:346), and version staging now includes `facade.ts` in [release.sh](scripts/release.sh:342). But release packaging is still blocked: the `GHOSTIE_RELAY_ORIGIN` Python injection is written inside the `Info.plist` heredoc in [build-release.sh](scripts/build-release.sh:452), so the generated plist begins with shell/Python text instead of XML and the Python never runs.
+
+2. Client removal deny: ADDRESSED. `/mcp/hosts/:id` now rejects tokens whose stored client id is no longer configured in [server.ts](mcps/remote-relay/src/server.ts:111), with a regression in [server.test.ts](mcps/remote-relay/src/server.test.ts:83).
+
+3. Cancellation reporting: ADDRESSED. Cancellation during in-flight pair start now attempts server cancel after the start returns and reports failure honestly in [RemoteHostingController.swift](menubar/Sources/MessagesForAIMenu/RemoteHostingController.swift:126), with coverage in [RemoteHostingPolicyTests.swift](menubar/Tests/MessagesForAIMenuTests/RemoteHostingPolicyTests.swift:97).
+
+4. Repeated polling: ADDRESSED, rejection justified. `pollPair` returns the already-created host only to the same proof holder during TTL, while approval replay is refused by `pair.host` in [authorization.ts](mcps/remote-relay/src/authorization.ts:33). This is recovery from a lost poll response, not new credential issuance.
+
+5. Swift lifecycle tests: ADDRESSED. The new test class covers start/stop, quit preference, process failure, disconnect success/failure, and cancellation while start is in flight in [RemoteHostingPolicyTests.swift](menubar/Tests/MessagesForAIMenuTests/RemoteHostingPolicyTests.swift:23).
+
+I did not edit files or run production operations. I also did not run builds/tests in this read-only sandbox. Final: BLOCK.
