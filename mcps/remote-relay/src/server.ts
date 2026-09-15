@@ -39,6 +39,7 @@ export function startRelay(options: RelayOptions) {
     async fetch(request, server) {
       const url = new URL(request.url);
       const path = url.pathname;
+      if (path === "/health" && request.method === "GET") return json({ status: "ok" });
       const origin = request.headers.get("origin");
       if (origin && origin !== options.origin) return json({ error: "forbidden_origin" }, 403);
       // Public TLS proxy must preserve Host and must be the only route to this listener.

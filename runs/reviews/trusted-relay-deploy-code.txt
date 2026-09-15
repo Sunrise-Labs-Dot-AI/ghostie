@@ -1,0 +1,9 @@
+**MERGE-OK FOR LIVE ACCEPTANCE**
+
+No blockers in the new production boundary. The Docker/Caddy/supervisor path is deploy-ready for a live Clerk acceptance run, not a public release.
+
+The boundary holds on the review axes: secrets are not printed, Clerk telemetry is disabled, Caddy logs are discarded, core dumps are disabled, SQLite stores hashed credentials/tokens only, and the smoke test asserts payload/token/log canaries. Lifecycle is sane: the supervisor runs relay plus Caddy, terminates the sibling if either child exits, and exits nonzero on proxy failure. Host/Origin handling is acceptable for live acceptance: Caddy normalizes upstream `Host` to the configured relay host while preserving client `Origin`; the relay rejects foreign origins and invalid upstream hosts outside `/health`.
+
+CI has real value as a packaging smoke, not a live identity proof. It verifies the production image boots, forwards through Caddy, enforces auth, returns no-store, fails closed offline, disables core dumps, avoids metadata/log leaks, and dies when Caddy dies. It does not cover actual Clerk signup/sign-in, CAPTCHA/CSP, or the chosen real MCP client OAuth flow.
+
+Before public release, run the live acceptance checklist from the README: real Clerk account flow, returning sign-in, two accounts/two Macs, chosen MCP client OAuth, TLS on both legs, suspend/wake, force-quit, revocation, and local synthetic draft review/send.
