@@ -21,9 +21,10 @@ const api=async(path,body)=>{
  const response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},body:JSON.stringify(body)});
  const data=await response.json(); if(!response.ok)throw Error('This request is unavailable or has expired. Start again in Ghostie or your MCP client.');return data;
 };
+let signInMounted=false;
 async function render(){
- if(!window.Clerk.user){byID('account').hidden=true;byID('signup').hidden=false;window.Clerk.mountSignIn(byID('login'),{routing:'hash'});status('Sign in or create an account to continue.');return;}
- window.Clerk.unmountSignIn(byID('login'));byID('signup').hidden=true;byID('account').hidden=false;
+ if(!window.Clerk.user){byID('account').hidden=true;byID('signup').hidden=false;if(!signInMounted){window.Clerk.mountSignIn(byID('login'),{routing:'hash'});signInMounted=true;}status('Sign in or create an account to continue.');return;}
+ if(signInMounted){window.Clerk.unmountSignIn(byID('login'));signInMounted=false;}byID('signup').hidden=true;byID('account').hidden=false;
  byID('identity').textContent='Signed in as '+(window.Clerk.user.primaryEmailAddress?.emailAddress||window.Clerk.user.id);
  try{
   if(pairing){byID('code-label').hidden=false;byID('details').textContent='Only connect if you started this from Ghostie on your own Mac. Enter the code displayed there.';}
