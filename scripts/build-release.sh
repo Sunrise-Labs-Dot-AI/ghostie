@@ -343,6 +343,8 @@ echo "=== Verifying inner-binary coverage (repo layout ↔ bundle) ==="
 EXPECTED_SIDECARS=()
 for mcp_dir in "$REPO_ROOT"/mcps/*/; do
   base=$(basename "$mcp_dir")
+  # The HTTPS relay runs on a server and is never a Mac app sidecar.
+  [[ "$base" == "remote-relay" ]] && continue
   # backend-dispatcher is the shared Bun backend compiled once to
   # messages-for-ai-backend. The historical MCP/daemon/tool names below are
   # tiny native launchers that exec this backend with a role.
@@ -500,6 +502,26 @@ cat > "$APP_PATH/Contents/Info.plist" <<EOF
 </dict>
 </plist>
 EOF
+
+# Optional public remote-MCP origin. No credentials are bundled in the app.
+python3 - "$APP_PATH/Contents/Info.plist" <<'PYREMOTE'
+import os
+import plistlib
+import sys
+from urllib.parse import urlsplit
+
+origin = os.environ.get("GHOSTIE_RELAY_ORIGIN", "")
+if origin:
+    url = urlsplit(origin)
+    if (url.scheme != "https" or not url.hostname or url.username or url.password
+            or url.path not in ("", "/") or url.query or url.fragment):
+        raise SystemExit("GHOSTIE_RELAY_ORIGIN must be an HTTPS origin")
+    with open(sys.argv[1], "rb") as source:
+        info = plistlib.load(source)
+    info["GhostieRemoteRelayURL"] = origin.rstrip("/")
+    with open(sys.argv[1], "wb") as target:
+        plistlib.dump(info, target)
+PYREMOTE
 
 # ============================================================================
 # Sign each inner binary with the BUNDLE's identifier, then seal the

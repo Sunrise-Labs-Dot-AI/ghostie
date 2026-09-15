@@ -1,0 +1,39 @@
+**Verdict: BLOCK**
+
+The amendment is safer than direct Clerk tokens for this product, because it can make the remote MCP token host-bound, client-bound, short-lived, revocable, and consent-scoped. Direct Clerk tokens are a bad fit if Clerk is not enforcing the exact MCP resource audience. Clerk’s current docs show PKCE/public clients, opaque tokens, custom scopes, 1-day access tokens, and non-expiring refresh tokens, which is not the narrow per-host capability Ghostie needs by default.
+
+**Blockers**
+
+1. [docs/plans/clerk-remote-mcp.md](docs/plans/clerk-remote-mcp.md:7) still says requests require “verified Clerk OAuth tokens.” That is now the wrong trust primitive.
+Fix: rewrite this to “relay-issued opaque access tokens,” with a real `/authorize`, `/token`, `/revoke`, and protected-resource metadata contract. Token records must bind `user_id`, `client_id`, `resource_id`, `host_id`, `scope`, `consent_version`, `expires_at`, and `revoked_at`.
+
+2. Resource binding is not concrete enough. If the remote MCP URL or request path can select host A while the token was minted for host B, this becomes cross-Mac confused deputy.
+Fix: make the resource URI host-specific and immutable, for example `/mcp/hosts/{host_id}`. Every request must require `path.host_id == token.host_id == consent.host_id == connected_wss.host_id`.
+
+3. The custom OAuth service can silently become a refresh-token substitute through the Clerk browser session.
+Fix: no refresh token is good, but add access-token TTL, consent TTL, re-consent on scope or host change, and revocation semantics. I would set access tokens to 5 to 15 minutes, no silent widening, and force explicit consent again for any new host or method scope.
+
+4. Static clients and exact redirect URIs may break real MCP clients.
+Fix: list the first supported clients and their exact redirect URIs in the plan before implementation. If a client needs loopback redirects with dynamic ports, either reject it or define a narrow RFC 8252-style exception. Do not “temporarily” allow wildcard redirects.
+
+5. Host WSS authentication is replayable if it is just a Keychain bearer credential.
+Fix: relay stores only a peppered hash of the host secret, host proves possession with a nonce challenge on every WSS connect, duplicate connections revoke or evict deterministically, and disconnect disables routing immediately.
+
+6. The pairing ceremony is underspecified for account takeover and misbinding.
+Fix: pairing records need TTL, one-time consume, displayed-code confirmation, host name/device fingerprint, user confirmation of “this Mac,” replay ledger, and explicit cancel/revoke. The displayed code should be a SAS confirmation value, not the credential.
+
+7. The data-boundary claim is too soft. Line 11 says relay buffers bodies in memory, while line 7 says “Metadata only lives in SQLite.” The relay still receives message bodies.
+Fix: state plainly that Sunrise relay can see message bodies in transit. Then require body-free logs, traces, metrics, exceptions, request dumps, WAF logs, and provider logs. Add tests that crash paths and timeout paths do not persist bodies.
+
+8. Authentication-material filtering is heuristic and admits it can miss secrets.
+Fix: do not make this a primary safety boundary. Keep the redactor, but add structural limits: narrow time windows, max result sizes, no bulk export, rate limits, untrusted-content wrapping on every message body, and user-visible warning that remote MCP can expose message contents to the configured client.
+
+9. Remote `stage` is a mutation with social-engineering blast radius.
+Fix: mark remote-origin drafts, cap rate and length, forbid schedule/approval metadata, forbid attachments and hidden fields, require strict schema with unknown-field rejection, and make local UI show “staged remotely by client X.”
+
+10. Verification is missing protocol conformance and abuse tests.
+Fix: add tests for PKCE downgrade refusal, code replay, redirect mismatch, state mismatch, resource mismatch, client mismatch, revoked consent, expired token, duplicate WSS host, path/token host mismatch, log-body leakage, and remote-stage flood limits.
+
+So: yes, the relay-owned OAuth code + PKCE design is safer than direct Clerk tokens. But it only clears the gate if the plan stops treating auth as a paragraph and specifies the token, consent, host, resource, redirect, and logging invariants as hard contracts.
+
+Sources checked: Clerk OAuth implementation docs, including PKCE/public clients, token expiration, opaque tokens, and custom scopes: https://clerk.com/docs/guides/configure/auth-strategies/oauth/how-clerk-implements-oauth ; Clerk OAuth app API shape: https://clerk.com/docs/reference/backend/oauth-applications/create

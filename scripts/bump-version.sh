@@ -53,7 +53,7 @@ FILES=(
 )
 
 MCP_INDEX_FILES=(
-  "mcps/ghostie/src/index.ts"
+  "mcps/ghostie/src/facade.ts"
   "mcps/imessage-drafts/src/index.ts"
   "mcps/whatsapp-drafts/src/index.ts"
 )

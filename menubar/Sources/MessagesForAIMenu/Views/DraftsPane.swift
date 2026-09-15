@@ -6739,6 +6739,11 @@ struct PendingMessageBubble: View {
 
   private var bubbleStack: some View {
     VStack(alignment: .trailing, spacing: 7) {
+      if draft.source == "ghostie-remote" {
+        Label("Staged remotely. Review before sending.", systemImage: "network")
+          .font(.caption)
+          .foregroundStyle(.secondary)
+      }
       if draft.induced_by_unknown_contact == true {
         InducedDraftBadge()
           .frame(maxWidth: 420)

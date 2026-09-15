@@ -126,6 +126,7 @@ jobs:
       matrix:
         mcp:
           - mcps/ghostie
+          - mcps/remote-relay
           - mcps/wrapped-generator
           - mcps/birthday-generator
     name: bun-portable-test (${{ matrix.mcp }})

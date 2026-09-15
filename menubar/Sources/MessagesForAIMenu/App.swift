@@ -366,9 +366,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // Start Sparkle's background update scheduler now that the app has finished
     // launching (Sparkle warns against starting it earlier).
     updater.start()
+    RemoteHostingController.shared.resumeIfEnabled()
   }
 
   func applicationWillTerminate(_ notification: Notification) {
+    RemoteHostingController.shared.stopHosting(preservePreference: true)
     attachmentSpoolCleanupTimer?.invalidate()
     DiagnosticsStore.shared.log("app_terminate")
     imessageDaemon.stopBlocking()

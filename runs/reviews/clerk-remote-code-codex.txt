@@ -1,0 +1,17 @@
+**Verdict: BLOCK**
+
+Critical:
+- [scripts/build-release.sh](scripts/build-release.sh:371): release packaging will now fail. The guard derives `remote-relay-mcp` from `mcps/remote-relay/src/index.ts`, but `BACKEND_LAUNCHERS` and `INNER_BINARIES` do not include it at lines 193-202 and 282-293. Since the plan says the relay is standalone, the fix is likely to explicitly exclude `remote-relay` from app sidecar derivation, not bundle it.
+
+Warnings:
+- [mcps/remote-relay/src/store.ts](mcps/remote-relay/src/store.ts:38): per-call auth does not recheck the configured OAuth client allowlist. Client validity is checked during consent in [authorization.ts](mcps/remote-relay/src/authorization.ts:56), then only stored on the token. If an operator removes a client, existing one-hour tokens remain valid. That undercuts the plan’s “requests require configured client allowlist” claim.
+- [menubar/Sources/MessagesForAIMenu/RemoteHostingController.swift](menubar/Sources/MessagesForAIMenu/RemoteHostingController.swift:150): pairing cancellation is best-effort. The UI clears local pairing state immediately, while server deletion is an unobserved async request. If that request fails, the pairing remains until expiry, contrary to “Cancel deletes the pairing.”
+- [mcps/remote-relay/src/authorization.ts](mcps/remote-relay/src/authorization.ts:39): approved pair records remain pollable until expiry. Re-approval is blocked, so this is not a direct takeover, but it does not fully satisfy the “approval is one-time” wording.
+- [menubar/Tests/MessagesForAIMenuTests/RemoteHostingPolicyTests.swift](menubar/Tests/MessagesForAIMenuTests/RemoteHostingPolicyTests.swift:4): Swift coverage is only URL/encoding policy. The plan claims settings state and lifecycle coverage, but start/stop, resume, process failure, disconnect, and cancellation are not covered here.
+
+Refuted areas:
+- No remote send guarantee looks solid in the reviewed remote path: [remote-policy.ts](mcps/ghostie/src/remote-policy.ts:8) only permits read/search/text-stage/draft read tools, and [remote-executor.ts](mcps/ghostie/src/remote-executor.ts:41) rejects every non-tool or unlisted tool call.
+- PKCE/resource/owner binding mostly matches the plan: consent checks exact redirect and host owner, exchange consumes codes and verifies S256/resource, and MCP calls bind token to host resource.
+- Content filtering is implemented at the Mac boundary and now has deterministic SDK-level tests. The “no provider logs/traces/crash dumps/backups” part remains deployment-gated, not proven by code, which is fine only if nobody claims it has shipped.
+
+I did not edit files. I did not run the full test suite in this read-only sandbox.

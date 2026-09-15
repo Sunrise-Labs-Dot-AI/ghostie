@@ -27,4 +27,7 @@ node tests/experience/mcp-agent-choice-contract.mjs
 echo "==> Site/update/package metadata checks"
 node tests/experience/site-update-checks.mjs
 
+echo "==> Remote MCP release packaging contract"
+python3 tests/experience/remote-release-contract.py
+
 echo "==> Experience evals passed"
