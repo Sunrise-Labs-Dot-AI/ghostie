@@ -1,0 +1,15 @@
+**Verdict: BLOCK**
+
+The relay core is directionally solid, especially the Mac-side tool allowlist and no-send boundary, but it is not production-shippable yet.
+
+Critical blockers:
+
+1. No production Railway deployment artifact exists. [mcps/remote-relay/README.md](mcps/remote-relay/README.md:7) still says the repo does not provision Clerk, TLS, a public hostname, or a production relay, and `mcps/remote-relay` has no Dockerfile, `railway.json`, proxy config, health/readiness route, or log/core-dump policy enforcement.
+
+2. Hosted OAuth acceptance is unproven. The implementation record says no account provisioning or relay deployment was performed ([runs/remote-mcp-implementation.md](runs/remote-mcp-implementation.md:7)), and the Railway probe only proved synthetic Claude over Railway standard HTTPS while ChatGPT remained unverified ([runs/railway-probe.md](runs/railway-probe.md:17), [runs/railway-probe.md](runs/railway-probe.md:29)). No real Clerk sign-in plus per-Mac OAuth consent flow has passed in a hosted client.
+
+3. The no-content-log claim is still a deployment promise, not evidence. Code tests show payloads do not land in SQLite ([mcps/remote-relay/src/server.test.ts](mcps/remote-relay/src/server.test.ts:29)), but there is no Railway/proxy log canary run, no provider log inspection, and no production config disabling body/header logs, traces, cache, or core dumps. The plan requires that before ship ([docs/plans/trusted-relay-v1.md](docs/plans/trusted-relay-v1.md:7)).
+
+Engineering choice: use Railway standard HTTPS edge, not the raw TCP tunnel. The probe showed hosted Claude failed on the assigned TCP port but passed through Railway HTTPS edge. Since James accepted trusted relay visibility, edge TLS termination is now the right production path.
+
+No files modified, no external actions called. I did not run tests in this read-only sandbox.

@@ -1,0 +1,5 @@
+No concrete blockers in this follow-up.
+
+The `signInMounted` guard addresses the reset bug: unauthenticated Clerk listener churn no longer remounts `<SignIn />`, so in-progress form state should survive typing/session updates. The authenticated path still unmounts exactly once when a user appears, and sign-out is covered because `signInMounted` is reset to `false` on sign-in, then the next unauthenticated render mounts SignIn again.
+
+Source-review only caveat matches your note: live Clerk sign-in/sign-out behavior is still pending verification, but from this diff the state machine is sound.

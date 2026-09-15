@@ -19,10 +19,14 @@ struct RemoteHostingSettingsSection: View {
           }
           Button("Disconnect account") { remote.disconnectAccount() }
         }.disabled(remote.isDisconnecting)
+        if let origin = RemoteHostingPolicy.origin(account.origin) {
+          Link("Manage account and passkeys", destination: origin.appendingPathComponent("account"))
+            .font(.callout)
+        }
       } else {
         TextField("Ghostie service URL", text: $remote.relayOrigin, prompt: Text("HTTPS service URL"))
           .textFieldStyle(.roundedBorder).disabled(remote.isPairing)
-        Text("Use the Ghostie service address supplied with your build. Accounts are managed by Clerk.").font(.caption).foregroundStyle(.secondary)
+        Text("Use the Ghostie service address supplied with your build. Sign up with your email; you can add a passkey later in Manage account.").font(.caption).foregroundStyle(.secondary)
         if let code = remote.pairingCode {
           Text(code).font(.title2.monospaced()).textSelection(.enabled).accessibilityLabel("Pairing code \(code)")
           if let url = remote.pairingURL { Link("Continue in browser", destination: url) }

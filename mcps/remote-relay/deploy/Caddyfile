@@ -1,0 +1,20 @@
+{
+    admin off
+    auto_https off
+    log {
+        output discard
+    }
+}
+:{$PORT:8080} {
+    request_body {
+        max_size 64KB
+    }
+    header {
+        Strict-Transport-Security "max-age=31536000"
+        ?Cache-Control "no-store"
+        ?X-Content-Type-Options "nosniff"
+    }
+    reverse_proxy 127.0.0.1:8787 {
+        header_up Host {$GHOSTIE_RELAY_HOST}
+    }
+}

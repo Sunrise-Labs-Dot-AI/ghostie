@@ -31,7 +31,7 @@ if (!config.success) {
 const env = config.data;
 mkdirSync(dirname(env.GHOSTIE_RELAY_DB), { recursive: true, mode: 0o700 });
 const store = new Store(env.GHOSTIE_RELAY_DB);
-const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY, publishableKey: env.CLERK_PUBLISHABLE_KEY });
+const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY, publishableKey: env.CLERK_PUBLISHABLE_KEY, telemetry: { disabled: true } });
 const relay = startRelay({
   origin: env.GHOSTIE_RELAY_ORIGIN, store, clients: env.GHOSTIE_OAUTH_CLIENTS,
   publishableKey: env.CLERK_PUBLISHABLE_KEY,
