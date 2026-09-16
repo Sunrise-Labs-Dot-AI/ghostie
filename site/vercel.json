@@ -15,7 +15,25 @@
       ]
     }
   ],
+  "crons": [
+    {
+      "path": "/v1/internal/message-opener-cleanup",
+      "schedule": "17 8 * * *"
+    }
+  ],
   "rewrites": [
+    {
+      "source": "/v1/links",
+      "destination": "/api/message-opener?action=create"
+    },
+    {
+      "source": "/t/:id",
+      "destination": "/api/message-opener?action=open&id=:id"
+    },
+    {
+      "source": "/v1/internal/message-opener-cleanup",
+      "destination": "/api/message-opener?action=cleanup"
+    },
     {
       "source": "/releases/latest/download/Ghostie.dmg",
       "destination": "/api/download"
