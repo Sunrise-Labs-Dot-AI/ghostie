@@ -60,3 +60,17 @@ James requested email signup with optional passkeys, without social OAuth setup.
 Added `/account` and a connected-account link in Advanced settings. Account management opens Clerk's prebuilt profile on the relay origin, keeping passkey enrollment and login on the same site. The account page does not call pairing or consent APIs, even with OAuth query parameters. Users complete their own passkey enrollment.
 
 Validation: relay typecheck and 21 tests/79 assertions pass; Swift build and full suite pass. Independent gpt-5.5 plan and adversarial diff reviews found no blockers (`runs/reviews/trusted-relay-account-{plan,code}.txt`). Prior Claude lane unavailable due expired OAuth, as recorded above. Live account creation, profile/passkey use, and both real client acceptance checks remain pending.
+
+## Real-account acceptance, September 15 evening (Pacific)
+
+James chose his real account rather than a separate test identity and supplied his email for Ghostie signup. Completed the production email OTP flow and verified the signed-in account page. Clerk's prebuilt profile opens on the relay origin and Security shows Add a passkey. No password or passkey was created by the agent; passkey device enrollment remains optional and user-operated.
+
+- Current relay deployment `ffa4b215-b95c-4f32-b3b7-c2fd0db57ebf` is successful. `/account` renders with CSP and no-store. Current application logs contain only volume/container startup lines, including after the synthetic authenticated tool calls.
+- Paired the fixed synthetic host with James's real Clerk account. It imports no messaging backend and exposes only `ghostie_connection_check`.
+- Desktop acceptance PASS: live Clerk session, per-host consent, S256 exchange, official MCP SDK initialize/list/call, then revocation and 401 rejection. Chrome briefly displayed ERR_BLOCKED_BY_CLIENT on the local callback, but the fixture subsequently received the callback and completed every assertion. No browser block was bypassed by the agent.
+- Hosted Claude acceptance PASS: static `ghostie-claude` client, live consent, authenticated tool discovery and one approved tool call returned exactly `Ghostie synthetic connection works. No messages are available.` Evidence chat: https://claude.ai/chat/b43d1367-8666-48d4-b8ab-fce1f0190cce . This verifies the hosted transport; a separate mobile device was not tested.
+- Stopped the synthetic fixture. It confirmed host/capability revocation and cleanup. Disconnected the temporary Claude connector and verified the disconnected UI. James's real Clerk account remains signed in.
+- Refreshed `/tmp/ghostie-trusted-local-qa/Ghostie.app` with the current UI, compiled shared backend, and all stable role launchers. Restored the canonical bundle identifier; each Mach-O has the canonical signing identifier and Developer ID signature, and strict bundle verification passes. The temporary bundle uses an isolated data folder via LSEnvironment, has updates disabled, and carries the live relay URL. It does not replace the installed app.
+- Requested that James open the temporary app from his own Terminal to finish GUI/Keychain/pair/start/stop checks after the earlier automated-launch Keychain stall. No app release has been published. Keep the default release service address unset until this final local acceptance passes.
+
+All 14 CI checks at implementation head `fc0b65b` passed, with two intentional site skips. Only acceptance documentation changed after that head.
