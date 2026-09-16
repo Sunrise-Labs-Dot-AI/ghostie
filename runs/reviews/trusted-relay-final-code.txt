@@ -1,0 +1,7 @@
+**Verdict:** Approved for live acceptance.
+
+I found no concrete correctness or security blockers in `origin/main...HEAD` for the production relay container, lifecycle handling, no-content logging, synthetic live acceptance scripts, or CI/type pin changes. The relay container keeps Bun on loopback behind Caddy, drops to `bun`, disables core dumps, suppresses child stdout/stderr, normalizes upstream `Host`, and the smoke test asserts auth refusal, forwarding, no-store, offline fail-closed behavior, no raw canaries in SQLite/logs, and proxy-death shutdown.
+
+I did not run Docker/Bun locally because this worktree is read-only, so this is a source review plus committed verification evidence review.
+
+**Remaining release gates:** live Clerk/browser/client OAuth acceptance, live deployment log inspection, signed local app acceptance including account/Keychain/offline/revocation/draft review, final CI/merge, and James-run release from his Terminal.

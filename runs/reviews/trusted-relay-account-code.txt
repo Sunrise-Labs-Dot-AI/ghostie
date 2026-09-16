@@ -1,0 +1,5 @@
+No concrete blockers found.
+
+The diff appears to preserve the important boundary: `/account` renders the Clerk-authenticated account UI, hides connection consent UI, returns before consent/pairing API calls, and makes `approve` a no-op when `accountOnly` is true. Query parameters that would normally matter for OAuth consent are ignored on `/account`, and account management uses Clerk’s `openUserProfile()` rather than any relay authorization path.
+
+Residual non-blocking nits: the page title still says “Connect Ghostie,” and the account route reuses the same page template, but neither appears to create host access or weaken the Clerk/MCP authorization model.

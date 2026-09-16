@@ -1,0 +1,13 @@
+No correctness/security blockers found in the bounded change.
+
+The fix does what it says: `signOut` now explicitly redirects to `/account`, avoiding the undefined relay root, while sign-in/sign-up redirect targets are same-origin path + query only via `location.pathname + location.search`. That preserves active `/pair?...` or `/account?...` state and excludes fragments, which is the right security posture versus `location.href`.
+
+The main things I checked adversarially:
+
+- `returnURL` cannot become cross-origin because it is built from `pathname` and `search`, not user-controlled absolute URL fields.
+- Query preservation for `/pair` keeps OAuth/consent context intact.
+- Fragment exclusion avoids feeding Clerk hash-routing state back into redirect targets.
+- `/account` sign-out redirect is intentionally fixed and does not grant/authorize anything.
+- Tests now assert the actual Clerk arguments for sign-in, sign-up, and sign-out, which covers the regression surface.
+
+Residual non-blocker: preserving the full query on `/account` is fine given the existing test asserts account management never authorizes with consent params, but it still means benign stale query params can survive sign-in/up flows there. I would not block on that under this scoped fix.

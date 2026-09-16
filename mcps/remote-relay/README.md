@@ -4,7 +4,7 @@ Opt-in remote reading and text-draft staging from a running Ghostie Mac. Clerk m
 
 ## Status
 
-Implemented and tested with synthetic data. This repository does not provision Clerk, a public hostname, TLS, or a production relay. A configured, signed app and a live Clerk/browser/client acceptance run are required before making this feature available to users. Settings accepts a service URL for advanced deployments. A distribution can set `GhostieRemoteRelayURL` in its app Info.plist; development can use `GHOSTIE_RELAY_ORIGIN` in the app launch environment. Neither has an invented production default.
+The trusted-relay implementation and production container are tested with synthetic data. The managed service uses Railway at `https://connect.messagesfor.ai` with the existing Ghostie production Clerk application. Live acceptance status is tracked in `runs/trusted-relay-v1.md`. A configured, signed app and a live Clerk/browser/client acceptance run are required before making this feature available to users. Settings accepts a service URL for advanced deployments. A distribution can set `GhostieRemoteRelayURL` in its app Info.plist; development can use `GHOSTIE_RELAY_ORIGIN` in the app launch environment. Neither has an invented production default.
 
 ## User flow
 
@@ -57,6 +57,8 @@ Register each supported MCP client with its exact callback URI from that client'
 
 Clients must support static public client IDs, authorization code with PKCE S256, the `resource` parameter at authorization and token exchange, and Streamable HTTP. No dynamic client registration, client secrets, wildcard redirects, or implicit grant. An exact HTTP loopback callback is permitted only when explicitly registered. Dynamic loopback ports are not supported. Validate the intended client with its real callback before launch; this implementation has SDK transport tests, not a certified production-client compatibility list.
 
+Cursor / Grok Bot uses the public client `ghostie-cursor`, scopes `messages:read messages:draft`, and no client secret. Register both `http://localhost:8787/callback` and `https://www.cursor.com/agents/mcp/oauth/callback`, as documented in [Cursor's static OAuth setup](https://cursor.com/docs/mcp#static-oauth-for-remote-servers). The explicit `localhost` HTTP exception supports its fixed desktop callback; consent and token exchange still require the exact registered URI. The MCP URL and OAuth `resource` are the host-specific URL copied from Ghostie's Advanced settings, not the relay root.
+
 ```sh
 cd mcps/remote-relay
 bun install
@@ -80,6 +82,23 @@ Caddy example, with the hostname supplied by deployment configuration:
 ```
 
 Keep access logs and request-body capture disabled. Set `LimitCORE=0` in the service supervisor. Do not deploy this relay as a stateless Vercel function: it owns long-lived WSS connections.
+
+## Production container on Railway
+
+Build from `mcps/remote-relay` with its Dockerfile. Run one replica with a persistent volume at `/data`, port `8080`, health path `/health`, restart on failure (three attempts), and serverless/CDN caching disabled. Keep the start command empty so the image entrypoint runs. The entrypoint disables core dumps, restricts volume permissions and drops to the Bun user. The supervisor owns both processes and stops the container if either exits. Caddy accepts Railway edge traffic and forwards only to the loopback Bun listener. Railway terminates public TLS and documents encryption between its edge and applications. This is a trusted hosting boundary, not relay-blind encryption.
+
+Configure the required variables above, with `GHOSTIE_RELAY_DB=/data/relay.sqlite` and `PORT=8080`. Store the Clerk secret only in Railway service variables. Clerk telemetry, Caddy logging and child stdout/stderr capture are disabled; only generic supervisor failures are emitted. Railway HTTP metadata can still include request paths, timing and source addresses. Do not claim that request metadata is deleted or that process memory is securely erased after a request.
+
+Verify the exact image locally before upload:
+
+```sh
+docker build -t ghostie-relay:local mcps/remote-relay
+bun run mcps/remote-relay/tests/container-smoke.ts
+```
+
+Upload only the relay directory using Railway CLI `up . --path-as-root` from that directory, with the explicit production project/service/environment IDs from the rollout record. New Railway services use dashboard settings or Infrastructure as Code; do not add a legacy railway.json. Keep deployments manual until live acceptance passes. Registered Claude client ID: `ghostie-claude`, callback `https://claude.ai/api/mcp/auth_callback` (no client secret).
+
+For manual browser acceptance, `GHOSTIE_RELAY_ORIGIN=https://connect.messagesfor.ai bun run mcps/remote-relay/tests/live-acceptance.ts` starts a fixed synthetic host and prints a pairing URL/code. It never imports messaging backends. Stop it with Ctrl-C to revoke the test host. If interrupted unexpectedly, its private temporary cleanup file permits retrying revocation; never commit or upload that file.
 
 ## Protocol and verification
 

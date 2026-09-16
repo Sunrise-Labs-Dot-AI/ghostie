@@ -1,0 +1,12 @@
+**Blockers**
+
+None, assuming exact redirect URI matching truly happens at authorization time and not just at startup/registration validation.
+
+**Acceptance Gaps**
+
+- Add an explicit test that `http://localhost:8787/callback` is accepted only as an exact registered URI, not via hostname-level consent or prefix/path normalization.
+- Add case/canonicalization coverage: `LOCALHOST`, trailing dot `localhost.`, percent-encoded host/path variants, default-port normalization, and path variants like `/callback/`, `/callback%2f`, `/callback?x=...`.
+- Confirm `localhost` allowance is scoped only to loopback-style HTTP redirect URIs and cannot expand to arbitrary `.localhost` names, wildcard hosts, or config-driven host consent.
+- Verify startup failure behavior remains fail-closed for malformed callbacks, but does not crash-loop production during phased config rollout.
+- Include a rollback criterion: if adding localhost config fails final health/OAuth smoke test, revert only the callback config, not code.
+- Document why `localhost` is accepted in production config despite HTTP, tied specifically to Cursor’s fixed documented callback.
