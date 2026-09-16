@@ -20,6 +20,14 @@
     -->
     <!-- release.sh inserts <item> entries here, newest first. -->
     <item>
+      <title>v0.14.0</title>
+      <sparkle:version>41</sparkle:version>
+      <sparkle:shortVersionString>0.14.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+      <pubDate>Wed, 16 Sep 2026 07:43:36 -0700</pubDate>
+      <enclosure url="https://spjjuysfijuttwap.public.blob.vercel-storage.com/releases/v0.14.0/messages-for-ai-v0.14.0.zip" sparkle:edSignature="U4gfmVhJJr0G9WfCBupHNp/cehKDnz7nUp7CWbkUt4MfThBdfTaGhoGVezxPAjxpHQ3bjQ7SZ7FnK1qJCuLhDA==" length="34949470" type="application/octet-stream" />
+    </item>
+    <item>
       <title>v0.13.0</title>
       <sparkle:version>22</sparkle:version>
       <sparkle:shortVersionString>0.13.0</sparkle:shortVersionString>
