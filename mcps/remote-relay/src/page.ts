@@ -14,6 +14,7 @@ body{font:16px/1.55 system-ui;background:#f7f6ef;color:#18352d;margin:0;padding:
 const config=${encoded};
 const byID=id=>document.getElementById(id);
 const query=Object.fromEntries(new URLSearchParams(location.search));
+const returnURL=location.pathname+location.search;
 const pairing=location.pathname==='/pair';
 const accountOnly=location.pathname==='/account';
 if(accountOnly){byID('heading').textContent='Your Ghostie account';byID('intro').textContent='Sign in with your email, then manage your account or add an optional passkey.';byID('connection').hidden=true;}
@@ -25,7 +26,7 @@ const api=async(path,body)=>{
 };
 let signInMounted=false;
 async function render(){
- if(!window.Clerk.user){byID('account').hidden=true;byID('signup').hidden=false;if(!signInMounted){window.Clerk.mountSignIn(byID('login'),{routing:'hash'});signInMounted=true;}status('Sign in or create an account to continue.');return;}
+ if(!window.Clerk.user){byID('account').hidden=true;byID('signup').hidden=false;if(!signInMounted){window.Clerk.mountSignIn(byID('login'),{routing:'hash',forceRedirectUrl:returnURL,signUpForceRedirectUrl:returnURL});signInMounted=true;}status('Sign in or create an account to continue.');return;}
  if(signInMounted){window.Clerk.unmountSignIn(byID('login'));signInMounted=false;}byID('signup').hidden=true;byID('account').hidden=false;
  byID('identity').textContent='Signed in as '+(window.Clerk.user.primaryEmailAddress?.emailAddress||window.Clerk.user.id);
  if(accountOnly){status('Choose Manage account, then Security to add a passkey.');return;}
@@ -40,9 +41,9 @@ byID('approve').onclick=async()=>{if(accountOnly)return;byID('approve').disabled
  else{const data=await api('/api/consent/approve',query);location.assign(data.redirect);}
 }catch(e){status(e.message);byID('approve').disabled=false;}};
 byID('cancel').onclick=()=>{byID('account').hidden=true;status('Cancelled. No new access was granted. You can close this window.');};
-byID('signout').onclick=()=>window.Clerk.signOut();
+byID('signout').onclick=()=>window.Clerk.signOut({redirectUrl:'/account'});
 byID('manage').onclick=()=>{if(window.Clerk.user)window.Clerk.openUserProfile();};
-byID('signup').onclick=()=>window.Clerk.openSignUp({forceRedirectUrl:location.href});
+byID('signup').onclick=()=>window.Clerk.openSignUp({forceRedirectUrl:returnURL,signInForceRedirectUrl:returnURL});
 const script=document.createElement('script');script.src=config.clerkScriptURL;script.dataset.clerkPublishableKey=config.publishableKey;script.crossOrigin='anonymous';
 script.onload=async()=>{try{await window.Clerk.load();await render();window.Clerk.addListener(()=>render());}catch{status('Sign-in is unavailable. Try again later.');}};
 script.onerror=()=>status('Sign-in could not load. Try again later.');document.head.appendChild(script);

@@ -8,12 +8,15 @@ test('Clerk session updates preserve an in-progress sign-in form', async () => {
   const nodes = new Map<string, Record<string, unknown>>();
   const get = (id: string) => { if (!nodes.has(id)) nodes.set(id, {}); return nodes.get(id)!; };
   let mounted = 0, unmounted = 0;
+  let signInOptions: Record<string, unknown> = {}, signUpOptions: Record<string, unknown> = {}, signOutOptions: Record<string, unknown> = {};
   let listener!: () => Promise<void>;
   let loading!: Promise<void>;
   const clerk = {
     user: null as { id: string } | null,
     load: async () => {},
-    mountSignIn: () => { mounted++; }, unmountSignIn: () => { unmounted++; },
+    mountSignIn: (_node: unknown, options: Record<string, unknown>) => { mounted++; signInOptions = options; }, unmountSignIn: () => { unmounted++; },
+    openSignUp: (options: Record<string, unknown>) => { signUpOptions = options; },
+    signOut: (options: Record<string, unknown>) => { signOutOptions = options; },
     addListener: (callback: () => Promise<void>) => { listener = callback; },
   };
   runInNewContext(script, {
@@ -34,6 +37,13 @@ test('Clerk session updates preserve an in-progress sign-in form', async () => {
   clerk.user = null; await listener(); await listener();
   expect(mounted).toBe(2);
   expect(get('account').hidden).toBe(true);
+  expect(signInOptions.forceRedirectUrl).toBe('/pair?id=fixture');
+  expect(signInOptions.signUpForceRedirectUrl).toBe('/pair?id=fixture');
+  (get('signup').onclick as () => void)();
+  expect(signUpOptions.forceRedirectUrl).toBe('/pair?id=fixture');
+  expect(signUpOptions.signInForceRedirectUrl).toBe('/pair?id=fixture');
+  (get('signout').onclick as () => void)();
+  expect(signOutOptions.redirectUrl).toBe('/account');
 });
 
 test('account management never authorizes a connection, including with consent query parameters', async () => {

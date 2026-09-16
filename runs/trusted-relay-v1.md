@@ -74,3 +74,7 @@ James chose his real account rather than a separate test identity and supplied h
 - Requested that James open the temporary app from his own Terminal to finish GUI/Keychain/pair/start/stop checks after the earlier automated-launch Keychain stall. No app release has been published. Keep the default release service address unset until this final local acceptance passes.
 
 All 14 CI checks at implementation head `fc0b65b` passed, with two intentional site skips. Only acceptance documentation changed after that head.
+
+### Returning-account redirect fix
+
+The returning-user check found that Clerk's default sign-out destination was `/`, which the relay does not serve. The sign-out button now explicitly returns to `/account`. Sign-in and signup (including switching between them) explicitly preserve the current supported route and query, excluding Clerk hash-router fragments. Regression assertions exercise the options passed to Clerk. Relay typecheck and 21 tests/84 assertions pass; independent gpt-5.5 adversarial review found no blockers (`runs/reviews/trusted-relay-redirect-code.txt`). Passwordless returning sign-in correctly advances from email (empty password field) to the email-code challenge. Final post-deploy redirect check is pending.
