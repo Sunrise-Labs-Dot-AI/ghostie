@@ -1,0 +1,25 @@
+MERGE-OK
+
+I could not find a bounded-diff issue worth blocking. I reviewed the new `localhost` callback allowance, exact redirect matching, token exchange binding, PKCE enforcement, container config, and negative tests.
+
+**Security Auditor Findings**
+
+NOTE: [mcps/remote-relay/src/authorization.ts:5](mcps/remote-relay/src/authorization.ts:5)
+
+Concrete scenario: a future test or internal caller constructs `new Authorization(...)` directly with an unvalidated `clients` array containing `http://localhost.evil.test:8787/callback`; `validateConsent` would accept it because it only checks exact membership in `client.redirects`.
+
+Suggested fix: keep routing all production config through `index.ts` validation, or validate `clients` in the `Authorization` constructor if direct construction ever becomes production-facing.
+
+Preexisting distinction: direct constructor trust was preexisting. The diff improves env config validation by centralizing `oauthRedirectURI`; it does not newly expose an internet route.
+
+**Production Failure Findings**
+
+NOTE: [mcps/remote-relay/src/authorization.ts:5](mcps/remote-relay/src/authorization.ts:5)
+
+Concrete scenario: if a supported desktop client changes from fixed `http://localhost:8787/callback` to another localhost port, production config will reject that callback unless it is explicitly added. Auth would fail at consent with “Consent unavailable.”
+
+Suggested fix: document every supported callback exactly, and keep the current rollout plan of web-only config until the new path is verified healthy.
+
+Preexisting distinction: exact registered callback matching and no dynamic loopback ports are intentional preexisting behavior, reinforced by the README. This diff only adds the fixed Cursor callback exception.
+
+I would not block this. The important exploit shape, “open redirect by relaxed localhost parsing,” is covered by exact string registration plus negative tests for hostname tricks, fragments, userinfo, and callback mutations.

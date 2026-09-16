@@ -19,7 +19,7 @@ try {
   await command(['docker', 'run', '-d', '--name', name, '-p', '127.0.0.1::8080',
     '-e', `GHOSTIE_RELAY_ORIGIN=${origin}`, '-e', 'CLERK_PUBLISHABLE_KEY=pk_test_Zml4dHVyZS5jbGVyay5hY2NvdW50cy5kZXYk',
     '-e', 'CLERK_SECRET_KEY=sk_test_fixture', '-e', 'CLERK_FRONTEND_ORIGIN=https://fixture.clerk.accounts.dev',
-    '-e', 'GHOSTIE_OAUTH_CLIENTS=[{"id":"fixture","name":"Fixture","redirects":["https://client.example.test/callback"]}]',
+    '-e', 'GHOSTIE_OAUTH_CLIENTS=[{"id":"fixture","name":"Fixture","redirects":["https://client.example.test/callback"]},{"id":"ghostie-cursor","name":"Grok Bot / Cursor","redirects":["http://localhost:8787/callback","https://www.cursor.com/agents/mcp/oauth/callback"]}]',
     '-v', `${volume}:/data`, 'ghostie-relay:local']);
   const mapping = (await command(['docker', 'port', name, '8080'])).trim();
   assert.match(mapping, /^127\.0\.0\.1:\d+$/);

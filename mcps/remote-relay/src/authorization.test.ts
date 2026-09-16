@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { Authorization } from "./authorization.ts";
+import { Authorization, oauthRedirectURI } from "./authorization.ts";
 import { hash, secret, Store } from "./store.ts";
 
 const stores: Store[] = [];
@@ -20,6 +20,40 @@ function fixture() {
   };
   return { store, auth, proof, pair, paired, consent, exchange, advance: (ms: number) => { now += ms; } };
 }
+
+test("configured callbacks allow Cursor and numeric loopback, rejecting unsafe hosts", () => {
+  for (const uri of ["http://localhost:8787/callback", "https://www.cursor.com/agents/mcp/oauth/callback",
+    "http://127.0.0.1:18764/callback", "http://[::1]:8787/callback"]) {
+    expect(oauthRedirectURI.safeParse(uri).success).toBe(true);
+  }
+  for (const uri of ["http://localhost.evil.test:8787/callback", "http://sub.localhost:8787/callback",
+    "http://localhost.:8787/callback", "http://external.example/callback", "http://user@localhost:8787/callback",
+    "http://localhost:8787/callback#fragment", "ftp://localhost/callback"]) {
+    expect(oauthRedirectURI.safeParse(uri).success).toBe(false);
+  }
+});
+
+test("Cursor public client requires exact registered callback and PKCE", () => {
+  const f = fixture();
+  const callbacks = ["http://localhost:8787/callback", "https://www.cursor.com/agents/mcp/oauth/callback"];
+  f.auth.clients.push({ id: "ghostie-cursor", name: "Grok Bot / Cursor", redirects: callbacks });
+  for (const redirect_uri of callbacks) {
+    const proof = secret();
+    const request = { ...f.consent, client_id: "ghostie-cursor", redirect_uri, code_challenge: hash(proof) };
+    const redirect = new URL(f.auth.approveConsent(request, "user-a"));
+    const token = f.auth.exchange({ grant_type: "authorization_code", code: redirect.searchParams.get("code"),
+      client_id: request.client_id, redirect_uri, resource: request.resource, code_verifier: proof });
+    expect(f.store.authorize(token.access_token, f.paired.host!, request.resource)?.client).toBe("ghostie-cursor");
+    expect(() => f.auth.approveConsent(request, "user-b")).toThrow();
+    for (const changed of [redirect_uri + "/", redirect_uri + "%2f", redirect_uri + "?extra=1"])
+      expect(() => f.auth.approveConsent({ ...request, redirect_uri: changed }, "user-a")).toThrow();
+  }
+  for (const changed of ["http://LOCALHOST:8787/callback", "http://%6cocalhost:8787/callback",
+    "http://localhost:8788/callback", "http://127.0.0.1:8787/callback",
+    "https://www.cursor.com:443/agents/mcp/oauth/callback"]) {
+    expect(() => f.auth.approveConsent({ ...f.consent, client_id: "ghostie-cursor", redirect_uri: changed }, "user-a")).toThrow();
+  }
+});
 
 describe("pairing", () => {
   test("only the initiating Mac can poll and approval cannot be replayed", () => {

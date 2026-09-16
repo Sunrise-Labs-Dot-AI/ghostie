@@ -2,6 +2,12 @@ import { z } from "zod";
 import { equal, hash, secret, Store } from "./store.ts";
 
 export interface OAuthClient { id: string; name: string; redirects: string[] }
+export const oauthRedirectURI = z.string().url().refine(value => {
+  const url = new URL(value);
+  // Cursor uses localhost for its fixed desktop callback. Consent still matches the full URI exactly.
+  return !url.hash && !url.username && !url.password && (url.protocol === "https:" ||
+    (url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)));
+});
 export const consentSchema = z.object({
   client_id: z.string().min(1).max(200), redirect_uri: z.string().url().max(2000),
   response_type: z.literal("code"), code_challenge_method: z.literal("S256"),

@@ -4,6 +4,7 @@ import { dirname } from "node:path";
 import { z } from "zod";
 import { Store } from "./store.ts";
 import { startRelay } from "./server.ts";
+import { oauthRedirectURI } from "./authorization.ts";
 
 const httpsOrigin = z.string().url().refine(value => {
   const url = new URL(value);
@@ -17,10 +18,7 @@ const config = z.object({
   GHOSTIE_RELAY_DB: z.string().min(1),
   GHOSTIE_OAUTH_CLIENTS: z.string().transform(value => JSON.parse(value)).pipe(z.array(z.object({
     id: z.string().min(1).max(200), name: z.string().min(1).max(100),
-    redirects: z.array(z.string().url().refine(value => {
-      const url = new URL(value);
-      return !url.hash && !url.username && !url.password && (url.protocol === "https:" || (url.protocol === "http:" && ["127.0.0.1", "[::1]"].includes(url.hostname)));
-    })).min(1),
+    redirects: z.array(oauthRedirectURI).min(1),
   }).strict()).min(1)),
 }).safeParse(process.env);
 if (!config.success) {

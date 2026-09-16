@@ -57,6 +57,8 @@ Register each supported MCP client with its exact callback URI from that client'
 
 Clients must support static public client IDs, authorization code with PKCE S256, the `resource` parameter at authorization and token exchange, and Streamable HTTP. No dynamic client registration, client secrets, wildcard redirects, or implicit grant. An exact HTTP loopback callback is permitted only when explicitly registered. Dynamic loopback ports are not supported. Validate the intended client with its real callback before launch; this implementation has SDK transport tests, not a certified production-client compatibility list.
 
+Cursor / Grok Bot uses the public client `ghostie-cursor`, scopes `messages:read messages:draft`, and no client secret. Register both `http://localhost:8787/callback` and `https://www.cursor.com/agents/mcp/oauth/callback`, as documented in [Cursor's static OAuth setup](https://cursor.com/docs/mcp#static-oauth-for-remote-servers). The explicit `localhost` HTTP exception supports its fixed desktop callback; consent and token exchange still require the exact registered URI. The MCP URL and OAuth `resource` are the host-specific URL copied from Ghostie's Advanced settings, not the relay root.
+
 ```sh
 cd mcps/remote-relay
 bun install
