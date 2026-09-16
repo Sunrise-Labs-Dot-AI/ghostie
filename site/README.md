@@ -59,3 +59,34 @@ Sparkle enclosure URL changes only because the exact same bytes were mirrored to
 a new host, the existing signature and length remain valid. If the zip is
 recreated, recompressed, or otherwise changes bytes, rerun Sparkle `sign_update`
 and update the enclosure signature and length together.
+
+## Mobile Messages opener
+
+`ghostie.app` exposes a compose-only HTTPS bridge for mobile chat clients that
+will open web links but reject raw `sms:` links. Opening a generated link never
+requires authentication.
+
+Create a seven-day link with a server-side request:
+
+```sh
+curl https://ghostie.app/v1/links \
+  -H 'Authorization: Bearer <MESSAGE_OPENER_API_TOKEN>' \
+  -H 'Content-Type: application/json' \
+  --data '{"phone":"+12155550123","body":"Want to grab lunch?"}'
+```
+
+The response is:
+
+```json
+{
+  "url": "https://ghostie.app/t/AbCdEf0123_-GhIj",
+  "expires_at": "2026-09-23T12:00:00.000Z"
+}
+```
+
+Inputs are `phone` (`+` and 7 to 15 digits) and non-empty `body` (at most 2,000
+Unicode characters). Creation uses `MESSAGE_OPENER_API_TOKEN`; the returned
+`/t/<id>` URL is a bearer link, so anyone who has it can open the draft until it
+expires. Draft payloads are encrypted with `MESSAGE_OPENER_ENCRYPTION_KEY`
+before the ciphertext is placed in the existing Blob store. The cleanup cron
+uses Vercel's `CRON_SECRET`. The landing page composes only and never sends.

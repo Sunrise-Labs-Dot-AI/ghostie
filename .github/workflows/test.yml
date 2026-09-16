@@ -299,3 +299,7 @@ jobs:
       - name: Check referral program handler
         working-directory: site
         run: npm run test:referral
+
+      - name: Check mobile Messages opener
+        working-directory: site
+        run: npm run test:message-opener
