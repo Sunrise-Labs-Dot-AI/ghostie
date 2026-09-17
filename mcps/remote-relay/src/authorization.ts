@@ -1,8 +1,9 @@
 import { z } from "zod";
-import { equal, hash, secret, Store } from "./store.ts";
+import { equal, hash, secret, Store, type Grant } from "./store.ts";
+import { grantScope } from "./scopes.ts";
 
+export { OAUTH_SCOPE } from "./scopes.ts";
 export interface OAuthClient { id: string; name: string; redirects: string[] }
-export const OAUTH_SCOPE = "messages:read messages:draft messages:link";
 export const oauthRedirectURI = z.string().url().refine(value => {
   const url = new URL(value);
   // Cursor uses localhost for its fixed desktop callback. Consent still matches the full URI exactly.
@@ -14,11 +15,20 @@ export const consentSchema = z.object({
   response_type: z.literal("code"), code_challenge_method: z.literal("S256"),
   code_challenge: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   state: z.string().min(1).max(1024), resource: z.string().url().max(2000),
-  scope: z.literal(OAUTH_SCOPE).default(OAUTH_SCOPE),
+  // Any subset of the supported scopes; absent grants all of them. Validated in validateConsent.
+  scope: z.string().max(200).optional(),
 });
 type Consent = z.infer<typeof consentSchema>;
-interface Code { request: Consent; host: string; user: string; expires: number }
+interface Code { request: Consent; scope: string; host: string; user: string; expires: number }
 interface Pair { digest: string; code: string; expires: number; host?: string; user?: string }
+const token = z.string().regex(/^[A-Za-z0-9._~-]{20,8192}$/);
+const codeGrant = z.object({ grant_type: z.literal("authorization_code"), code: z.string().max(100),
+  client_id: z.string().max(200), redirect_uri: z.string().max(2000), resource: z.string().max(2000),
+  code_verifier: z.string().regex(/^[A-Za-z0-9._~-]{43,128}$/),
+}).strict();
+const refreshGrant = z.object({ grant_type: z.literal("refresh_token"), refresh_token: token,
+  client_id: z.string().min(1).max(200), resource: z.string().max(2000).optional(), scope: z.string().max(200).optional(),
+}).strict();
 
 export class Authorization {
   readonly codes = new Map<string, Code>();
@@ -64,33 +74,51 @@ export class Authorization {
     const hostID = request.resource.startsWith(`${this.origin}/mcp/hosts/`) ? request.resource.slice(`${this.origin}/mcp/hosts/`.length) : "";
     const host = this.store.host(hostID);
     if (!client || !host || host.user !== user || request.resource !== this.resource(host.id)) throw new Error("Consent unavailable");
-    return { request, client, host };
+    let scope: string;
+    try { scope = grantScope(request.scope); } catch { throw new Error("Consent unavailable"); }
+    return { request, client, host, scope };
   }
   approveConsent(raw: unknown, user: string) {
     this.cleanup();
-    const { request, host } = this.validateConsent(raw, user);
+    const { request, host, scope } = this.validateConsent(raw, user);
     if (this.codes.size >= 100) throw new Error("Consent unavailable");
     const code = secret();
-    this.codes.set(hash(code), { request, host: host.id, user, expires: this.now() + 60_000 });
+    this.codes.set(hash(code), { request, scope, host: host.id, user, expires: this.now() + 60_000 });
     const redirect = new URL(request.redirect_uri);
     redirect.searchParams.set("code", code);
     redirect.searchParams.set("state", request.state);
     return redirect.href;
   }
+  /** Token endpoint: authorization code with PKCE, or a rotating refresh token. Throws invalid_grant or temporarily_unavailable. */
   exchange(raw: unknown) {
     this.cleanup();
-    const params = z.object({ grant_type: z.literal("authorization_code"), code: z.string().max(100),
-      client_id: z.string().max(200), redirect_uri: z.string().max(2000), resource: z.string().max(2000),
-      code_verifier: z.string().regex(/^[A-Za-z0-9._~-]{43,128}$/),
-    }).strict().parse(raw);
+    const kind = z.object({ grant_type: z.enum(["authorization_code", "refresh_token"]) }).passthrough().safeParse(raw);
+    if (!kind.success) throw new Error("invalid_grant");
+    if (kind.data.grant_type === "refresh_token") return this.refresh(raw);
+    const params = codeGrant.parse(raw);
     const key = hash(params.code);
     const code = this.codes.get(key);
     this.codes.delete(key); // consume on any exchange attempt, including bad proof
     if (!code || !equal(hash(params.code_verifier), code.request.code_challenge) ||
       params.client_id !== code.request.client_id || params.redirect_uri !== code.request.redirect_uri ||
       params.resource !== code.request.resource || this.store.host(code.host)?.user !== code.user) throw new Error("invalid_grant");
-    return { access_token: this.store.issueToken({ host: code.host, user: code.user, client: params.client_id,
-      resource: params.resource, expires: this.now() + 3_600_000 }), token_type: "Bearer", expires_in: 3600,
-      scope: OAUTH_SCOPE };
+    return this.respond(() => this.store.issueGrant({ family: secret(), host: code.host, user: code.user, client: params.client_id, resource: params.resource, scope: code.scope }, this.now()));
+  }
+  private refresh(raw: unknown) {
+    const params = refreshGrant.safeParse(raw);
+    if (!params.success) throw new Error("invalid_grant");
+    return this.respond(() => this.store.rotateRefreshToken(params.data.refresh_token, this.now(), grant => {
+      if (!this.clients.some(client => client.id === grant.client) || params.data.client_id !== grant.client ||
+        (params.data.resource !== undefined && params.data.resource !== grant.resource)) return null;
+      // A refresh may narrow the grant, never widen it. Any scope problem answers like an unknown token
+      // so the endpoint cannot be used to probe whether a stolen token is still live.
+      try { return grantScope(params.data.scope, grant.scope); } catch { return null; }
+    }));
+  }
+  private respond(issue: () => ReturnType<Store["issueGrant"]> | null) {
+    let issued: ReturnType<Store["issueGrant"]> | null;
+    try { issued = issue(); } catch (error) { throw new Error(error instanceof Error && error.message === "Token limit" ? "temporarily_unavailable" : "invalid_grant"); }
+    if (!issued) throw new Error("invalid_grant");
+    return { access_token: issued.access_token, token_type: "Bearer", expires_in: 3600, refresh_token: issued.refresh_token, scope: issued.scope };
   }
 }

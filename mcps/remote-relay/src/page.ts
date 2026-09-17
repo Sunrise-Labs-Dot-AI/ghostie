@@ -7,7 +7,7 @@ body{font:16px/1.55 system-ui;background:#f7f6ef;color:#18352d;margin:0;padding:
 </style><main><h1 id="heading">Connect your Mac</h1><p id="intro">Read iMessage and WhatsApp, stage drafts for review, and create mobile Messages compose links.</p>
 <div id="login"></div><button id="signup" hidden>Create an account</button><div id="account" hidden>
 <p id="identity"></p><div id="connection"><p id="details"></p><label id="code-label" hidden>Code shown in Ghostie on your Mac<input id="code" autocomplete="off" maxlength="8" spellcheck="false"></label>
-<p>Message reads and staged drafts pass through Ghostie's relay in memory. Compose links store the recipient and message body as encrypted ciphertext for seven days. Anyone with a compose link can use it until it expires.</p>
+<p>Message reads and staged drafts pass through Ghostie's relay in memory.<span id="link-terms"> Compose links store the recipient and message body as encrypted ciphertext for seven days. Anyone with a compose link can use it until it expires.</span></p>
 <p>HTTPS encrypts the connection. Suspected authentication codes are filtered on your Mac, but filtering cannot catch every format.</p>
 <p>The Mac must stay awake with Ghostie hosting. Remote access cannot send or approve messages.</p>
 <button id="approve" disabled>Connect</button><button id="cancel">Cancel</button></div><button id="manage">Manage account</button><button id="signout">Sign out</button></div><p id="status" role="status" aria-live="polite">Loading secure sign-in...</p></main>
@@ -33,7 +33,7 @@ async function render(){
  if(accountOnly){status('Choose Manage account, then Security to add a passkey.');return;}
  try{
   if(pairing){byID('code-label').hidden=false;byID('details').textContent='Only connect if you started this from Ghostie on your own Mac. Enter the code displayed there.';}
-  else{const data=await api('/api/consent/details',query);byID('details').textContent='Allow '+data.client+' ('+data.redirect_origin+') to read messages, stage drafts on this Mac, and create public seven-day compose links containing a recipient and message body. A link opens a prefilled compose screen but never sends: '+data.host;}
+  else{const data=await api('/api/consent/details',query);const link=typeof data.scope==='string'&&data.scope.split(' ').includes('messages:link');byID('link-terms').hidden=!link;byID('details').textContent='Allow '+data.client+' ('+data.redirect_origin+') to '+(data.permissions||'read messages and stage drafts')+' on this Mac'+(link?'. Compose links are public seven-day compose links containing a recipient and message body; a link opens a prefilled compose screen but never sends':'')+': '+data.host;}
   byID('approve').disabled=false;status('Review the access above, then choose Connect.');
  }catch(e){status(e.message);}
 }
