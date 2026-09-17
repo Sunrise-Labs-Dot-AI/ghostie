@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
 import { describeScope, filterToolList, grantScope, OAUTH_SCOPE, requiredScope, scopeAllows, TOOL_SCOPES } from "./scopes.ts";
 import { MESSAGE_LINK_TOOL_NAME } from "./message-opener.ts";
-import { remoteSchemas } from "../../ghostie/src/remote-policy.ts";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 test("grants canonical subsets, ignores offline_access, refuses unknown or empty scopes", () => {
   expect(grantScope(undefined)).toBe(OAUTH_SCOPE);
@@ -39,5 +40,10 @@ test("consent phrasing lists granted permissions in canonical order", () => {
 });
 
 test("the relay allowlist is exactly the Mac's remote allowlist plus the relay-owned link tool", () => {
-  expect(Object.keys(TOOL_SCOPES).sort()).toEqual([...Object.keys(remoteSchemas), MESSAGE_LINK_TOOL_NAME].sort());
+  // Read the Mac policy as text: this package must not depend on the Mac package's modules or node_modules.
+  const source = readFileSync(join(import.meta.dir, "../../ghostie/src/remote-policy.ts"), "utf8");
+  const literal = /export const remoteSchemas = \{([\s\S]*?)\} as const;/.exec(source)?.[1] ?? "";
+  const macTools = [...literal.matchAll(/^\s*([a-z_]+):/gm)].map(match => match[1]!);
+  expect(macTools.length).toBeGreaterThan(0);
+  expect(Object.keys(TOOL_SCOPES).sort()).toEqual([...macTools, MESSAGE_LINK_TOOL_NAME].sort());
 });
