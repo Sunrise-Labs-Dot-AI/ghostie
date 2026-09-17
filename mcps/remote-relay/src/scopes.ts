@@ -6,6 +6,21 @@ export const OAUTH_SCOPE: string = SUPPORTED_SCOPES.join(" ");
 /** Standard OAuth request for a refresh token. Accepted for compatibility; refresh tokens are issued regardless. */
 export const OFFLINE_ACCESS = "offline_access";
 
+/**
+ * Every tool a remote client may call, with the scope it needs. This mirrors the Mac's remote
+ * allowlist (`mcps/ghostie/src/remote-policy.ts`) plus the relay-owned link tool; a tool missing
+ * here is refused before it reaches the Mac, so adding a Mac tool requires a deliberate entry.
+ */
+export const TOOL_SCOPES: Readonly<Record<string, Scope>> = {
+  list_message_threads: "messages:read",
+  get_message_thread: "messages:read",
+  search_message_history: "messages:read",
+  list_message_drafts: "messages:read",
+  get_message_draft: "messages:read",
+  stage_message_draft: "messages:draft",
+  [MESSAGE_LINK_TOOL_NAME]: "messages:link",
+};
+
 const isScope = (value: string): value is Scope => (SUPPORTED_SCOPES as readonly string[]).includes(value);
 
 /**
@@ -30,22 +45,23 @@ export function scopeAllows(scope: string, name: Scope): boolean {
   return scope.split(" ").includes(name);
 }
 
-/** The scope a remote tool call needs. Everything not otherwise listed is a read. */
-export function requiredScope(tool: string): Scope {
-  if (tool === "stage_message_draft") return "messages:draft";
-  if (tool === MESSAGE_LINK_TOOL_NAME) return "messages:link";
-  return "messages:read";
+/** The scope a remote tool call needs, or undefined for a tool the relay does not know. */
+export function requiredScope(tool: string): Scope | undefined {
+  return Object.hasOwn(TOOL_SCOPES, tool) ? TOOL_SCOPES[tool] : undefined;
 }
 
-/** Drop tools the token cannot call from a tools/list result. */
+/** Keep only known tools the token can call in a tools/list result. */
 export function filterToolList(response: unknown, scope: string): unknown {
   if (!response || typeof response !== "object" || Array.isArray(response)) return response;
   const rpc = response as Record<string, unknown>;
   if (!rpc.result || typeof rpc.result !== "object" || Array.isArray(rpc.result)) return response;
   const result = rpc.result as Record<string, unknown>;
   if (!Array.isArray(result.tools)) return response;
-  const tools = result.tools.filter(tool => tool && typeof tool === "object" && typeof (tool as Record<string, unknown>).name === "string"
-    && scopeAllows(scope, requiredScope((tool as Record<string, unknown>).name as string)));
+  const tools = result.tools.filter(tool => {
+    if (!tool || typeof tool !== "object" || typeof (tool as Record<string, unknown>).name !== "string") return false;
+    const needed = requiredScope((tool as Record<string, unknown>).name as string);
+    return needed !== undefined && scopeAllows(scope, needed);
+  });
   return { ...rpc, result: { ...result, tools } };
 }
 

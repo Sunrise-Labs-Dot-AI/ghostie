@@ -1,5 +1,7 @@
 import { expect, test } from "bun:test";
-import { describeScope, filterToolList, grantScope, OAUTH_SCOPE, requiredScope, scopeAllows } from "./scopes.ts";
+import { describeScope, filterToolList, grantScope, OAUTH_SCOPE, requiredScope, scopeAllows, TOOL_SCOPES } from "./scopes.ts";
+import { MESSAGE_LINK_TOOL_NAME } from "./message-opener.ts";
+import { remoteSchemas } from "../../ghostie/src/remote-policy.ts";
 
 test("grants canonical subsets, ignores offline_access, refuses unknown or empty scopes", () => {
   expect(grantScope(undefined)).toBe(OAUTH_SCOPE);
@@ -20,8 +22,11 @@ test("tool scope requirements and list filtering follow the grant", () => {
   expect(requiredScope("stage_message_draft")).toBe("messages:draft");
   expect(requiredScope("ghostie_create_messages_link")).toBe("messages:link");
   expect(requiredScope("get_message_thread")).toBe("messages:read");
+  expect(requiredScope("approve_message_draft")).toBeUndefined();
+  expect(requiredScope("")).toBeUndefined();
+  expect(requiredScope("constructor")).toBeUndefined();
   expect(scopeAllows("messages:read", "messages:draft")).toBe(false);
-  const listed = { jsonrpc: "2.0", id: 1, result: { tools: [{ name: "get_message_thread" }, { name: "stage_message_draft" }, { name: "ghostie_create_messages_link" }, { name: 7 }] } };
+  const listed = { jsonrpc: "2.0", id: 1, result: { tools: [{ name: "get_message_thread" }, { name: "stage_message_draft" }, { name: "ghostie_create_messages_link" }, { name: "approve_message_draft" }, { name: 7 }] } };
   expect((filterToolList(listed, "messages:read") as any).result.tools.map((t: any) => t.name)).toEqual(["get_message_thread"]);
   expect((filterToolList(listed, OAUTH_SCOPE) as any).result.tools.map((t: any) => t.name)).toEqual(["get_message_thread", "stage_message_draft", "ghostie_create_messages_link"]);
   expect(filterToolList({ jsonrpc: "2.0", id: 1, error: { code: -32601 } }, "messages:read")).toEqual({ jsonrpc: "2.0", id: 1, error: { code: -32601 } });
@@ -31,4 +36,8 @@ test("consent phrasing lists granted permissions in canonical order", () => {
   expect(describeScope("messages:read")).toBe("read messages");
   expect(describeScope("messages:draft messages:read")).toBe("read messages and stage drafts for your review");
   expect(describeScope(OAUTH_SCOPE)).toBe("read messages, stage drafts for your review, and create public Messages compose links");
+});
+
+test("the relay allowlist is exactly the Mac's remote allowlist plus the relay-owned link tool", () => {
+  expect(Object.keys(TOOL_SCOPES).sort()).toEqual([...Object.keys(remoteSchemas), MESSAGE_LINK_TOOL_NAME].sort());
 });

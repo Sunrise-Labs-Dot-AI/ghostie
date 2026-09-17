@@ -34,9 +34,9 @@ James approved the plan and the 30-day rotating refresh token lifetime on 2026-0
 
 ## Verification
 
-- Relay: typecheck and 63 tests / 344 assertions pass (scope subsets and enforcement, refresh rotation, replay revocation, narrowing, binding, revocation, host deletion, legacy tokens, concurrent discovery with serialized calls, bounded queue and timeout, per-host cap, stale replacement, outstanding-work failure on replacement, heartbeat echo, HTTP token endpoint end to end, metadata).
-- Production image: local build and container smoke including the refresh grant, replay revocation, and refresh-token canaries in metadata and logs: see rollout notes below.
-- Adversarial review: see below.
+- Relay: typecheck and 66 tests / 380 assertions pass (scope subsets and enforcement from an explicit allowlist pinned to the Mac's, refresh rotation in one transaction, reuse grace and replay revocation, narrowing, binding, cap behaviour, revocation, host deletion, legacy-token backfill, concurrent discovery with serialized calls, bounded queue and timeout, per-host and per-account caps, liveness-gated replacement, concurrent connects, outstanding-work failure on replacement, heartbeat echo, HTTP token endpoint end to end, metadata).
+- Production image: local build and container smoke on the reviewed code, including the refresh grant, replay revocation, and refresh-token canaries in metadata and logs.
+- Adversarial review (`/code-review`, three clean-context personas, Security Auditor escalated): 15 findings, 14 accepted and fixed in the same PR, 1 deferred (per-token queue fairness for one account with several clients). The material ones: refresh rotation was not atomic, so a cap hit could burn a client's token and a retry would revoke its grant (fixed with a single transaction and per-family caps); two concurrent refreshes from one honest client revoked its own grant (fixed with a 30 second reuse grace); unconditional connection replacement let any credential holder evict a live Mac and had a handshake race (fixed with a 20 second liveness gate and takeover ordered by sequence in the socket open handler); the tool-to-scope map was default-allow (fixed with an explicit allowlist that a test keeps equal to the Mac's). Sidecar: `/tmp/code-review-pr44-20260917T0903.md`.
 
 ## Rollout
 

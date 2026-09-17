@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { equal, hash, secret, REFRESH_TOKEN_LIFETIME_MS, Store, type Grant } from "./store.ts";
+import { equal, hash, secret, Store, type Grant } from "./store.ts";
 import { grantScope } from "./scopes.ts";
 
 export { OAUTH_SCOPE } from "./scopes.ts";
@@ -27,7 +27,7 @@ const codeGrant = z.object({ grant_type: z.literal("authorization_code"), code: 
   code_verifier: z.string().regex(/^[A-Za-z0-9._~-]{43,128}$/),
 }).strict();
 const refreshGrant = z.object({ grant_type: z.literal("refresh_token"), refresh_token: token,
-  client_id: z.string().max(200).optional(), resource: z.string().max(2000).optional(), scope: z.string().max(200).optional(),
+  client_id: z.string().min(1).max(200), resource: z.string().max(2000).optional(), scope: z.string().max(200).optional(),
 }).strict();
 
 export class Authorization {
@@ -89,7 +89,7 @@ export class Authorization {
     redirect.searchParams.set("state", request.state);
     return redirect.href;
   }
-  /** Token endpoint: authorization code with PKCE, or a rotating refresh token. Throws invalid_grant or invalid_scope. */
+  /** Token endpoint: authorization code with PKCE, or a rotating refresh token. Throws invalid_grant or temporarily_unavailable. */
   exchange(raw: unknown) {
     this.cleanup();
     const kind = z.object({ grant_type: z.enum(["authorization_code", "refresh_token"]) }).passthrough().safeParse(raw);
@@ -102,28 +102,23 @@ export class Authorization {
     if (!code || !equal(hash(params.code_verifier), code.request.code_challenge) ||
       params.client_id !== code.request.client_id || params.redirect_uri !== code.request.redirect_uri ||
       params.resource !== code.request.resource || this.store.host(code.host)?.user !== code.user) throw new Error("invalid_grant");
-    return this.issue({ family: secret(), host: code.host, user: code.user, client: params.client_id, resource: params.resource, scope: code.scope });
+    return this.respond(() => this.store.issueGrant({ family: secret(), host: code.host, user: code.user, client: params.client_id, resource: params.resource, scope: code.scope }, this.now()));
   }
   private refresh(raw: unknown) {
     const params = refreshGrant.safeParse(raw);
     if (!params.success) throw new Error("invalid_grant");
-    let scope: string | undefined;
-    let narrowing = true;
-    const grant = this.store.redeemRefreshToken(params.data.refresh_token, this.now(), candidate => {
-      if (!this.clients.some(client => client.id === candidate.client) ||
-        (params.data.client_id !== undefined && params.data.client_id !== candidate.client) ||
-        (params.data.resource !== undefined && params.data.resource !== candidate.resource)) return false;
-      // A refresh may narrow the grant, never widen it.
-      try { scope = grantScope(params.data.scope, candidate.scope); return true; } catch { narrowing = false; return false; }
-    });
-    if (!narrowing) throw new Error("invalid_scope");
-    if (!grant || scope === undefined) throw new Error("invalid_grant");
-    return this.issue({ ...grant, scope });
+    return this.respond(() => this.store.rotateRefreshToken(params.data.refresh_token, this.now(), grant => {
+      if (!this.clients.some(client => client.id === grant.client) || params.data.client_id !== grant.client ||
+        (params.data.resource !== undefined && params.data.resource !== grant.resource)) return null;
+      // A refresh may narrow the grant, never widen it. Any scope problem answers like an unknown token
+      // so the endpoint cannot be used to probe whether a stolen token is still live.
+      try { return grantScope(params.data.scope, grant.scope); } catch { return null; }
+    }));
   }
-  private issue(grant: Grant) {
-    const now = this.now();
-    const access_token = this.store.issueToken({ ...grant, expires: now + 3_600_000 }, now);
-    const refresh_token = this.store.issueRefreshToken({ ...grant, expires: now + REFRESH_TOKEN_LIFETIME_MS }, now);
-    return { access_token, token_type: "Bearer", expires_in: 3600, refresh_token, scope: grant.scope };
+  private respond(issue: () => ReturnType<Store["issueGrant"]> | null) {
+    let issued: ReturnType<Store["issueGrant"]> | null;
+    try { issued = issue(); } catch (error) { throw new Error(error instanceof Error && error.message === "Token limit" ? "temporarily_unavailable" : "invalid_grant"); }
+    if (!issued) throw new Error("invalid_grant");
+    return { access_token: issued.access_token, token_type: "Bearer", expires_in: 3600, refresh_token: issued.refresh_token, scope: issued.scope };
   }
 }
