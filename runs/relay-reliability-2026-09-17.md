@@ -40,10 +40,14 @@ James approved the plan and the 30-day rotating refresh token lifetime on 2026-0
 
 ## Rollout
 
-(filled in after deployment)
+PR [#44](https://github.com/Sunrise-Labs-Dot-AI/ghostie/pull/44) passed all 14 CI checks (two intentional site skips) at `b44c5ba` and merged as `0b92aea`. The merged relay directory was uploaded with Railway CLI `up . --path-as-root` to the canonical project, environment, and service; deployment `4065d330-5fc0-45b8-8226-2d2b2e7cc94a` reported SUCCESS at 16:19 UTC (09:19 PDT). Application logs contain only the two container-start lines. Live checks: `/health` ok; the authorization-server metadata now lists `refresh_token` and `offline_access`; a 401 challenge carries `error="invalid_token"` and the supported scope. Existing hosts, tokens, and the volume were kept; token policy stays at 2, so tokens issued since PR #41 keep working and the M1's pairing did not change.
+
+Rollback: redeploy the relay directory from `eb9db3c` (PR #42 era). The old build runs against the migrated database but cannot refresh or revoke refresh tokens; after any rollback with a revocation in it, delete every row from `refresh_tokens` before redeploying this build (see README).
+
+User step after rollout: reconnect Grok Bot once (configure the three scopes or none, so Cursor discovers them). Nothing else changes for claude.ai; it will start refreshing silently on its next connection.
 
 ## Remaining
 
-- Mac-side heartbeat in `mcps/ghostie/src/remote-host.ts` for the next app release (relay support is live).
+- Mac-side heartbeat: PR [#45](https://github.com/Sunrise-Labs-Dot-AI/ghostie/pull/45) (`remote-heartbeat.ts`, 15 second send, 10 second echo timeout, terminate and reconnect) rides the next app release; relay support is live.
 - Live confirmation that Grok Bot survives an hour boundary without a Connect card; Cursor's refresh behavior is undocumented, so if it never refreshes, the failure mode is unchanged from before.
 - Cause of the periodic WebSocket drops; compare the M4 path monitor with the next churn window in the relay logs.
