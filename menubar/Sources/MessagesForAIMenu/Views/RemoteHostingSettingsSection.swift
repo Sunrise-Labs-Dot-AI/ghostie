@@ -6,7 +6,7 @@ struct RemoteHostingSettingsSection: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
       Label("Host a remote MCP", systemImage: "network").font(.headline)
-      Text("Connect an AI client to iMessage and WhatsApp on this Mac. It can read messages and stage text drafts for your review in Ghostie.").font(.callout)
+      Text("Connect an AI client to iMessage and WhatsApp on this Mac. It can read messages, stage text drafts for your review in Ghostie, and create mobile Messages compose links.").font(.callout)
       Text("This Mac must stay awake with Ghostie running. If the app quits, the Mac sleeps, or the connection drops, the MCP is unavailable.").font(.caption).foregroundStyle(.secondary)
       if let account = remote.account {
         Text("Account: \(account.user)").font(.caption).textSelection(.enabled)
@@ -38,7 +38,7 @@ struct RemoteHostingSettingsSection: View {
         }
       }
       Text(remote.status).font(.callout).accessibilityLabel("Remote hosting status: \(remote.status)")
-      Text("Connections use HTTPS encryption. The relay can see content in memory; it does not store messages. Credentials stay in Keychain. Suspected 2FA codes and sign-in links are hidden on this Mac before results leave it. Filtering may miss unfamiliar formats. Local messages and drafts retain their existing storage protection.").font(.caption).foregroundStyle(.secondary)
+      Text("Connections use HTTPS encryption. The relay sees message reads and drafts in memory but does not store them. Creating a compose link stores its recipient and body as encrypted ciphertext for seven days at ghostie.app. Anyone with the link can open that prefilled compose screen until it expires. Credentials stay in Keychain. Suspected 2FA codes and sign-in links are hidden on this Mac before results leave it. Filtering may miss unfamiliar formats. Local messages and drafts retain their existing storage protection.").font(.caption).foregroundStyle(.secondary)
       Text("Remote access cannot send, approve, schedule, or attach local files. Review every remotely staged draft before sending.").font(.caption).foregroundStyle(.secondary)
     }.padding(.vertical, 8)
   }

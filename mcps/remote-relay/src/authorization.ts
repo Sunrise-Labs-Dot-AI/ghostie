@@ -2,6 +2,7 @@ import { z } from "zod";
 import { equal, hash, secret, Store } from "./store.ts";
 
 export interface OAuthClient { id: string; name: string; redirects: string[] }
+export const OAUTH_SCOPE = "messages:read messages:draft messages:link";
 export const oauthRedirectURI = z.string().url().refine(value => {
   const url = new URL(value);
   // Cursor uses localhost for its fixed desktop callback. Consent still matches the full URI exactly.
@@ -13,7 +14,7 @@ export const consentSchema = z.object({
   response_type: z.literal("code"), code_challenge_method: z.literal("S256"),
   code_challenge: z.string().regex(/^[A-Za-z0-9_-]{43}$/),
   state: z.string().min(1).max(1024), resource: z.string().url().max(2000),
-  scope: z.literal("messages:read messages:draft").default("messages:read messages:draft"),
+  scope: z.literal(OAUTH_SCOPE).default(OAUTH_SCOPE),
 });
 type Consent = z.infer<typeof consentSchema>;
 interface Code { request: Consent; host: string; user: string; expires: number }
@@ -90,6 +91,6 @@ export class Authorization {
       params.resource !== code.request.resource || this.store.host(code.host)?.user !== code.user) throw new Error("invalid_grant");
     return { access_token: this.store.issueToken({ host: code.host, user: code.user, client: params.client_id,
       resource: params.resource, expires: this.now() + 3_600_000 }), token_type: "Bearer", expires_in: 3600,
-      scope: "messages:read messages:draft" };
+      scope: OAUTH_SCOPE };
   }
 }

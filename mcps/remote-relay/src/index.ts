@@ -1,26 +1,12 @@
 import { createClerkClient } from "@clerk/backend";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { z } from "zod";
 import { Store } from "./store.ts";
 import { startRelay } from "./server.ts";
-import { oauthRedirectURI } from "./authorization.ts";
+import { relayConfigSchema } from "./config.ts";
+import { createMessageLinkCreator } from "./message-opener.ts";
 
-const httpsOrigin = z.string().url().refine(value => {
-  const url = new URL(value);
-  return url.protocol === "https:" && url.origin === value && !url.username && !url.password;
-});
-const config = z.object({
-  GHOSTIE_RELAY_ORIGIN: httpsOrigin,
-  CLERK_PUBLISHABLE_KEY: z.string().regex(/^pk_(test|live)_/),
-  CLERK_SECRET_KEY: z.string().regex(/^sk_(test|live)_/),
-  CLERK_FRONTEND_ORIGIN: httpsOrigin,
-  GHOSTIE_RELAY_DB: z.string().min(1),
-  GHOSTIE_OAUTH_CLIENTS: z.string().transform(value => JSON.parse(value)).pipe(z.array(z.object({
-    id: z.string().min(1).max(200), name: z.string().min(1).max(100),
-    redirects: z.array(oauthRedirectURI).min(1),
-  }).strict()).min(1)),
-}).safeParse(process.env);
+const config = relayConfigSchema.safeParse(process.env);
 if (!config.success) {
   // Never print the parser's input, which includes the Clerk secret.
   process.stderr.write("Remote relay configuration is missing or invalid. See README.\n");
@@ -32,6 +18,7 @@ const store = new Store(env.GHOSTIE_RELAY_DB);
 const clerk = createClerkClient({ secretKey: env.CLERK_SECRET_KEY, publishableKey: env.CLERK_PUBLISHABLE_KEY, telemetry: { disabled: true } });
 const relay = startRelay({
   origin: env.GHOSTIE_RELAY_ORIGIN, store, clients: env.GHOSTIE_OAUTH_CLIENTS,
+  messageLinks: createMessageLinkCreator({ token: env.MESSAGE_OPENER_API_TOKEN, endpoint: env.MESSAGE_OPENER_API_URL }),
   publishableKey: env.CLERK_PUBLISHABLE_KEY,
   clerkScriptURL: `${env.CLERK_FRONTEND_ORIGIN}/npm/@clerk/clerk-js@5/dist/clerk.browser.js`,
   sessionUser: async request => {

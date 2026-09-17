@@ -27,7 +27,9 @@ the approval gate, not protocol features.
   used by the transport packages.
 - `mcps/remote-relay/`: optional standalone HTTPS/WSS relay for the Advanced
   remote MCP flow. Clerk browser accounts, per-Mac OAuth consent, no cloud
-  message storage. The app owns `ghostie-remote-host` in the shared backend;
+  message storage in the relay; its explicit compose-link tool sends encrypted
+  seven-day payloads to the `ghostie.app` opener service. The app owns
+  `ghostie-remote-host` in the shared backend;
   its allowlist and authentication-content filter live in `mcps/ghostie/src/remote-*`.
   Deployment and encryption boundaries: `mcps/remote-relay/README.md`.
 - `mcps/imessage-drafts/` — iMessage stdio MCP **+ chat.db daemon**

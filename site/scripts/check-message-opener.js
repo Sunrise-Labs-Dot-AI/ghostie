@@ -256,6 +256,27 @@ test("landing page contains the three targets in order without plaintext body", 
   assert.ok(contrastRatio(smallColor, "#ffffff") >= 4.5, "fallback text meets WCAG AA contrast");
 });
 
+test("landing page safely encodes hostile and unusual message text", async () => {
+  const body = `</script><script>alert("x&y")</script>\r\nquote ' # ? % 👻 \u202E \u2028 \u2029`;
+  const created = await createLink({ body });
+  const id = JSON.parse(created.response.body).url.split("/").pop();
+  const response = await invoke(created.handler, { action: "open", id });
+
+  assert.equal(response.statusCode, 200);
+  assert.match(response.headers["content-security-policy"], /default-src 'none'/);
+  assert.doesNotMatch(response.body, /<script>alert/);
+  assert.doesNotMatch(response.body, /<\/script><script>/);
+  assert.doesNotMatch(response.body, /\u2028|\u2029/);
+
+  const targets = _internals.messageTargets("+12155550123", body);
+  const serializedTargets = JSON.stringify(targets)
+    .replaceAll("&", "\\u0026")
+    .replaceAll("\u2028", "\\u2028")
+    .replaceAll("\u2029", "\\u2029");
+  assert.ok(response.body.includes(`const targets = ${serializedTargets};`));
+  assert.ok(targets.every((target) => target.includes(encodeURIComponent(body))));
+});
+
 test("tampered ciphertext returns 404 instead of leaking a decrypt error", async () => {
   const created = await createLink();
   const id = JSON.parse(created.response.body).url.split("/").pop();

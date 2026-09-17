@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { Authorization, oauthRedirectURI } from "./authorization.ts";
+import { Authorization, OAUTH_SCOPE, oauthRedirectURI } from "./authorization.ts";
 import { hash, secret, Store } from "./store.ts";
 
 const stores: Store[] = [];
@@ -79,6 +79,7 @@ describe("pairing", () => {
 describe("host-bound OAuth", () => {
   test("exchanges S256 once, returns bound token, stores no bearer secrets", () => {
     const f = fixture(); const exchange = f.exchange(); const token = f.auth.exchange(exchange);
+    expect(token.scope).toBe(OAUTH_SCOPE);
     expect(f.store.authorize(token.access_token, f.paired.host!, f.consent.resource)?.client).toBe("client");
     expect(() => f.auth.exchange(exchange)).toThrow();
     const rows = JSON.stringify(f.store.db.query("SELECT * FROM tokens").all());
@@ -86,6 +87,14 @@ describe("host-bound OAuth", () => {
     expect(f.store.authorize(token.access_token, f.paired.host!, f.consent.resource, Date.now() + 3_600_001)).toBeNull();
     f.store.revoke(token.access_token);
     expect(f.store.authorize(token.access_token, f.paired.host!, f.consent.resource)).toBeNull();
+  });
+  test("invalidates tokens issued under the pre-link consent policy", () => {
+    const f = fixture();
+    const legacy = secret();
+    f.store.db.query("INSERT INTO tokens VALUES (?, ?, ?, ?, ?, ?, 1)").run(
+      hash(legacy), f.paired.host!, "user-a", "client", f.consent.resource, Date.now() + 60_000,
+    );
+    expect(f.store.authorize(legacy, f.paired.host!, f.consent.resource)).toBeNull();
   });
   for (const field of ["code_verifier", "redirect_uri", "resource", "client_id"] as const) {
     test(`refuses wrong ${field} and consumes code`, () => {
@@ -100,6 +109,8 @@ describe("host-bound OAuth", () => {
     expect(() => f.auth.approveConsent({ ...f.consent, code_challenge_method: "plain" }, "user-a")).toThrow();
     expect(() => f.auth.approveConsent({ ...f.consent, redirect_uri: "https://client.example.test/other" }, "user-a")).toThrow();
     expect(() => f.auth.approveConsent({ ...f.consent, resource: f.consent.resource + "?other" }, "user-a")).toThrow();
+    for (const scope of ["messages:read", "messages:read messages:draft"])
+      expect(() => f.auth.approveConsent({ ...f.consent, scope }, "user-a")).toThrow();
   });
   test("expiry and host deletion revoke authority", () => {
     const f = fixture(); const expired = f.exchange(); f.advance(60_001);

@@ -4,10 +4,11 @@ export function accountPage(publishableKey: string, clerkScriptURL: string, nonc
   return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Connect Ghostie</title><style nonce="${nonce}">
 body{font:16px/1.55 system-ui;background:#f7f6ef;color:#18352d;margin:0;padding:48px 20px}main{max-width:520px;margin:auto}h1{font-size:32px}button,input{font:inherit;padding:12px;border:1px solid #647a6b;border-radius:8px;margin:8px 8px 8px 0}button{cursor:pointer;background:#d4f5dc}button:disabled{opacity:.5}input{display:block;width:85%}small{display:block;color:#53675c}#status{white-space:pre-wrap}a{color:inherit}
-</style><main><h1 id="heading">Connect your Mac</h1><p id="intro">Read iMessage and WhatsApp, and stage drafts for review in Ghostie.</p>
+</style><main><h1 id="heading">Connect your Mac</h1><p id="intro">Read iMessage and WhatsApp, stage drafts for review, and create mobile Messages compose links.</p>
 <div id="login"></div><button id="signup" hidden>Create an account</button><div id="account" hidden>
 <p id="identity"></p><div id="connection"><p id="details"></p><label id="code-label" hidden>Code shown in Ghostie on your Mac<input id="code" autocomplete="off" maxlength="8" spellcheck="false"></label>
-<p>Your messages are sent to the connected AI client. HTTPS encrypts the connection; Ghostie's relay can see content in memory. Suspected authentication codes are filtered on your Mac, but filtering cannot catch every format.</p>
+<p>Message reads and staged drafts pass through Ghostie's relay in memory. Compose links store the recipient and message body as encrypted ciphertext for seven days. Anyone with a compose link can use it until it expires.</p>
+<p>HTTPS encrypts the connection. Suspected authentication codes are filtered on your Mac, but filtering cannot catch every format.</p>
 <p>The Mac must stay awake with Ghostie hosting. Remote access cannot send or approve messages.</p>
 <button id="approve" disabled>Connect</button><button id="cancel">Cancel</button></div><button id="manage">Manage account</button><button id="signout">Sign out</button></div><p id="status" role="status" aria-live="polite">Loading secure sign-in...</p></main>
 <script nonce="${nonce}">
@@ -32,7 +33,7 @@ async function render(){
  if(accountOnly){status('Choose Manage account, then Security to add a passkey.');return;}
  try{
   if(pairing){byID('code-label').hidden=false;byID('details').textContent='Only connect if you started this from Ghostie on your own Mac. Enter the code displayed there.';}
-  else{const data=await api('/api/consent/details',query);byID('details').textContent='Allow '+data.client+' ('+data.redirect_origin+') to read messages and stage drafts on this Mac: '+data.host;}
+  else{const data=await api('/api/consent/details',query);byID('details').textContent='Allow '+data.client+' ('+data.redirect_origin+') to read messages, stage drafts on this Mac, and create public seven-day compose links containing a recipient and message body. A link opens a prefilled compose screen but never sends: '+data.host;}
   byID('approve').disabled=false;status('Review the access above, then choose Connect.');
  }catch(e){status(e.message);}
 }

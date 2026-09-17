@@ -1,22 +1,35 @@
 import { afterEach, expect, test } from "bun:test";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { startRelay } from "./server.ts";
 import { hash, secret, Store } from "./store.ts";
+import { MESSAGE_LINK_TOOL_NAME, MessageLinkError, type MessageLinkCreator } from "./message-opener.ts";
 
 const resources: { stop(): void; store: Store }[] = [];
 afterEach(() => { for (const r of resources.splice(0)) { r.stop(); r.store.db.close(); } });
-function fixture(timeoutMs = 500) {
+function fixture(timeoutMs = 500, messageLinks: MessageLinkCreator = {
+  async create() { return { url: "https://ghostie.app/t/AbCdEf0123_-GhIj", expires_at: "2026-09-23T12:00:00.000Z" }; },
+}, now = Date.now) {
   const store = new Store(":memory:");
-  const relay = startRelay({ origin: "https://relay.example.test", store, clients: [{ id: "client-a", name: "Fixture", redirects: ["https://client.example.test/callback"] }], publishableKey: "pk_test_fixture", clerkScriptURL: "https://clerk.example.test/script.js", sessionUser: async () => null, port: 0, timeoutMs });
+  const relay = startRelay({ origin: "https://relay.example.test", store, clients: [{ id: "client-a", name: "Fixture", redirects: ["https://client.example.test/callback"] }], publishableKey: "pk_test_fixture", clerkScriptURL: "https://clerk.example.test/script.js", messageLinks, sessionUser: async () => null, port: 0, timeoutMs, now });
   resources.push({ ...relay, store });
   const host = secret(), credential = secret();
   store.addHost({ id: host, user: "user-a", credential: hash(credential), created: Date.now() });
   const token = store.issueToken({ host, user: "user-a", client: "client-a", resource: relay.auth.resource(host), expires: Date.now() + 60_000 });
-  const request = (path: string, body?: unknown, auth = token, headers: Record<string, string> = {}) => fetch(`http://127.0.0.1:${relay.server.port}${path}`, { method: body === undefined ? "GET" : "POST", headers: { Host: "relay.example.test", Authorization: `Bearer ${auth}`, "Content-Type": "application/json", ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  const requestWith = (path: string, auth: string, body?: unknown, headers: Record<string, string> = {}) => fetch(`http://127.0.0.1:${relay.server.port}${path}`, { method: body === undefined ? "GET" : "POST", headers: { Host: "relay.example.test", Authorization: `Bearer ${auth}`, "Content-Type": "application/json", ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
+  const request = (path: string, body?: unknown, auth = token, headers: Record<string, string> = {}) => requestWith(path, auth, body, headers);
+  const addAuthorizedHost = (user = `user-${secret()}`) => {
+    const addedHost = secret();
+    store.addHost({ id: addedHost, user, credential: hash(secret()), created: Date.now() });
+    const addedToken = store.issueToken({ host: addedHost, user, client: "client-a", resource: relay.auth.resource(addedHost), expires: Date.now() + 60_000 });
+    const addedPath = `/mcp/hosts/${addedHost}`;
+    return { host: addedHost, token: addedToken, path: addedPath, request: (body: unknown) => requestWith(addedPath, addedToken, body) };
+  };
   const connect = () => new Promise<WebSocket>((resolve, reject) => {
     const socket = new WebSocket(`ws://127.0.0.1:${relay.server.port}/hosts/${host}/connect`, { headers: { Host: "relay.example.test", Authorization: `Bearer ${credential}` } });
     socket.onopen = () => resolve(socket); socket.onerror = reject;
   });
-  return { ...relay, store, host, token, credential, request, connect, path: `/mcp/hosts/${host}` };
+  return { ...relay, store, host, token, credential, request, connect, addAuthorizedHost, path: `/mcp/hosts/${host}` };
 }
 test("requires resource auth, rejects foreign origins, reports offline", async () => {
   const f = fixture();
@@ -25,6 +38,7 @@ test("requires resource auth, rejects foreign origins, reports offline", async (
   expect(unauthorized.headers.get("www-authenticate")).toContain(`/.well-known/oauth-protected-resource${f.path}`);
   expect((await f.request(f.path, {}, f.token, { Origin: "https://evil.example.test" })).status).toBe(403);
   expect((await f.request(f.path, { jsonrpc: "2.0", id: 1, method: "ping" })).status).toBe(503);
+  expect((await f.request(f.path, { jsonrpc: "2.0", id: 2, method: "initialize", params: { protocolVersion: "2025-11-25" } })).status).toBe(503);
 });
 test("routes one request to its authenticated host and never persists payloads", async () => {
   const f = fixture(); const socket = await f.connect();
@@ -68,8 +82,19 @@ test("account page retains browser isolation and no-store headers", async () => 
   expect(page.headers.get('referrer-policy')).toBe('no-referrer');
   expect(page.headers.get('content-security-policy')).toContain("frame-ancestors 'none'");
   expect(page.headers.get('content-security-policy')).toContain('https://clerk.example.test');
-  expect(await page.text()).toContain('openUserProfile');
+  const html = await page.text();
+  expect(html).toContain('openUserProfile');
+  expect(html).toContain('encrypted ciphertext for seven days');
+  expect(html).toContain('public seven-day compose links');
   expect((await f.request('/account', undefined, f.token, { Origin: 'https://evil.example.test' })).status).toBe(403);
+});
+
+test("OAuth metadata publishes the dedicated link scope", async () => {
+  const f = fixture();
+  const authorization = await f.request("/.well-known/oauth-authorization-server");
+  expect((await authorization.json() as any).scopes_supported).toEqual(["messages:read", "messages:draft", "messages:link"]);
+  const resource = await f.request(`/.well-known/oauth-protected-resource${f.path}`);
+  expect((await resource.json() as any).scopes_supported).toEqual(["messages:read", "messages:draft", "messages:link"]);
 });
 
 test("duplicate host cannot replace an existing connection", async () => {
@@ -95,4 +120,169 @@ test("per-host in-flight limit fails closed", async () => {
 test("removing a configured client invalidates already issued tokens", async () => {
   const f = fixture(); f.auth.clients.splice(0);
   expect((await f.request(f.path, { jsonrpc: "2.0", id: 1, method: "ping" })).status).toBe(401);
+});
+
+test("relay advertises the link tool online and can execute a discovered link call after the Mac disconnects", async () => {
+  const calls: unknown[] = [];
+  const f = fixture(500, { async create(input) { calls.push(input); return { url: "https://ghostie.app/t/AbCdEf0123_-GhIj", expires_at: "2026-09-23T12:00:00.000Z" }; } });
+  const socket = await f.connect();
+  socket.onmessage = event => {
+    const work = JSON.parse(String(event.data));
+    socket.send(JSON.stringify({ id: work.id, response: { jsonrpc: "2.0", id: work.request.id, result: { tools: [{ name: "get_message_thread", inputSchema: { type: "object" } }] } } }));
+  };
+  const listed = await f.request(f.path, { jsonrpc: "2.0", id: 2, method: "tools/list", params: {} });
+  const tools = ((await listed.json() as any).result.tools as { name: string }[]);
+  expect(tools.map(tool => tool.name)).toEqual(["get_message_thread", MESSAGE_LINK_TOOL_NAME]);
+  socket.close();
+  await Bun.sleep(20);
+  const response = await f.request(f.path, { jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: MESSAGE_LINK_TOOL_NAME, arguments: { phone: "+12155550123", body: "Synthetic hello" } } });
+  expect(response.status).toBe(200);
+  const payload = await response.json() as any;
+  expect(payload.id).toBe(3);
+  expect(payload.result.structuredContent.url).toBe("https://ghostie.app/t/AbCdEf0123_-GhIj");
+  expect(calls).toEqual([{ phone: "+12155550123", body: "Synthetic hello" }]);
+});
+
+test("connected tool discovery replaces a host tool with the canonical relay tool", async () => {
+  const f = fixture();
+  const socket = await f.connect();
+  socket.onmessage = event => {
+    const work = JSON.parse(String(event.data));
+    socket.send(JSON.stringify({ id: work.id, response: { jsonrpc: "2.0", id: work.request.id, result: { tools: [
+      { name: "get_message_thread", inputSchema: { type: "object" } },
+      { name: MESSAGE_LINK_TOOL_NAME, description: "untrusted host copy", inputSchema: {} },
+    ] } } }));
+  };
+  const response = await f.request(f.path, { jsonrpc: "2.0", id: 4, method: "tools/list", params: {} });
+  const tools = ((await response.json() as any).result.tools as { name: string; description?: string }[]);
+  expect(tools.map(tool => tool.name)).toEqual(["get_message_thread", MESSAGE_LINK_TOOL_NAME]);
+  expect(tools[1]!.description).toContain("never sends");
+  socket.close();
+});
+
+test("link failures are protocol-valid, retain the request id, and do not expose inputs", async () => {
+  const f = fixture(500, { async create() { throw new MessageLinkError("outcome_unknown", "Outcome unknown. Do not retry automatically."); } });
+  const body = "private-body-canary";
+  const response = await f.request(f.path, { jsonrpc: "2.0", id: "link-1", method: "tools/call", params: { name: MESSAGE_LINK_TOOL_NAME, arguments: { phone: "+12155550123", body } } });
+  expect(response.status).toBe(200);
+  const text = await response.text();
+  expect(text).toContain('"id":"link-1"');
+  expect(text).toContain("Do not retry automatically");
+  expect(text).not.toContain(body);
+  expect(text).not.toContain("+12155550123");
+});
+
+test("link creation is limited per host before another upstream request", async () => {
+  let calls = 0;
+  const f = fixture(500, { async create() { calls += 1; return { url: "https://ghostie.app/t/AbCdEf0123_-GhIj", expires_at: "2026-09-23T12:00:00.000Z" }; } });
+  const rpc = (id: number) => ({ jsonrpc: "2.0", id, method: "tools/call", params: { name: MESSAGE_LINK_TOOL_NAME, arguments: { phone: "+12155550123", body: "Synthetic" } } });
+  for (let id = 1; id <= 6; id += 1) expect((await f.request(f.path, rpc(id))).status).toBe(200);
+  const limited = await f.request(f.path, rpc(7));
+  expect(limited.status).toBe(200);
+  const payload = await limited.json() as any;
+  expect(payload.id).toBe(7);
+  expect(payload.result.isError).toBe(true);
+  expect(calls).toBe(6);
+});
+
+test("link creation enforces one in-flight call per host", async () => {
+  let release!: () => void;
+  let started!: () => void;
+  const began = new Promise<void>(resolve => { started = resolve; });
+  const held = new Promise<void>(resolve => { release = resolve; });
+  const f = fixture(500, { async create() { started(); await held; return { url: "https://ghostie.app/t/AbCdEf0123_-GhIj", expires_at: "2026-09-23T12:00:00.000Z" }; } });
+  const rpc = (id: number) => ({ jsonrpc: "2.0", id, method: "tools/call", params: { name: MESSAGE_LINK_TOOL_NAME, arguments: { phone: "+12155550123", body: "Synthetic" } } });
+  const first = f.request(f.path, rpc(1));
+  await began;
+  const blocked = await f.request(f.path, rpc(2));
+  expect(blocked.status).toBe(200);
+  expect((await blocked.json() as any).result.isError).toBe(true);
+  release();
+  expect((await first).status).toBe(200);
+});
+
+test("link creation enforces the global in-flight cap", async () => {
+  let release!: () => void;
+  const held = new Promise<void>(resolve => { release = resolve; });
+  let calls = 0;
+  let allStarted!: () => void;
+  const began = new Promise<void>(resolve => { allStarted = resolve; });
+  const f = fixture(500, { async create() { calls += 1; if (calls === 10) allStarted(); await held; return { url: "https://ghostie.app/t/AbCdEf0123_-GhIj", expires_at: "2026-09-23T12:00:00.000Z" }; } });
+  const hosts = [{ request: (body: unknown) => f.request(f.path, body) }];
+  for (let index = 1; index < 11; index += 1) hosts.push(f.addAuthorizedHost());
+  const rpc = (id: number) => ({ jsonrpc: "2.0", id, method: "tools/call", params: { name: MESSAGE_LINK_TOOL_NAME, arguments: { phone: "+12155550123", body: "Synthetic" } } });
+  const active = hosts.slice(0, 10).map((host, index) => host.request(rpc(index + 1)));
+  await began;
+  const limited = await hosts[10]!.request(rpc(11));
+  expect(limited.status).toBe(200);
+  const limitedPayload = await limited.json() as any;
+  expect(limitedPayload.id).toBe(11);
+  expect(limitedPayload.result.isError).toBe(true);
+  expect(calls).toBe(10);
+  release();
+  expect((await Promise.all(active)).every(response => response.status === 200)).toBe(true);
+});
+
+test("link creation rejects expired, revoked, wrong-resource, and unknown-client tokens", async () => {
+  let calls = 0;
+  const f = fixture(500, { async create() { calls += 1; return { url: "https://ghostie.app/t/AbCdEf0123_-GhIj", expires_at: "2026-09-23T12:00:00.000Z" }; } });
+  const rpc = { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: MESSAGE_LINK_TOOL_NAME, arguments: { phone: "+12155550123", body: "Synthetic" } } };
+  const expired = f.store.issueToken({ host: f.host, user: "user-a", client: "client-a", resource: f.auth.resource(f.host), expires: Date.now() - 1 });
+  const wrongResource = f.store.issueToken({ host: f.host, user: "user-a", client: "client-a", resource: "https://relay.example.test/mcp/hosts/wrong", expires: Date.now() + 60_000 });
+  const unknownClient = f.store.issueToken({ host: f.host, user: "user-a", client: "unknown", resource: f.auth.resource(f.host), expires: Date.now() + 60_000 });
+  const revoked = f.store.issueToken({ host: f.host, user: "user-a", client: "client-a", resource: f.auth.resource(f.host), expires: Date.now() + 60_000 });
+  f.store.revoke(revoked);
+  for (const token of [expired, wrongResource, unknownClient, revoked]) expect((await f.request(f.path, rpc, token)).status).toBe(401);
+  expect(calls).toBe(0);
+});
+
+test("link limit is a rolling minute rather than a fixed window", async () => {
+  let current = 0;
+  let calls = 0;
+  const f = fixture(500, { async create() { calls += 1; return { url: "https://ghostie.app/t/AbCdEf0123_-GhIj", expires_at: "2026-09-23T12:00:00.000Z" }; } }, () => current);
+  const rpc = (id: number) => ({ jsonrpc: "2.0", id, method: "tools/call", params: { name: MESSAGE_LINK_TOOL_NAME, arguments: { phone: "+12155550123", body: "Synthetic" } } });
+  expect((await f.request(f.path, rpc(1))).status).toBe(200);
+  current = 59_999;
+  for (let id = 2; id <= 6; id += 1) expect((await f.request(f.path, rpc(id))).status).toBe(200);
+  current = 60_001;
+  expect((await (await f.request(f.path, rpc(7))).json() as any).result.isError).toBeUndefined();
+  expect((await (await f.request(f.path, rpc(8))).json() as any).result.isError).toBe(true);
+  expect(calls).toBe(7);
+});
+
+test("standard MCP SDK parses link rate limits as tool results", async () => {
+  let calls = 0;
+  const f = fixture(500, { async create() { calls += 1; return { url: "https://ghostie.app/t/AbCdEf0123_-GhIj", expires_at: "2026-09-23T12:00:00.000Z" }; } });
+  const socket = await f.connect();
+  socket.onmessage = event => {
+    const work = JSON.parse(String(event.data));
+    const result = work.request.method === "initialize"
+      ? { protocolVersion: work.request.params.protocolVersion, capabilities: { tools: {} }, serverInfo: { name: "fixture", version: "1" } }
+      : { tools: [{ name: "get_message_thread", inputSchema: { type: "object" } }] };
+    socket.send(JSON.stringify({ id: work.id, response: { jsonrpc: "2.0", id: work.request.id, result } }));
+  };
+  const client = new Client({ name: "relay-test", version: "1" });
+  const transport = new StreamableHTTPClientTransport(new URL(`https://relay.example.test${f.path}`), {
+    fetch: async (_url, init) => {
+      const headers = new Headers(init?.headers);
+      headers.set("Host", "relay.example.test");
+      headers.set("Authorization", `Bearer ${f.token}`);
+      return fetch(`http://127.0.0.1:${f.server.port}${f.path}`, { ...init, headers });
+    },
+  });
+  try {
+    await client.connect(transport);
+    expect((await client.listTools()).tools.map(tool => tool.name)).toEqual(["get_message_thread", MESSAGE_LINK_TOOL_NAME]);
+    for (let count = 0; count < 6; count += 1) {
+      const result = await client.callTool({ name: MESSAGE_LINK_TOOL_NAME, arguments: { phone: "+12155550123", body: "Synthetic" } });
+      expect(result.isError).not.toBe(true);
+    }
+    const limited = await client.callTool({ name: MESSAGE_LINK_TOOL_NAME, arguments: { phone: "+12155550123", body: "Synthetic" } });
+    expect(limited.isError).toBe(true);
+    expect(JSON.stringify(limited)).toContain("after a minute");
+    expect(calls).toBe(6);
+  } finally {
+    await client.close();
+    socket.close();
+  }
 });
