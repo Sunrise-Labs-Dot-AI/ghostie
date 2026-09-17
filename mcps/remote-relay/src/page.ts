@@ -33,7 +33,7 @@ async function render(){
  if(accountOnly){status('Choose Manage account, then Security to add a passkey.');return;}
  try{
   if(pairing){byID('code-label').hidden=false;byID('details').textContent='Only connect if you started this from Ghostie on your own Mac. Enter the code displayed there.';}
-  else{const data=await api('/api/consent/details',query);byID('details').textContent='Allow '+data.client+' ('+data.redirect_origin+') to read messages, stage drafts on this Mac, and create public seven-day compose links containing a recipient and message body. A link opens a prefilled compose screen but never sends: '+data.host;}
+  else{const data=await api('/api/consent/details',query);const link=typeof data.scope==='string'&&data.scope.split(' ').includes('messages:link');byID('details').textContent='Allow '+data.client+' ('+data.redirect_origin+') to '+(data.permissions||'read messages and stage drafts')+' on this Mac'+(link?'. Compose links are public seven-day compose links containing a recipient and message body; a link opens a prefilled compose screen but never sends':'')+': '+data.host;}
   byID('approve').disabled=false;status('Review the access above, then choose Connect.');
  }catch(e){status(e.message);}
 }

@@ -1,30 +1,39 @@
 import { randomUUID } from "node:crypto";
 import type { ServerWebSocket } from "bun";
 import { z } from "zod";
-import { Authorization, OAUTH_SCOPE, type OAuthClient } from "./authorization.ts";
+import { Authorization, type OAuthClient } from "./authorization.ts";
 import { Store, secret } from "./store.ts";
 import { accountPage } from "./page.ts";
 import { addMessageLinkTool, MESSAGE_LINK_TOOL_NAME, MessageLinkError, type MessageLinkCreator } from "./message-opener.ts";
+import { OAUTH_SCOPE, OFFLINE_ACCESS, SUPPORTED_SCOPES, describeScope, filterToolList, requiredScope, scopeAllows } from "./scopes.ts";
 
 type ConnectionData = { host: string };
-type Pending = { host: string; socket: ServerWebSocket<ConnectionData>; resolve: (response: Response) => void; timer: ReturnType<typeof setTimeout>; addLinkTool: boolean };
+type Pending = { host: string; socket: ServerWebSocket<ConnectionData>; resolve: (response: Response) => void; timer: ReturnType<typeof setTimeout>; addLinkTool: boolean; scope: string };
+type Waiter = { grant: (result: "ok" | "timeout") => void; timer: ReturnType<typeof setTimeout> };
 export interface RelayOptions {
   origin: string; store: Store; clients: OAuthClient[]; publishableKey: string; clerkScriptURL: string;
   messageLinks: MessageLinkCreator;
   sessionUser: (request: Request) => Promise<string | null>;
-  port?: number; timeoutMs?: number; now?: () => number;
+  port?: number; timeoutMs?: number; queueWaitMs?: number; now?: () => number;
 }
+/** Concurrent non-tool requests one host may have in flight, and tool calls that may wait their turn. */
+const HOST_IN_FLIGHT = 8;
+const HOST_QUEUE = 8;
 const bearer = (request: Request) => /^Bearer ([A-Za-z0-9._~-]{20,8192})$/.exec(request.headers.get("authorization") ?? "")?.[1] ?? "";
 const json = (body: unknown, status = 200, headers: Record<string, string> = {}) => Response.json(body, { status, headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...headers } });
 const unavailable = () => json({ error: "host_unavailable", message: "Open Ghostie and start hosting on your Mac. If a draft request was interrupted, inspect the Mac queue before retrying." }, 503);
+const challenge = (origin: string, hostID: string, error?: "invalid_token" | "insufficient_scope") =>
+  `Bearer ${error ? `error="${error}", ` : ""}scope="${OAUTH_SCOPE}", resource_metadata="${origin}/.well-known/oauth-protected-resource/mcp/hosts/${hostID}"`;
 
 export function startRelay(options: RelayOptions) {
-  const auth = new Authorization(options.store, options.origin, options.clients);
+  const auth = new Authorization(options.store, options.origin, options.clients, options.now);
   const connections = new Map<string, ServerWebSocket<ConnectionData>>();
   const pending = new Map<string, Pending>();
   const limits = new Map<string, { count: number; reset: number }>();
   const linkRuns = new Map<string, number[]>();
   const linkInFlight = new Set<string>();
+  // One tool call reaches a Mac at a time; the rest wait in order instead of failing.
+  const locks = new Map<string, { waiters: Waiter[] }>();
   const now = options.now ?? Date.now;
   function limited(key: string, maximum: number) {
     const current = now();
@@ -45,6 +54,24 @@ export function startRelay(options: RelayOptions) {
     if (active.length >= maximum) { linkRuns.set(key, active); return true; }
     active.push(current); linkRuns.set(key, active); return false;
   }
+  function acquire(hostID: string): Promise<"ok" | "full" | "timeout"> {
+    const lock = locks.get(hostID);
+    if (!lock) { locks.set(hostID, { waiters: [] }); return Promise.resolve("ok"); }
+    if (lock.waiters.length >= HOST_QUEUE) return Promise.resolve("full");
+    return new Promise(resolve => {
+      const waiter: Waiter = {
+        grant: result => { clearTimeout(waiter.timer); resolve(result); },
+        timer: setTimeout(() => { const index = lock.waiters.indexOf(waiter); if (index >= 0) lock.waiters.splice(index, 1); resolve("timeout"); }, options.queueWaitMs ?? 15_000),
+      };
+      lock.waiters.push(waiter);
+    });
+  }
+  function release(hostID: string) {
+    const lock = locks.get(hostID);
+    if (!lock) return;
+    const next = lock.waiters.shift();
+    if (next) next.grant("ok"); else locks.delete(hostID);
+  }
   function finish(id: string, response: Response) {
     const work = pending.get(id);
     if (!work) return;
@@ -64,10 +91,11 @@ export function startRelay(options: RelayOptions) {
       try {
         if (request.method === "GET" && path === "/.well-known/oauth-authorization-server") return json({
           issuer: options.origin, authorization_endpoint: `${options.origin}/oauth/authorize`, token_endpoint: `${options.origin}/oauth/token`, revocation_endpoint: `${options.origin}/oauth/revoke`,
-          response_types_supported: ["code"], grant_types_supported: ["authorization_code"], code_challenge_methods_supported: ["S256"], token_endpoint_auth_methods_supported: ["none"], scopes_supported: OAUTH_SCOPE.split(" "),
+          response_types_supported: ["code"], grant_types_supported: ["authorization_code", "refresh_token"], code_challenge_methods_supported: ["S256"], token_endpoint_auth_methods_supported: ["none"],
+          scopes_supported: [...SUPPORTED_SCOPES, OFFLINE_ACCESS],
         });
         const metadata = /^\/\.well-known\/oauth-protected-resource\/mcp\/hosts\/([A-Za-z0-9_-]{43})$/.exec(path);
-        if (request.method === "GET" && metadata) return json({ resource: auth.resource(metadata[1]!), authorization_servers: [options.origin], scopes_supported: OAUTH_SCOPE.split(" "), bearer_methods_supported: ["header"] });
+        if (request.method === "GET" && metadata) return json({ resource: auth.resource(metadata[1]!), authorization_servers: [options.origin], scopes_supported: [...SUPPORTED_SCOPES], bearer_methods_supported: ["header"] });
         if (request.method === "GET" && ["/account", "/pair", "/oauth/authorize"].includes(path)) {
           const nonce = secret();
           const clerkOrigin = new URL(options.clerkScriptURL).origin;
@@ -97,8 +125,8 @@ export function startRelay(options: RelayOptions) {
             auth.approvePair(id, code, user); return json({ ok: true });
           }
           if (path === "/api/consent/details") {
-            const { client, host, request: consent } = auth.validateConsent(body, user);
-            return json({ client: client.name, redirect_origin: new URL(consent.redirect_uri).origin, host: host.id });
+            const { client, host, request: consent, scope } = auth.validateConsent(body, user);
+            return json({ client: client.name, redirect_origin: new URL(consent.redirect_uri).origin, host: host.id, scope, permissions: describeScope(scope) });
           }
           return json({ redirect: auth.approveConsent(body, user) });
         }
@@ -116,7 +144,10 @@ export function startRelay(options: RelayOptions) {
             options.store.deleteHost(host.id); connections.get(host.id)?.close(1000, "Disconnected"); return json({ ok: true });
           }
           if (request.method === "GET" && hostRoute[2]) {
-            if (connections.has(host.id)) return json({ error: "host_already_connected" }, 409);
+            // The newest holder of the Mac credential wins. The previous socket is usually a dead
+            // connection the relay has not timed out yet; keeping it would refuse the live Mac for up to the idle timeout.
+            const stale = connections.get(host.id);
+            if (stale) { connections.delete(host.id); stale.close(1012, "Replaced by a newer connection"); }
             if (server.upgrade(request, { data: { host: host.id } })) return;
           }
           return json({ error: "method_not_allowed" }, 405);
@@ -125,8 +156,9 @@ export function startRelay(options: RelayOptions) {
         if (route) {
           const hostID = route[1]!;
           const resource = auth.resource(hostID);
-          const token = options.store.authorize(bearer(request), hostID, resource);
-          if (!token || !options.clients.some(client => client.id === token.client)) return json({ error: "unauthorized" }, 401, { "WWW-Authenticate": `Bearer resource_metadata="${options.origin}/.well-known/oauth-protected-resource/mcp/hosts/${hostID}"` });
+          const presented = bearer(request);
+          const token = options.store.authorize(presented, hostID, resource);
+          if (!token || !options.clients.some(client => client.id === token.client)) return json({ error: "unauthorized" }, 401, { "WWW-Authenticate": challenge(options.origin, hostID, presented ? "invalid_token" : undefined) });
           if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { Allow: "POST" });
           if (limited(`host:${hostID}`, 60)) return json({ error: "rate_limited" }, 429);
           const rpc = await request.json() as Record<string, unknown>;
@@ -137,7 +169,12 @@ export function startRelay(options: RelayOptions) {
           const rpcError = (code: number, message: string) => json({ jsonrpc: "2.0", id: validID ? rpc.id : null, error: { code, message } });
           const params = rpc.params && typeof rpc.params === "object" && !Array.isArray(rpc.params)
             ? rpc.params as Record<string, unknown> : undefined;
-          if (rpc.method === "tools/call" && params?.name === MESSAGE_LINK_TOOL_NAME) {
+          const toolCall = rpc.method === "tools/call";
+          if (toolCall) {
+            const name = typeof params?.name === "string" ? params.name : "";
+            if (!scopeAllows(token.scope, requiredScope(name))) return json({ error: "insufficient_scope" }, 403, { "WWW-Authenticate": challenge(options.origin, hostID, "insufficient_scope") });
+          }
+          if (toolCall && params?.name === MESSAGE_LINK_TOOL_NAME) {
             if (!validID) return rpcError(-32600, "Invalid request");
             const toolFailure = (message: string) => rpcResult({ isError: true, content: [{ type: "text", text: message }] });
             if (linkInFlight.has(hostID)) return toolFailure("A Messages link is already being created for this Mac. Wait for that result before trying again.");
@@ -159,19 +196,31 @@ export function startRelay(options: RelayOptions) {
               linkInFlight.delete(hostID);
             }
           }
-          const socket = connections.get(hostID);
-          if (!socket) return unavailable();
-          if (pending.size >= 100 || [...pending.values()].some(p => p.host === hostID)) return json({ error: "host_busy" }, 429);
-          const id = randomUUID();
-          return await new Promise<Response>(resolve => {
-            const timeout = options.timeoutMs ?? 20_000;
-            const timer = setTimeout(() => finish(id, unavailable()), timeout);
-            pending.set(id, { host: hostID, socket, resolve, timer, addLinkTool: rpc.method === "tools/list" });
-            if (socket.send(JSON.stringify({ id, deadline: Date.now() + timeout, request: rpc })) === 0) finish(id, unavailable());
-          });
+          if (pending.size >= 100 || [...pending.values()].filter(p => p.host === hostID).length >= HOST_IN_FLIGHT) return json({ error: "host_busy" }, 429);
+          if (toolCall) {
+            const slot = await acquire(hostID);
+            if (slot === "full") return json({ error: "host_busy" }, 429);
+            if (slot === "timeout") return rpcError(-32000, "Mac is busy. Inspect the draft queue before retrying a draft.");
+          }
+          try {
+            const socket = connections.get(hostID);
+            if (!socket) return unavailable();
+            const id = randomUUID();
+            return await new Promise<Response>(resolve => {
+              const timeout = options.timeoutMs ?? 20_000;
+              const timer = setTimeout(() => finish(id, unavailable()), timeout);
+              pending.set(id, { host: hostID, socket, resolve, timer, addLinkTool: rpc.method === "tools/list" && scopeAllows(token.scope, "messages:link"), scope: token.scope });
+              if (socket.send(JSON.stringify({ id, deadline: Date.now() + timeout, request: rpc })) === 0) finish(id, unavailable());
+            });
+          } finally {
+            if (toolCall) release(hostID);
+          }
         }
         return json({ error: "not_found" }, 404);
-      } catch { return json({ error: path === "/oauth/token" ? "invalid_grant" : "request_unavailable" }, 400); }
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : "";
+        return json({ error: path === "/oauth/token" ? (reason === "invalid_scope" ? "invalid_scope" : "invalid_grant") : "request_unavailable" }, 400);
+      }
     },
     websocket: {
       maxPayloadLength: 1_048_576, idleTimeout: 30, sendPings: true,
@@ -182,10 +231,15 @@ export function startRelay(options: RelayOptions) {
       message(socket, message) {
         try {
           const packet = JSON.parse(String(message));
+          // Application heartbeat: the Mac learns within seconds that a silent path is dead.
+          if (packet && typeof packet === "object" && typeof packet.heartbeat === "number" && Object.keys(packet).length === 1) {
+            if (connections.get(socket.data.host) === socket) socket.send(JSON.stringify({ heartbeat: packet.heartbeat }));
+            return;
+          }
           const work = pending.get(packet.id);
           if (!work || work.socket !== socket || work.host !== socket.data.host) return;
           if (!options.store.host(work.host) || packet.unavailable || !packet.response || typeof packet.response !== "object") finish(packet.id, unavailable());
-          else finish(packet.id, json(work.addLinkTool ? addMessageLinkTool(packet.response) : packet.response));
+          else finish(packet.id, json(work.addLinkTool ? addMessageLinkTool(filterToolList(packet.response, work.scope)) : filterToolList(packet.response, work.scope)));
         } catch { socket.close(1008, "Invalid response"); }
       },
       close(socket) {
@@ -195,5 +249,5 @@ export function startRelay(options: RelayOptions) {
     },
     error() { return json({ error: "service_unavailable" }, 503); },
   });
-  return { server, auth, connections, stop() { for (const id of pending.keys()) finish(id, unavailable()); server.stop(true); } };
+  return { server, auth, connections, stop() { for (const id of pending.keys()) finish(id, unavailable()); for (const lock of locks.values()) for (const waiter of lock.waiters) waiter.grant("timeout"); locks.clear(); server.stop(true); } };
 }

@@ -109,8 +109,18 @@ describe("host-bound OAuth", () => {
     expect(() => f.auth.approveConsent({ ...f.consent, code_challenge_method: "plain" }, "user-a")).toThrow();
     expect(() => f.auth.approveConsent({ ...f.consent, redirect_uri: "https://client.example.test/other" }, "user-a")).toThrow();
     expect(() => f.auth.approveConsent({ ...f.consent, resource: f.consent.resource + "?other" }, "user-a")).toThrow();
-    for (const scope of ["messages:read", "messages:read messages:draft"])
+    for (const scope of ["", "messages:send", "offline_access", "messages:read admin"])
       expect(() => f.auth.approveConsent({ ...f.consent, scope }, "user-a")).toThrow();
+  });
+  test("consent grants any subset of the supported scopes and the token carries it", () => {
+    const f = fixture();
+    for (const [requested, granted] of [["messages:read messages:draft", "messages:read messages:draft"], ["messages:draft messages:read offline_access", "messages:read messages:draft"], ["messages:read", "messages:read"]] as [string, string][]) {
+      const verifier = secret();
+      const url = new URL(f.auth.approveConsent({ ...f.consent, scope: requested, code_challenge: hash(verifier) }, "user-a"));
+      const token = f.auth.exchange({ grant_type: "authorization_code", code: url.searchParams.get("code")!, client_id: "client", redirect_uri: f.consent.redirect_uri, resource: f.consent.resource, code_verifier: verifier });
+      expect(token.scope).toBe(granted);
+      expect(f.store.authorize(token.access_token, f.paired.host!, f.consent.resource)?.scope).toBe(granted);
+    }
   });
   test("expiry and host deletion revoke authority", () => {
     const f = fixture(); const expired = f.exchange(); f.advance(60_001);
@@ -120,5 +130,70 @@ describe("host-bound OAuth", () => {
     expect(f.store.authorize(token.access_token, secondID, f.auth.resource(secondID))).toBeNull();
     f.store.deleteHost(f.paired.host!);
     expect(f.store.authorize(token.access_token, f.paired.host!, f.consent.resource)).toBeNull();
+  });
+});
+
+describe("refresh tokens", () => {
+  const refresh = (f: ReturnType<typeof fixture>, refresh_token: string, extra: Record<string, string> = {}) =>
+    f.auth.exchange({ grant_type: "refresh_token", refresh_token, client_id: "client", resource: f.consent.resource, ...extra });
+  test("code exchange issues a refresh token that rotates on use and expires after 30 days", () => {
+    const f = fixture(); const first = f.auth.exchange(f.exchange());
+    expect(first.refresh_token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(first.refresh_token).not.toBe(first.access_token);
+    f.advance(3_600_001);
+    expect(f.store.authorize(first.access_token, f.paired.host!, f.consent.resource, Date.now() + 3_600_001)).toBeNull();
+    const second = refresh(f, first.refresh_token);
+    expect(second.scope).toBe(OAUTH_SCOPE);
+    expect(second.refresh_token).not.toBe(first.refresh_token);
+    expect(f.store.authorize(second.access_token, f.paired.host!, f.consent.resource, Date.now() + 3_600_001)?.client).toBe("client");
+    const rows = JSON.stringify(f.store.db.query("SELECT * FROM refresh_tokens").all()) + JSON.stringify(f.store.db.query("SELECT * FROM tokens").all());
+    for (const raw of [first.access_token, first.refresh_token, second.access_token, second.refresh_token]) expect(rows).not.toContain(raw);
+    f.advance(30 * 24 * 3_600_000 + 1);
+    expect(() => refresh(f, second.refresh_token)).toThrow("invalid_grant");
+  });
+  test("replaying a rotated refresh token revokes the whole family", () => {
+    const f = fixture(); const first = f.auth.exchange(f.exchange());
+    const second = refresh(f, first.refresh_token);
+    expect(() => refresh(f, first.refresh_token)).toThrow("invalid_grant");
+    expect(f.store.authorize(second.access_token, f.paired.host!, f.consent.resource)).toBeNull();
+    expect(() => refresh(f, second.refresh_token)).toThrow("invalid_grant");
+  });
+  test("refresh is bound to the client, resource, and host account, and a mismatch does not burn the token", () => {
+    const f = fixture(); const issued = f.auth.exchange(f.exchange());
+    expect(() => refresh(f, issued.refresh_token, { client_id: "other" })).toThrow("invalid_grant");
+    expect(() => refresh(f, issued.refresh_token, { resource: f.consent.resource + "x" })).toThrow("invalid_grant");
+    expect(() => f.auth.exchange({ grant_type: "refresh_token", refresh_token: secret() })).toThrow("invalid_grant");
+    expect(() => f.auth.exchange({ grant_type: "refresh_token", refresh_token: issued.refresh_token, extra: "field" })).toThrow("invalid_grant");
+    const renewed = f.auth.exchange({ grant_type: "refresh_token", refresh_token: issued.refresh_token });
+    expect(renewed.access_token).toBeTruthy();
+    f.auth.clients.splice(0);
+    expect(() => refresh(f, renewed.refresh_token)).toThrow("invalid_grant");
+  });
+  test("refresh may narrow the granted scope but not widen it", () => {
+    const f = fixture(); const verifier = secret();
+    const url = new URL(f.auth.approveConsent({ ...f.consent, scope: "messages:read messages:draft", code_challenge: hash(verifier) }, "user-a"));
+    const issued = f.auth.exchange({ grant_type: "authorization_code", code: url.searchParams.get("code")!, client_id: "client", redirect_uri: f.consent.redirect_uri, resource: f.consent.resource, code_verifier: verifier });
+    expect(() => refresh(f, issued.refresh_token, { scope: OAUTH_SCOPE })).toThrow("invalid_scope");
+    expect(() => refresh(f, issued.refresh_token, { scope: "messages:send" })).toThrow("invalid_scope");
+    const narrowed = refresh(f, issued.refresh_token, { scope: "messages:read" });
+    expect(narrowed.scope).toBe("messages:read");
+    expect(f.store.authorize(narrowed.access_token, f.paired.host!, f.consent.resource)?.scope).toBe("messages:read");
+  });
+  test("revoking a refresh token, disconnecting the Mac, or a wrong-user host ends the grant", () => {
+    const f = fixture(); const issued = f.auth.exchange(f.exchange());
+    f.store.revoke(issued.refresh_token);
+    expect(f.store.authorize(issued.access_token, f.paired.host!, f.consent.resource)).toBeNull();
+    expect(() => refresh(f, issued.refresh_token)).toThrow("invalid_grant");
+    const again = f.auth.exchange(f.exchange());
+    f.store.deleteHost(f.paired.host!);
+    expect(() => refresh(f, again.refresh_token)).toThrow("invalid_grant");
+    expect(f.store.db.query("SELECT count(*) n FROM refresh_tokens").get()).toEqual({ n: 0 });
+  });
+  test("tokens issued before grant metadata existed keep the full scope", () => {
+    const f = fixture(); const legacy = secret();
+    f.store.db.query("INSERT INTO tokens VALUES (?, ?, ?, ?, ?, ?, 2)").run(hash(legacy), f.paired.host!, "user-a", "client", f.consent.resource, Date.now() + 60_000);
+    const token = f.store.authorize(legacy, f.paired.host!, f.consent.resource);
+    expect(token?.scope).toBe(OAUTH_SCOPE);
+    expect(token?.family).toBe("");
   });
 });

@@ -9,6 +9,8 @@ const canary = `synthetic-content-${randomBytes(16).toString('hex')}`;
 const credential = randomBytes(32).toString('base64url');
 const token = randomBytes(32).toString('base64url');
 const openerToken = `opener-${randomBytes(32).toString('base64url')}`;
+const refreshToken = randomBytes(32).toString('base64url');
+const family = randomBytes(32).toString('base64url');
 const host = randomBytes(32).toString('base64url');
 const phoneCanary = '+12155550123';
 const returnedLinkCanary = 'https://ghostie.app/t/AbCdEf0123_-GhIj';
@@ -48,10 +50,25 @@ try {
   assert(ready, 'container readiness');
   const seed = `import {Store,hash} from '/app/src/store.ts'; const s=new Store('/data/relay.sqlite');
     s.addHost({id:${JSON.stringify(host)},user:'fixture',credential:hash(${JSON.stringify(credential)}),created:Date.now()});
-    s.db.query('INSERT INTO tokens VALUES (?, ?, ?, ?, ?, ?, 2)').run(hash(${JSON.stringify(token)}),${JSON.stringify(host)},'fixture','fixture',${JSON.stringify(`${origin}/mcp/hosts/${host}`)},Date.now()+60000); s.db.close();`;
+    s.db.query('INSERT INTO tokens VALUES (?, ?, ?, ?, ?, ?, 2)').run(hash(${JSON.stringify(token)}),${JSON.stringify(host)},'fixture','fixture',${JSON.stringify(`${origin}/mcp/hosts/${host}`)},Date.now()+60000);
+    s.db.query('INSERT INTO refresh_tokens VALUES (?, ?, ?, ?, ?, ?, ?, ?, 2, 0)').run(hash(${JSON.stringify(refreshToken)}),${JSON.stringify(family)},${JSON.stringify(host)},'fixture','fixture',${JSON.stringify(`${origin}/mcp/hosts/${host}`)},'messages:read messages:draft messages:link',Date.now()+600000); s.db.close();`;
   await command(['docker', 'exec', '-i', name, 'bun', 'run', '-'], seed);
   const endpoint = `${base}/mcp/hosts/${host}`;
   assert.equal((await fetch(endpoint, { method: 'POST' })).status, 401);
+  const metadata = await (await fetch(`${base}/.well-known/oauth-authorization-server`)).json() as { grant_types_supported: string[]; scopes_supported: string[] };
+  assert.deepEqual(metadata.grant_types_supported, ['authorization_code', 'refresh_token']);
+  assert.deepEqual(metadata.scopes_supported, ['messages:read', 'messages:draft', 'messages:link', 'offline_access']);
+  // Refresh grant through the production image: rotation works, replay of the rotated token revokes the family.
+  const tokenRequest = (body: Record<string, string>) => fetch(`${base}/oauth/token`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(body) });
+  const renewed = await tokenRequest({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: 'fixture', resource: `${origin}/mcp/hosts/${host}` });
+  assert.equal(renewed.status, 200, 'refresh grant');
+  const rotated = await renewed.json() as { access_token: string; refresh_token: string; scope: string; expires_in: number };
+  assert.equal(rotated.scope, 'messages:read messages:draft messages:link');
+  assert.equal(rotated.expires_in, 3600);
+  assert.notEqual(rotated.refresh_token, refreshToken);
+  const replay = await tokenRequest({ grant_type: 'refresh_token', refresh_token: refreshToken, client_id: 'fixture' });
+  assert.equal(replay.status, 400, 'replayed refresh token refused');
+  assert.equal((await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${rotated.access_token}`, 'Content-Type': 'application/json' }, body: '{"jsonrpc":"2.0","id":0,"method":"ping"}' })).status, 401, 'family revoked after replay');
   socket = new WebSocket(`${base.replace('http:', 'ws:')}/hosts/${host}/connect`, { headers: { Authorization: `Bearer ${credential}` } });
   await new Promise<void>((resolve, reject) => { socket!.onopen = () => resolve(); socket!.onerror = () => reject(new Error('host socket failed')); });
   socket.onmessage = event => {
@@ -65,8 +82,8 @@ try {
   assert.equal(response.headers.get('cache-control'), 'no-store');
   const limits = await command(['docker', 'exec', name, 'cat', '/proc/1/limits']);
   assert.match(limits, /Max core file size\s+0\s+0/);
-  const contents = await command(['docker', 'exec', name, 'bun', '-e', "import{Database}from'bun:sqlite';let d=new Database('/data/relay.sqlite');console.log(JSON.stringify([d.query('SELECT * FROM hosts').all(),d.query('SELECT * FROM tokens').all()]));"]);
-  for (const value of [canary, phoneCanary, returnedLinkCanary, credential, token, openerToken]) assert(!contents.includes(value), 'no content or bearer secrets in metadata');
+  const contents = await command(['docker', 'exec', name, 'bun', '-e', "import{Database}from'bun:sqlite';let d=new Database('/data/relay.sqlite');console.log(JSON.stringify([d.query('SELECT * FROM hosts').all(),d.query('SELECT * FROM tokens').all(),d.query('SELECT * FROM token_grants').all(),d.query('SELECT * FROM refresh_tokens').all()]));"]);
+  for (const value of [canary, phoneCanary, returnedLinkCanary, credential, token, openerToken, refreshToken, rotated.access_token, rotated.refresh_token]) assert(!contents.includes(value), 'no content or bearer secrets in metadata');
   socket.close(); socket = undefined;
   await Bun.sleep(100);
   const linkResponse = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -80,9 +97,9 @@ try {
   const exit = (await command(['docker', 'wait', name])).trim();
   assert.equal(exit, '1', 'proxy failure must stop relay container');
   const logs = await command(['docker', 'logs', name]);
-  for (const value of [canary, phoneCanary, returnedLinkCanary, credential, token, openerToken, host, 'sk_test_fixture']) assert(!logs.includes(value), 'no content, identifiers or credentials in logs');
+  for (const value of [canary, phoneCanary, returnedLinkCanary, credential, token, openerToken, refreshToken, rotated.refresh_token, host, 'sk_test_fixture']) assert(!logs.includes(value), 'no content, identifiers or credentials in logs');
   assert(logs.includes('Relay service stopped unexpectedly.'), 'generic operational signal remains');
-  console.log('PASS: production image forwarding, authenticated offline link creation, auth gate, no-store, offline, core limits, metadata/log canaries, proxy failure shutdown.');
+  console.log('PASS: production image forwarding, refresh grant rotation and replay revocation, authenticated offline link creation, auth gate, no-store, offline, core limits, metadata/log canaries, proxy failure shutdown.');
 } finally {
   socket?.close();
   await command(['docker', 'rm', '-f', name]).catch(() => {});
