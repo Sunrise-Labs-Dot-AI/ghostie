@@ -25,7 +25,7 @@ test("tool scope requirements and list filtering follow the grant", () => {
   expect(requiredScope("get_message_thread")).toBe("messages:read");
   expect(requiredScope("approve_message_draft")).toBeUndefined();
   expect(requiredScope("")).toBeUndefined();
-  expect(requiredScope("constructor")).toBeUndefined();
+  for (const name of ["constructor", "__proto__", "toString", "hasOwnProperty"]) expect(requiredScope(name)).toBeUndefined();
   expect(scopeAllows("messages:read", "messages:draft")).toBe(false);
   const listed = { jsonrpc: "2.0", id: 1, result: { tools: [{ name: "get_message_thread" }, { name: "stage_message_draft" }, { name: "ghostie_create_messages_link" }, { name: "approve_message_draft" }, { name: 7 }] } };
   expect((filterToolList(listed, "messages:read") as any).result.tools.map((t: any) => t.name)).toEqual(["get_message_thread"]);

@@ -158,6 +158,7 @@ export function startRelay(options: RelayOptions) {
             const existing = connections.get(host.id);
             if (existing && now() - (lastHeard.get(existing) ?? 0) < STALE_AFTER_MS) return json({ error: "host_already_connected" }, 409);
             if (server.upgrade(request, { data: { host: host.id, sequence: ++sequence } })) return;
+            return json({ error: "upgrade_required" }, 426, { Upgrade: "websocket" });
           }
           return json({ error: "method_not_allowed" }, 405);
         }
@@ -269,5 +270,5 @@ export function startRelay(options: RelayOptions) {
     },
     error() { return json({ error: "service_unavailable" }, 503); },
   });
-  return { server, auth, connections, stop() { for (const id of pending.keys()) finish(id, unavailable()); for (const lock of locks.values()) for (const waiter of lock.waiters) waiter.grant("timeout"); locks.clear(); server.stop(true); } };
+  return { server, auth, connections, sequence: () => sequence, stop() { for (const id of pending.keys()) finish(id, unavailable()); for (const lock of locks.values()) for (const waiter of lock.waiters) waiter.grant("timeout"); locks.clear(); server.stop(true); } };
 }

@@ -19,11 +19,15 @@ function fixture(timeoutMs = 500, messageLinks: MessageLinkCreator = {
   const requestWith = (path: string, auth: string, body?: unknown, headers: Record<string, string> = {}) => fetch(`http://127.0.0.1:${relay.server.port}${path}`, { method: body === undefined ? "GET" : "POST", headers: { Host: "relay.example.test", Authorization: `Bearer ${auth}`, "Content-Type": "application/json", ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) });
   const request = (path: string, body?: unknown, auth = token, headers: Record<string, string> = {}) => requestWith(path, auth, body, headers);
   const addAuthorizedHost = (user = `user-${secret()}`) => {
-    const addedHost = secret();
-    store.addHost({ id: addedHost, user, credential: hash(secret()), created: Date.now() });
+    const addedHost = secret(), addedCredential = secret();
+    store.addHost({ id: addedHost, user, credential: hash(addedCredential), created: Date.now() });
     const addedToken = store.issueToken({ host: addedHost, user, client: "client-a", resource: relay.auth.resource(addedHost), expires: Date.now() + 60_000 });
     const addedPath = `/mcp/hosts/${addedHost}`;
-    return { host: addedHost, token: addedToken, path: addedPath, request: (body: unknown) => requestWith(addedPath, addedToken, body) };
+    const addedConnect = () => new Promise<WebSocket>((resolve, reject) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${relay.server.port}/hosts/${addedHost}/connect`, { headers: { Host: "relay.example.test", Authorization: `Bearer ${addedCredential}` } });
+      socket.onopen = () => resolve(socket); socket.onerror = reject;
+    });
+    return { host: addedHost, token: addedToken, path: addedPath, request: (body: unknown) => requestWith(addedPath, addedToken, body), connect: addedConnect };
   };
   const connect = () => new Promise<WebSocket>((resolve, reject) => {
     const socket = new WebSocket(`ws://127.0.0.1:${relay.server.port}/hosts/${host}/connect`, { headers: { Host: "relay.example.test", Authorization: `Bearer ${credential}` } });
@@ -158,7 +162,9 @@ test("heartbeats and responses keep a connection live; two concurrent connects s
   const opened = results.filter(result => result.status === "fulfilled").map(result => result.value);
   expect(opened.filter(ws => ws.readyState === WebSocket.OPEN).length).toBe(1);
   expect(f.connections.size).toBe(1);
-  expect(f.connections.get(f.host)!.data.sequence).toBeGreaterThan(0);
+  // The survivor is always the attempt that was authorized last, whichever socket finished its handshake first.
+  expect(f.connections.get(f.host)!.data.sequence).toBe(f.sequence());
+  expect(f.sequence()).toBeGreaterThanOrEqual(2);
   expect(codes).toEqual([1012]);
   for (const ws of opened) ws.close();
 });
@@ -212,16 +218,20 @@ test("per-host and per-account in-flight caps fail closed while another account 
   const held = Array.from({ length: 8 }, (_, id) => f.request(f.path, { jsonrpc: "2.0", id, method: "ping" }));
   await eight;
   expect((await f.request(f.path, { jsonrpc: "2.0", id: 9, method: "ping" })).status).toBe(429);
-  // A second Mac of the same account shares the account budget of 16; a third account is unaffected.
-  const sibling = f.addAuthorizedHost("user-a"); const other = f.addAuthorizedHost("user-b");
-  const siblingSocket = await new Promise<WebSocket>((resolve, reject) => { const ws = new WebSocket(`ws://127.0.0.1:${f.server.port}/hosts/${sibling.host}/connect`, { headers: { Host: "relay.example.test", Authorization: `Bearer ${f.store.db.query<{ credential: string }, [string]>("SELECT credential FROM hosts WHERE id = ?").get(sibling.host)!.credential}` } }); ws.onopen = () => resolve(ws); ws.onerror = reject; }).catch(() => undefined);
-  expect(siblingSocket).toBeUndefined(); // the stored credential is a digest, so this cannot connect; the cap check below does not need a socket
+  // A second Mac of the same account fills the account budget of 16 ...
+  const sibling = f.addAuthorizedHost("user-a"); const siblingSocket = await sibling.connect();
+  let siblingCount = 0; let siblingFull!: () => void; const sixteen = new Promise<void>(resolve => { siblingFull = resolve; });
+  siblingSocket.onmessage = () => { if (++siblingCount === 8) siblingFull(); };
   const siblingHeld = Array.from({ length: 8 }, (_, id) => sibling.request({ jsonrpc: "2.0", id, method: "ping" }));
-  expect((await Promise.all(siblingHeld)).map(r => r.status)).toEqual(Array(8).fill(503));
-  const otherResponse = await other.request({ jsonrpc: "2.0", id: 1, method: "ping" });
-  expect(otherResponse.status).toBe(503);
-  socket.close();
-  expect((await Promise.all(held)).every(r => r.status === 503)).toBe(true);
+  await sixteen;
+  // ... so a third Mac of the same account is refused before the relay even looks for its socket (429, not 503) ...
+  const third = f.addAuthorizedHost("user-a");
+  expect((await third.request({ jsonrpc: "2.0", id: 1, method: "ping" })).status).toBe(429);
+  // ... while another account with no socket still reaches the offline answer.
+  const other = f.addAuthorizedHost("user-b");
+  expect((await other.request({ jsonrpc: "2.0", id: 1, method: "ping" })).status).toBe(503);
+  socket.close(); siblingSocket.close();
+  expect((await Promise.all([...held, ...siblingHeld])).every(r => r.status === 503)).toBe(true);
 });
 
 test("removing a configured client invalidates already issued tokens", async () => {
@@ -462,5 +472,15 @@ test("relay echoes host heartbeats and ignores malformed ones", async () => {
   await Bun.sleep(30);
   expect(replies).toEqual([JSON.stringify({ heartbeat: 7 })]);
   expect(f.connections.size).toBe(1);
+  socket.close();
+});
+
+test("a connect request that is not a WebSocket upgrade leaves the live connection untouched", async () => {
+  const f = fixture(); const socket = await f.connect();
+  const plain = await fetch(`http://127.0.0.1:${f.server.port}/hosts/${f.host}/connect`, { headers: { Host: "relay.example.test", Authorization: `Bearer ${f.credential}` } });
+  expect([409, 426]).toContain(plain.status);
+  expect(f.connections.size).toBe(1);
+  f.echoHost(socket);
+  expect((await f.request(f.path, { jsonrpc: "2.0", id: 1, method: "ping" })).status).toBe(200);
   socket.close();
 });
