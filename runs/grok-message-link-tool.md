@@ -36,11 +36,28 @@ the client has discovered the tool. It composes a message and never sends it.
 
 ## Production rollout
 
-Pending the PR/CI gate. Deployment uses the canonical Railway project,
-environment, and service recorded in `runs/trusted-relay-v1.md`. The opener
-token is read directly from login-keychain service
+PR [#41](https://github.com/Sunrise-Labs-Dot-AI/ghostie/pull/41) passed every
+CI check and merged as `f9718a27eaea5098bc9f83d75adcb9adabafe07d`.
+Deployment `57f2ddca-796b-4ae3-a8ec-2bb2e8305e87` uploaded exactly that merged
+relay directory to the canonical Railway project, environment, and service
+recorded in `runs/trusted-relay-v1.md`. Railway reports SUCCESS.
+
+The opener token was read directly from login-keychain service
 `ghostie-message-opener-api-token` into the Railway variable
-`MESSAGE_OPENER_API_TOKEN` without printing it.
+`MESSAGE_OPENER_API_TOKEN` via stdin without displaying it or putting it in a
+process argument.
+
+Post-deploy checks:
+
+- `https://connect.messagesfor.ai/health` returns `{"status":"ok"}`.
+- OAuth metadata advertises `messages:read`, `messages:draft`, and
+  `messages:link`.
+- The live account/consent page contains the encrypted seven-day storage and
+  public compose-link disclosures.
+- Application logs contain only volume/container startup lines.
+- Railway HTTP logs report zero 5xx requests in the deployment window.
+
+## Remaining user-controlled acceptance
 
 After deployment, reauthorize CoS, Networker, and Sunny, verify that each sees
 `ghostie_create_messages_link`, and create one synthetic link through a persona.
