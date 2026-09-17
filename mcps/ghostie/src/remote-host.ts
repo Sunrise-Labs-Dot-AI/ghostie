@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { createRemoteExecutor } from "./remote-executor.ts";
+import { createHeartbeat, type Heartbeat } from "./remote-heartbeat.ts";
 
 // A private pipe from the app carries credentials. Neither argv nor disk does.
 const configSchema = z.object({ origin: z.string().url(), host: z.string().regex(/^[A-Za-z0-9_-]{43}$/), credential: z.string().regex(/^[A-Za-z0-9_-]{43}$/) }).strict();
@@ -34,11 +35,19 @@ process.stdin.on("data", async chunk => {
       if (stopping) return;
       socket = new WebSocket(url.href, { headers: { Authorization: `Bearer ${config.credential}` } });
       const current = socket;
-      current.onopen = () => { delay = 1000; process.stdout.write('{"status":"online"}\n'); };
+      // The relay echoes {"heartbeat": n}. A missed echo means the path died silently; drop the socket
+      // without a close handshake (nothing would answer it) so the reconnect loop starts at once.
+      const heartbeat: Heartbeat = createHeartbeat({
+        send: sequence => { if (current.readyState === WebSocket.OPEN) current.send(JSON.stringify({ heartbeat: sequence })); else throw new Error("closed"); },
+        dead: () => { if ("terminate" in current && typeof current.terminate === "function") current.terminate(); else current.close(); },
+      });
+      current.onopen = () => { delay = 1000; heartbeat.start(); process.stdout.write('{"status":"online"}\n'); };
       current.onmessage = async event => {
         if (typeof event.data !== "string" || Buffer.byteLength(event.data) > 65_536) { current.close(); return; }
         try {
-          const packet = z.object({ id: z.string().uuid(), deadline: z.number(), request: z.unknown() }).strict().parse(JSON.parse(event.data));
+          const parsed: unknown = JSON.parse(event.data);
+          if (parsed && typeof parsed === "object" && "heartbeat" in parsed) { heartbeat.echo((parsed as { heartbeat: unknown }).heartbeat); return; }
+          const packet = z.object({ id: z.string().uuid(), deadline: z.number(), request: z.unknown() }).strict().parse(parsed);
           for (const [id, expires] of seen) if (expires < Date.now()) seen.delete(id);
           if (packet.deadline <= Date.now() || packet.deadline > Date.now() + 30_000 || seen.has(packet.id)) return;
           if (seen.size >= 10000) { current.close(); return; }
@@ -51,6 +60,7 @@ process.stdin.on("data", async chunk => {
       };
       current.onerror = () => {}; // no payloads or bearer headers in diagnostics
       current.onclose = () => {
+        heartbeat.stop();
         process.stdout.write('{"status":"offline"}\n');
         setTimeout(connect, delay);
         delay = Math.min(delay * 2, 30_000);
