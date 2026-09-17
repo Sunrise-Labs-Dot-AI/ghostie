@@ -18,7 +18,7 @@ const server = Bun.serve({ hostname: '127.0.0.1', port: 18764, fetch(request) {
   return new Response('Ghostie synthetic connection approved. You can close this tab.', { headers: { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer' } });
 } });
 const timeout = setTimeout(() => { server.stop(true); process.exit(1); }, 300_000);
-const params = new URLSearchParams({ client_id: 'ghostie-desktop', redirect_uri: redirect, response_type: 'code', code_challenge_method: 'S256', code_challenge: hash(verifier), state, resource, scope: 'messages:read messages:draft' });
+const params = new URLSearchParams({ client_id: 'ghostie-desktop', redirect_uri: redirect, response_type: 'code', code_challenge_method: 'S256', code_challenge: hash(verifier), state, resource, scope: 'messages:read messages:draft messages:link' });
 console.log(`Synthetic desktop authorization: ${origin}/oauth/authorize?${params}`);
 let token: string | undefined;
 try {
@@ -29,11 +29,13 @@ try {
   const client = new Client({ name: 'ghostie-live-acceptance', version: '1.0.0' });
   await client.connect(new StreamableHTTPClientTransport(new URL(resource), { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
   const listed = await client.listTools();
-  assert.deepEqual(listed.tools.map(t => t.name), ['ghostie_connection_check']);
+  assert.deepEqual(listed.tools.map(t => t.name), ['ghostie_connection_check', 'ghostie_create_messages_link']);
   const result = await client.callTool({ name: 'ghostie_connection_check', arguments: {} });
   assert(JSON.stringify(result).includes('Ghostie synthetic connection works. No messages are available.'));
+  const link = await client.callTool({ name: 'ghostie_create_messages_link', arguments: { phone: '+12155550123', body: 'Synthetic Ghostie compose-link acceptance.' } });
+  assert.match(JSON.stringify(link), /https:\/\/ghostie\.app\/t\/[A-Za-z0-9_-]{16}/);
   await client.close();
-  console.log('PASS: live Clerk OAuth, PKCE, desktop SDK initialization/list/call.');
+  console.log('PASS: live Clerk OAuth, PKCE, desktop SDK discovery, host call, and compose-link creation.');
 } finally {
   if (token) {
     const response = await fetch(`${origin}/oauth/revoke`, { method: 'POST', body: new URLSearchParams({ token }) });

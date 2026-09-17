@@ -7,6 +7,7 @@ export const hash = (value: string) => createHash("sha256").update(value).digest
 export const equal = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b));
 export interface Host { id: string; user: string; credential: string; created: number }
 interface Token { digest: string; host: string; user: string; client: string; resource: string; expires: number; policy: number }
+export const TOKEN_POLICY = 2;
 export class Store {
   readonly db: Database;
   constructor(path: string) {
@@ -32,13 +33,13 @@ export class Store {
     this.db.query("DELETE FROM tokens WHERE expires <= ?").run(Date.now());
     if (this.db.query<{ n: number }, [string]>("SELECT count(*) n FROM tokens WHERE host = ?").get(token.host)!.n >= 30) throw new Error("Token limit");
     const raw = secret();
-    this.db.query("INSERT INTO tokens VALUES (?, ?, ?, ?, ?, ?, 1)").run(hash(raw), token.host, token.user, token.client, token.resource, token.expires);
+    this.db.query("INSERT INTO tokens VALUES (?, ?, ?, ?, ?, ?, ?)").run(hash(raw), token.host, token.user, token.client, token.resource, token.expires, TOKEN_POLICY);
     return raw;
   }
   authorize(raw: string, hostID: string, resource: string, now = Date.now()) {
     const token = this.db.query<Token, [string]>("SELECT * FROM tokens WHERE digest = ?").get(hash(raw));
     const host = this.host(hostID);
-    return token && host && token.expires > now && token.policy === 1 && token.host === hostID && token.resource === resource && token.user === host.user ? token : null;
+    return token && host && token.expires > now && token.policy === TOKEN_POLICY && token.host === hostID && token.resource === resource && token.user === host.user ? token : null;
   }
   revoke(raw: string) { this.db.query("DELETE FROM tokens WHERE digest = ?").run(hash(raw)); }
   hostAuthorized(id: string, raw: string) {
