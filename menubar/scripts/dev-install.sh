@@ -88,6 +88,25 @@ if [[ ! -w "$INSTALL_ROOT" ]]; then
   exit 1
 fi
 
+# ── Native by default; universal on request ──
+# Releases ship universal (arm64 + x86_64) so Intel Macs can run Ghostie — see
+# the universal-binary note in scripts/build-release.sh. Dev builds default to
+# THIS machine's arch only, because a second slice roughly doubles the ~10s dev
+# loop and you can't exercise it locally anyway.
+#
+# Set UNIVERSAL=1 to smoke-test a universal dev build without cutting a release:
+#   UNIVERSAL=1 bash menubar/scripts/dev-install.sh
+if [[ "${UNIVERSAL:-0}" == "1" ]]; then
+  # Deployment target must match LSMinimumSystemVersion in the Info.plist below.
+  SWIFT_BUILD_TRIPLES=(arm64-apple-macosx14.0 x86_64-apple-macosx14.0)
+  echo "› UNIVERSAL=1 — building arm64 + x86_64 (slower than the default)"
+else
+  # Empty triple = a plain `swift build -c release`, which keeps the default dev
+  # loop on its existing incremental cache at .build/release. Passing an explicit
+  # --triple would relocate the build dir and force one full rebuild.
+  SWIFT_BUILD_TRIPLES=("")
+fi
+
 echo "› swift build -c release"
 BIN=".build/release/${EXE_NAME}"
 # ── macOS build.db disk-I/O artifact tolerance ──
@@ -119,35 +138,60 @@ BUILD_DB_ERR_RE='build\.db.*disk I/O error'
 # capturing it so we can scan for the build.db artifact afterward. Removes any
 # stale binary first (so a leftover can't masquerade as this run's output) and
 # sets SWIFT_BUILD_RC + SWIFT_BUILD_LOG.
+# Takes a target triple; an empty string means a plain host-arch build. Sets
+# BIN to the product path for that triple.
 run_release_build() {
+  local triple="$1"
+  local -a triple_args=()
+  if [[ -n "$triple" ]]; then
+    triple_args=(--triple "$triple")
+    # Ask SwiftPM where this triple's products land rather than guessing the
+    # directory name (it drops the OS-version suffix: x86_64-apple-macosx).
+    BIN="$(swift build -c release "${triple_args[@]}" --show-bin-path)/${EXE_NAME}"
+  else
+    BIN=".build/release/${EXE_NAME}"
+  fi
   [[ -n "${SWIFT_BUILD_LOG:-}" ]] && rm -f "$SWIFT_BUILD_LOG"
   SWIFT_BUILD_LOG="$(mktemp -t mfa-swift-build)"
   rm -f "$BIN"
   set +e
-  swift build -c release 2>&1 | tee "$SWIFT_BUILD_LOG"
+  swift build -c release "${triple_args[@]}" 2>&1 | tee "$SWIFT_BUILD_LOG"
   SWIFT_BUILD_RC=${PIPESTATUS[0]}
   set -e
 }
 
-run_release_build
+SWIFT_SLICE_BINS=()
+for triple in "${SWIFT_BUILD_TRIPLES[@]}"; do
+  [[ -n "$triple" ]] && echo "  · $triple"
+  run_release_build "$triple"
 
-# Self-heal: build.db corrupted the link product (binary missing despite the
-# disk-I/O error). Wipe .build and rebuild from scratch — exactly once.
-if [[ ! -x "$BIN" ]] && grep -qE "$BUILD_DB_ERR_RE" "$SWIFT_BUILD_LOG"; then
-  echo "  ⚠ build.db corrupted the link product — wiping .build and retrying once."
-  rm -rf .build
-  run_release_build
-fi
-rm -f "$SWIFT_BUILD_LOG"
+  # Self-heal: build.db corrupted the link product (binary missing despite the
+  # disk-I/O error). Wipe .build and rebuild from scratch — exactly once.
+  if [[ ! -x "$BIN" ]] && grep -qE "$BUILD_DB_ERR_RE" "$SWIFT_BUILD_LOG"; then
+    echo "  ⚠ build.db corrupted the link product — wiping .build and retrying once."
+    rm -rf .build
+    run_release_build "$triple"
+  fi
+  rm -f "$SWIFT_BUILD_LOG"
 
-if [[ ! -x "$BIN" ]]; then
-  echo "✗ swift build did not produce $BIN (exit $SWIFT_BUILD_RC)." >&2
-  echo "  This is a real build failure, not the build.db disk-I/O artifact." >&2
-  exit 1
-fi
-if [[ $SWIFT_BUILD_RC -ne 0 ]]; then
-  echo "  ⚠ swift build exited $SWIFT_BUILD_RC but linked a fresh binary —"
-  echo "  ⚠ proceeding (known macOS build.db disk-I/O artifact, not a compile error)."
+  if [[ ! -x "$BIN" ]]; then
+    echo "✗ swift build did not produce $BIN (exit $SWIFT_BUILD_RC)." >&2
+    echo "  This is a real build failure, not the build.db disk-I/O artifact." >&2
+    exit 1
+  fi
+  if [[ $SWIFT_BUILD_RC -ne 0 ]]; then
+    echo "  ⚠ swift build exited $SWIFT_BUILD_RC but linked a fresh binary —"
+    echo "  ⚠ proceeding (known macOS build.db disk-I/O artifact, not a compile error)."
+  fi
+  SWIFT_SLICE_BINS+=("$BIN")
+done
+
+# Stitch the slices when there's more than one. Skipped in the default
+# single-arch case so BIN keeps pointing at SwiftPM's own product.
+if (( ${#SWIFT_SLICE_BINS[@]} > 1 )); then
+  echo "› lipo → universal ${EXE_NAME}"
+  BIN=".build/${EXE_NAME}-universal"
+  lipo -create -output "$BIN" "${SWIFT_SLICE_BINS[@]}"
 fi
 
 echo "› assembling ${APP}"
