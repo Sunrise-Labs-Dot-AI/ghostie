@@ -22,6 +22,9 @@ const HOST_QUEUE = 8;
 /** Requests one account may hold across its Macs, and the process-wide ceiling. */
 const USER_IN_FLIGHT = 16;
 const GLOBAL_IN_FLIGHT = 1000;
+/** Authenticated MCP requests one host accepts per fixed minute. A client that runs several personas (Cursor's
+ *  Grok Bot) initializes them in parallel, four requests each, and never retries a 429; 60 refused those bursts. */
+const HOST_REQUESTS_PER_MINUTE = 240;
 /** A Mac connection not heard from (pong, heartbeat, or response) for this long may be replaced by a new one. */
 const STALE_AFTER_MS = 20_000;
 const bearer = (request: Request) => /^Bearer ([A-Za-z0-9._~-]{20,8192})$/.exec(request.headers.get("authorization") ?? "")?.[1] ?? "";
@@ -170,7 +173,7 @@ export function startRelay(options: RelayOptions) {
           const token = options.store.authorize(bearer(request), hostID, resource);
           if (!token || !options.clients.some(client => client.id === token.client)) return json({ error: "unauthorized" }, 401, { "WWW-Authenticate": challenge(options.origin, hostID, presented ? "invalid_token" : undefined) });
           if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { Allow: "POST" });
-          if (limited(`host:${hostID}`, 60)) return json({ error: "rate_limited" }, 429);
+          if (limited(`host:${hostID}`, HOST_REQUESTS_PER_MINUTE)) return json({ error: "rate_limited" }, 429);
           const rpc = await request.json() as Record<string, unknown>;
           if (!rpc || typeof rpc !== "object" || Array.isArray(rpc) || rpc.jsonrpc !== "2.0") return json({ error: "invalid_request" }, 400);
           if (rpc.method === "notifications/initialized" && rpc.id === undefined) return new Response(null, { status: 202, headers: { "Cache-Control": "no-store" } });

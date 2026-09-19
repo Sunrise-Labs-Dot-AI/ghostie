@@ -234,6 +234,19 @@ test("per-host and per-account in-flight caps fail closed while another account 
   expect((await Promise.all([...held, ...siblingHeld])).every(r => r.status === 503)).toBe(true);
 });
 
+test("per-host request limit admits a multi-persona burst, refuses the excess, and resets after a minute", async () => {
+  let current = Date.now();
+  const f = fixture(500, undefined, () => current); const socket = await f.connect(); f.echoHost(socket);
+  const token = f.store.issueToken({ host: f.host, user: "user-a", client: "client-a", resource: f.auth.resource(f.host), expires: Date.now() + 600_000 });
+  // Sixty personas initializing at once send four requests each; the old limit of 60 refused the first burst's second request.
+  for (let i = 0; i < 240; i += 1) expect((await f.request(f.path, { jsonrpc: "2.0", method: "notifications/initialized" }, token)).status).toBe(202);
+  const refused = await f.request(f.path, { jsonrpc: "2.0", id: 1, method: "ping" }, token);
+  expect(refused.status).toBe(429);
+  expect(((await refused.json()) as { error: string }).error).toBe("rate_limited");
+  current += 60_001;
+  expect((await f.request(f.path, { jsonrpc: "2.0", id: 2, method: "ping" }, token)).status).toBe(200);
+  socket.close();
+});
 test("removing a configured client invalidates already issued tokens", async () => {
   const f = fixture(); f.auth.clients.splice(0);
   expect((await f.request(f.path, { jsonrpc: "2.0", id: 1, method: "ping" })).status).toBe(401);
