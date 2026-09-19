@@ -822,7 +822,7 @@ export async function runStdio() {
   setInterval(() => void refreshChatDbStatus(), 30_000).unref?.();
 
   const server = new McpServer(
-    { name: "ghostie-mcp", version: "0.14.0" },
+    { name: "ghostie-mcp", version: "0.15.0" },
     {
       instructions:
         "Ghostie: a generalized facade over local iMessage and WhatsApp transports. " +
