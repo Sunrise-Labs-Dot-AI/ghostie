@@ -51,3 +51,26 @@ User step after rollout: reconnect Grok Bot once (configure the three scopes or 
 - Mac-side heartbeat: PR [#45](https://github.com/Sunrise-Labs-Dot-AI/ghostie/pull/45) (`remote-heartbeat.ts`, 15 second send, 10 second echo timeout, terminate and reconnect) rides the next app release; relay support is live.
 - Live confirmation that Grok Bot survives an hour boundary without a Connect card; Cursor's refresh behavior is undocumented, so if it never refreshes, the failure mode is unchanged from before.
 - Cause of the periodic WebSocket drops; compare the M4 path monitor with the next churn window in the relay logs.
+
+## Follow-up, 2026-09-19 (Pacific): post-rollout check and per-host limit
+
+James reported the remote MCP as "still flaky" two days after the rollout. Read-only evidence: Railway HTTP logs for deployment `4065d330` (Sep 17 16:19 to Sep 19 20:25 UTC, 11,842 rows, host ids stripped), the M1 over SSH (process table, sockets, content-free activity timestamps, daemon logs), and the M4 path monitor.
+
+| Window (UTC) | What happened |
+| --- | --- |
+| Sep 17 16:19 to 20:00 | 30 × 401 and nothing else: the pre-rollout token had expired and there was no refresh token until James re-consented at 20:00 (iPhone). Expected. |
+| Sep 17 20:00 to Sep 18 07:34 | 850 × 200, 369 × 202. One 401 per hour boundary, each followed within a second by a silent refresh (25 exchanges over the deployment, no Connect card). Zero 409. 12 × 429 in two bursts. No call slower than 100 ms at the edge. |
+| Sep 18 08:56 to 09:01 | House WAN outage seen by both Macs (the M4 monitor's TLS leg and the M1's WhatsApp daemon). The relay logged the M1's socket closing at 08:56:07 after 16.6 h. |
+| Sep 18 13:28 to Sep 19 20:24 | 189 × 503 `host_unavailable`, all immediate. Zero reconnect attempts reached the relay. |
+
+Findings:
+1. The M1 (Ghostie 0.14.0, host process from Sep 17 03:24 UTC) still held one ESTABLISHED socket to the Railway edge (the A record of `connect.messagesfor.ai`), half open: the relay's close was lost in the outage, the 0.14.0 host has no heartbeat, Bun's WebSocket client sets no TCP keepalive (`net.inet.tcp.always_keepalive=0`), and the reconnect loop only runs on close. The app kept showing Online. The host's last executed request was 07:31:53 UTC Sep 18 (M1 activity log, pid-matched). Cause #5 above, observed live. The app's `terminationHandler` turns hosting off rather than respawning, so killing the process would not have helped; James chose Stop hosting then Start hosting at 20:38 UTC Sep 19 and every call from 20:40 was 200 again.
+2. The twelve 429s were the fixed-window per-host limiter (60 authenticated POSTs per minute), not `host_busy`: in the first burst the relay accepted exactly 60 POSTs from 21:33:37 and refused the 61st, then served again after the window reset. Cursor's Grok Bot initializes personas in parallel (about four requests each, peaks of 75 to 103 requests per minute) and does not retry a 429, so refused personas never initialized. The in-flight cap of eight was never reached (peak 20 requests in one second, all fast).
+3. The path monitor's echo.websocket.org leg closes every 605 s on its own (service limit) and was never a network signal; the TLS leg to the relay stayed up 17.4 h and 5.3 h and captured the outage. Monitor stopped; log kept in the session scratchpad.
+
+Change: PR [#46](https://github.com/Sunrise-Labs-Dot-AI/ghostie/pull/46) (`c879e6f`) raises the per-host limit to `HOST_REQUESTS_PER_MINUTE = 240` with a test (240 admitted, the 241st refused as `rate_limited`, reset after a minute) and a README update. Typecheck clean, 68 tests, 14 CI checks green including the container smoke. James ran the admin merge and the Railway upload (the auto-mode classifier refused both to the agent). Deployment `50e7c572-6a87-46cb-9b84-69398f614e52` SUCCESS at 20:49:00 UTC. The old container closed the M1's socket at 20:48:55; the M1's first reconnect waited 15 s at the edge for the single replica (502), and the next attempt was connected by 20:49:22 with no Stop/Start. Live checks: `/health` ok, metadata lists both grant types, an unauthenticated call answers 401.
+
+Remaining:
+- Release v0.15.0 with the heartbeat (#45); the release preflight passes on the M4. After it ships, a WAN blip should produce a reconnect within about 25 s (15 s send, 10 s echo timeout) with no Stop/Start.
+- Success watch for the limiter: no 429 during Grok Bot persona bursts.
+- Deferred: per-token queue fairness.
