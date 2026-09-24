@@ -51,6 +51,85 @@ struct IMessageDeliveryConfirmer {
     return nil
   }
 
+  /// Aggregate outcome of every outbound row one send run produced.
+  struct Reconciliation: Equatable {
+    /// Rows matched for this handle at/after the send start.
+    let observed: Int
+    /// Of those, rows carrying a non-zero `message.error` — the same signal
+    /// `isBounce` uses, counted per part instead of only for the newest row.
+    let failed: Int
+  }
+
+  /// Reconcile what a MULTIPART send actually did. `latestOutbound` answers
+  /// "did the newest message bounce?", which is blind to a partial failure: a
+  /// burst of attachment uploads can have the first rows land clean and later
+  /// ones rejected, and the newest row alone can report either. Polls until
+  /// `expected` rows are visible — a rejected transfer still writes its row,
+  /// carrying `error != 0`, so the count converges on success and failure
+  /// alike — then reports the tallies. Returns the last snapshot it managed to
+  /// read if the rows never all appear, and nil if chat.db never became
+  /// readable. Read-only.
+  func reconcileOutbound(
+    handle: String,
+    since: Date,
+    expected: Int,
+    attempts: Int = 12,
+    delaySeconds: TimeInterval = 1.0
+  ) async -> Reconciliation? {
+    let sinceNanos = Self.appleNanoseconds(since)
+    let total = max(1, attempts)
+    var latest: Reconciliation?
+    for attempt in 0..<total {
+      if let snapshot = outboundCounts(handle: handle, sinceNanos: sinceNanos) {
+        latest = snapshot
+        if snapshot.observed >= expected { return snapshot }
+      }
+      if attempt < total - 1 {
+        try? await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
+      }
+    }
+    return latest
+  }
+
+  /// Tally outbound rows to `handle` at/after `sinceNanos`. Bounded scan: the
+  /// window starts at the send, and a draft carries at most a handful of parts,
+  /// so the cap only guards against a pathological burst from other threads.
+  func outboundCounts(handle: String, sinceNanos: Int64) -> Reconciliation? {
+    guard let targetKey = ContactAvatarStore.canonicalKey(handle) else { return nil }
+    guard FileManager.default.fileExists(atPath: dbURL.path) else { return nil }
+
+    var db: OpaquePointer?
+    let flags = SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
+    guard sqlite3_open_v2(dbURL.path, &db, flags, nil) == SQLITE_OK, let db else {
+      if let db { sqlite3_close(db) }
+      return nil
+    }
+    defer { sqlite3_close(db) }
+
+    let sql = """
+      SELECT h.id, m.error
+      FROM message m
+      JOIN handle h ON h.ROWID = m.handle_id
+      WHERE m.is_from_me = 1 AND m.date >= ?
+      ORDER BY m.date DESC
+      LIMIT 200
+      """
+    var stmt: OpaquePointer?
+    guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK, let stmt else { return nil }
+    defer { sqlite3_finalize(stmt) }
+    sqlite3_bind_int64(stmt, 1, sinceNanos)
+
+    var observed = 0
+    var failed = 0
+    while sqlite3_step(stmt) == SQLITE_ROW {
+      let rawHandle = sqlite3_column_text(stmt, 0).map { String(cString: $0) } ?? ""
+      guard ContactAvatarStore.canonicalKey(rawHandle) == targetKey else { continue }
+      observed += 1
+      if sqlite3_column_int64(stmt, 1) != 0 { failed += 1 }
+    }
+    return Reconciliation(observed: observed, failed: failed)
+  }
+
   /// Most-recent outbound message to `handle` whose date >= `sinceNanos`. Scans
   /// the newest 25 outbound rows and canonical-matches the handle (formats vary:
   /// "+1650…" vs "(650)…"), the same matching the resolvers use.
