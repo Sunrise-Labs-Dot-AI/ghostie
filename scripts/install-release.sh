@@ -66,6 +66,58 @@ if [[ ! -x "$APP_SRC/Contents/MacOS/ghostie-mcp" ]]; then
   exit 1
 fi
 
+# ─── Check this Mac can actually RUN the app, before installing anything ────
+#
+# Previously the installer would happily copy the app onto an unsupported Mac,
+# print "Installed", and leave the user with a bundle that fails at launch with
+# a macOS dialog that names no cause. Both failure modes are worth catching:
+#
+#   - Wrong architecture. Releases through v0.13.0 shipped arm64-only, so every
+#     Intel Mac got "You can't open the application because it is not supported
+#     on this type of Mac." Rosetta cannot rescue this: it translates x86→ARM,
+#     never ARM→x86. Builds from v0.14.0 on are universal, so this check should
+#     pass everywhere — it now guards against a regression in the build script.
+#   - Too old an OS. The app needs macOS 14 (Sonoma).
+#
+# We use `file`, NOT `lipo`, to read the Mach-O: /usr/bin/lipo is one of the
+# Xcode Command Line Tools shims, so calling it on a Mac without the CLT
+# installed pops the "install developer tools" dialog instead of answering.
+# /usr/bin/file is part of the base system.
+FILE=/usr/bin/file
+SW_VERS=/usr/bin/sw_vers
+UNAME=/usr/bin/uname
+
+MIN_MACOS_MAJOR=14
+MACOS_VERSION="$("$SW_VERS" -productVersion 2>/dev/null || echo "0")"
+MACOS_MAJOR="${MACOS_VERSION%%.*}"
+if [[ ! "$MACOS_MAJOR" =~ ^[0-9]+$ ]] || (( MACOS_MAJOR < MIN_MACOS_MAJOR )); then
+  echo "✗ $APP_NAME needs macOS $MIN_MACOS_MAJOR (Sonoma) or later." >&2
+  echo "  This Mac is running macOS ${MACOS_VERSION}." >&2
+  echo "  Nothing has been installed. Update macOS in System Settings →" >&2
+  echo "  General → Software Update, then run this installer again." >&2
+  exit 1
+fi
+
+HOST_ARCH="$("$UNAME" -m)"   # arm64 on Apple Silicon, x86_64 on Intel
+APP_EXEC="$APP_SRC/Contents/MacOS/MessagesForAIMenu"
+APP_ARCHS="$("$FILE" -b "$APP_EXEC" 2>/dev/null)"
+if [[ "$APP_ARCHS" != *"$HOST_ARCH"* ]]; then
+  case "$HOST_ARCH" in
+    x86_64) host_label="an Intel Mac" ;;
+    arm64)  host_label="an Apple Silicon Mac" ;;
+    *)      host_label="this Mac ($HOST_ARCH)" ;;
+  esac
+  echo "✗ This build of $APP_NAME does not support $host_label." >&2
+  echo "  Your Mac needs the '$HOST_ARCH' architecture, which this app is" >&2
+  echo "  missing. macOS cannot translate between architectures here, so the" >&2
+  echo "  app would fail to open." >&2
+  echo "  Nothing has been installed." >&2
+  echo "  Please report this at https://github.com/Sunrise-Labs-Dot-AI/ghostie/issues" >&2
+  echo "  including this line: host=$HOST_ARCH app=[$APP_ARCHS]" >&2
+  exit 1
+fi
+echo "  ✓ macOS $MACOS_VERSION on $HOST_ARCH — supported"
+
 # ─── Verify the archive's signing identity matches EXPECTED_TEAM_ID ─────────
 #
 # This is the headline check that defends against a phishing-site
