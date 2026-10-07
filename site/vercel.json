@@ -63,6 +63,16 @@
       "destination": "/ghostie/pro.html"
     },
     {
+      "source": "/whats-new",
+      "has": [{ "type": "host", "value": "ghostie.app" }],
+      "destination": "/ghostie/whats-new/index.html"
+    },
+    {
+      "source": "/whats-new",
+      "has": [{ "type": "host", "value": "www.ghostie.app" }],
+      "destination": "/ghostie/whats-new/index.html"
+    },
+    {
       "source": "/assets/:path*",
       "has": [{ "type": "host", "value": "ghostie.app" }],
       "destination": "/ghostie/assets/:path*"

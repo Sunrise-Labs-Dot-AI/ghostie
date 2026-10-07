@@ -13,7 +13,9 @@ const HOST_ROUTES = new Map([
     ["/security", "/ghostie/security/index.html"],
     ["/security.html", "/ghostie/security/index.html"],
     ["/support", "/ghostie/support/index.html"],
-    ["/support.html", "/ghostie/support/index.html"]
+    ["/support.html", "/ghostie/support/index.html"],
+    ["/whats-new", "/ghostie/whats-new/index.html"],
+    ["/whats-new.html", "/ghostie/whats-new/index.html"]
   ])],
   ["www.ghostie.app", new Map([
     ["/", "/ghostie/index.html"],
@@ -25,7 +27,9 @@ const HOST_ROUTES = new Map([
     ["/security", "/ghostie/security/index.html"],
     ["/security.html", "/ghostie/security/index.html"],
     ["/support", "/ghostie/support/index.html"],
-    ["/support.html", "/ghostie/support/index.html"]
+    ["/support.html", "/ghostie/support/index.html"],
+    ["/whats-new", "/ghostie/whats-new/index.html"],
+    ["/whats-new.html", "/ghostie/whats-new/index.html"]
   ])],
   ["textingwrapped.com", new Map([
     ["/", "/texting-wrapped/index.html"]
@@ -46,7 +50,9 @@ export const config = {
     "/security/:path*",
     "/security.html",
     "/support/:path*",
-    "/support.html"
+    "/support.html",
+    "/whats-new/:path*",
+    "/whats-new.html"
   ]
 };
 

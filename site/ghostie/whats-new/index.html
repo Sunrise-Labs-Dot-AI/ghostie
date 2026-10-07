@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>What's new - Ghostie</title>
+  <meta name="description" content="What changed in Ghostie v0.13 through v0.15: the move to ghostie.app, optional remote access from your AI clients, and the Messages opener.">
+  <link rel="icon" type="image/png" sizes="32x32" href="/assets/favicon-32.png">
+  <style>
+    :root {
+      --fg: #111317;
+      --muted: #66707f;
+      --bg: #f6f7f9;
+      --paper: #ffffff;
+      --line: #dfe4eb;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --fg: #f4f6fa;
+        --muted: #9ea7b5;
+        --bg: #171b1f;
+        --paper: #101215;
+        --line: #2b323a;
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .page {
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 30px 22px 58px;
+    }
+
+    header,
+    footer {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    a { color: inherit; }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--fg);
+      font-weight: 730;
+      text-decoration: none;
+    }
+
+    .brand img {
+      width: 32px;
+      height: auto;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+
+    main {
+      margin: 56px 0 46px;
+      padding: 34px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: var(--paper);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(36px, 6vw, 54px);
+      line-height: 1;
+      letter-spacing: 0;
+    }
+
+    .lede {
+      margin: 0 0 32px;
+    }
+
+    h2 {
+      margin: 30px 0 8px;
+      font-size: 21px;
+      line-height: 1.18;
+    }
+
+    .version {
+      color: var(--muted);
+      font-weight: 500;
+      white-space: nowrap;
+    }
+
+    h1 .version {
+      display: block;
+      margin-top: 10px;
+      font-size: 16px;
+      line-height: 1.3;
+    }
+
+    p,
+    li {
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    ul {
+      padding-left: 20px;
+    }
+
+    code {
+      padding: 1px 5px;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      color: var(--fg);
+      background: var(--bg);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+
+    strong { color: var(--fg); }
+
+    footer {
+      border-top: 1px solid var(--line);
+      padding-top: 22px;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      justify-content: flex-end;
+    }
+
+    @media (max-width: 620px) {
+      header,
+      footer {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      main {
+        padding: 24px;
+      }
+
+      .footer-links {
+        justify-content: flex-start;
+      }
+    }
+  </style>
+  <script defer src="/analytics.js"></script>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <a class="brand" href="/">
+        <img src="/assets/ghostie-hero.png" alt="">
+        <span>Ghostie</span>
+      </a>
+      <a href="/">Back to product</a>
+    </header>
+
+    <main>
+      <h1>What's new <span class="version">(v0.13&ndash;0.15)</span></h1>
+
+      <p class="lede">
+        These releases were plumbing. No Don&rsquo;t Ghost, Birthdays, or Wrapped user-facing ships in this window.
+      </p>
+
+      <h2>Ghostie now lives at ghostie.app <span class="version">(v0.13.0)</span></h2>
+      <p>
+        Update feed &rarr; <a href="https://ghostie.app/appcast.xml">https://ghostie.app/appcast.xml</a>. Control / kill-switch
+        manifest &rarr; ghostie.app. In-app account, support, terms, and privacy links, plus site metadata, follow.
+        messagesfor.ai stays live as an alias so v0.12 installs keep updating. If you are on v0.12, Check for Updates is
+        the normal path. If you are on v0.11.3 or earlier, auto-update cannot reach you; download the DMG and replace your
+        copy manually (see the
+        <a href="https://github.com/Sunrise-Labs-Dot-AI/ghostie/releases/tag/v0.12.0">v0.12 notes</a> for why).
+      </p>
+
+      <h2>Remote access from your AI clients <span class="version">(v0.14.0)</span></h2>
+      <p>
+        Optional: connect a Ghostie account in Settings &rarr; Advanced to host a remote MCP from your Mac. Sign up by
+        email and optionally add a passkey. Supported clients can read iMessage and WhatsApp conversations and stage text
+        drafts for your review in Ghostie.
+      </p>
+      <ul>
+        <li>
+          <strong>You approve every send.</strong> Remote access cannot send, approve, schedule, or attach local files.
+        </li>
+        <li>
+          <strong>Your Mac is the host.</strong> Remote access is unavailable when Ghostie is closed, your Mac sleeps, or
+          the connection drops.
+        </li>
+        <li>
+          <strong>Sensitive sign-in content is filtered locally.</strong> Ghostie hides suspected verification codes and
+          sign-in links before returning results. Detection may miss unfamiliar formats.
+        </li>
+        <li>
+          <strong>Connections use TLS encryption.</strong> The relay processes content in memory without intentional
+          message storage or content logging. This is a trusted relay, not end-to-end encryption that hides content from
+          the relay.
+        </li>
+      </ul>
+      <p>
+        Also includes email sign-in fixes and static OAuth support for Claude and Cursor/Grok Bot. In Cursor/Grok Bot, use
+        public client ID <code>ghostie-cursor</code>, scopes <code>messages:read messages:draft</code>, and no client
+        secret. Remote hosting is optional.
+      </p>
+
+      <h2>Messages opener and Grok Bot link tooling <span class="version">(v0.15.0)</span></h2>
+      <p>
+        Public mobile Messages opener and a Grok Bot Messages link tool. Relay hardening on top: scope subsets, refresh
+        tokens, queued calls, stale-socket replacement; a heartbeat on the Mac&rsquo;s relay connection; and a higher
+        per-host request limit for multi-persona clients.
+      </p>
+    </main>
+
+    <footer>
+      <span>&copy; 2016 <a href="https://sunriselabs.ai">Sunrise Labs</a></span>
+      <span class="footer-links">
+        <a href="https://x.com/heyGhostie">X</a>
+        <span>&middot;</span>
+        <a href="/terms">Terms</a>
+        <span>&middot;</span>
+        <a href="/privacy">Privacy</a>
+        <span>&middot;</span>
+        <a href="/security">Security</a>
+        <span>&middot;</span>
+        <a href="/support">Support</a>
+      </span>
+    </footer>
+  </div>
+</body>
+</html>
